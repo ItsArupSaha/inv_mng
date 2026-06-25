@@ -54,9 +54,11 @@ export function RecordPurchaseDialog({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       supplier: '',
+      location: '',
       items: [{ itemName: '', categoryId: '', categoryName: '', author: '', medicineGroup: '', company: '', expiryDate: '', location: '', quantity: 1, cost: 0, sellingPrice: 0 }],
       discountType: 'amount',
       discountValue: 0,
+      vat: 0,
       paymentMethod: 'Due',
       amountPaid: 0,
       splitPaymentMethod: 'Cash',
@@ -82,6 +84,7 @@ export function RecordPurchaseDialog({
 
       form.reset({
         supplier: '',
+        location: '',
         items: [{ 
           itemName: '', 
           categoryId: initialCategoryId, 
@@ -97,6 +100,7 @@ export function RecordPurchaseDialog({
         }],
         discountType: 'amount',
         discountValue: 0,
+        vat: 0,
         paymentMethod: 'Due',
         amountPaid: 0,
         splitPaymentMethod: 'Cash',
@@ -115,7 +119,8 @@ export function RecordPurchaseDialog({
 
         const mappedItems = data.items.map(item => ({
           ...item,
-          company: storeType === 'pharmacy' ? data.supplier : item.company
+          company: storeType === 'pharmacy' ? data.supplier : item.company,
+          location: storeType === 'pharmacy' ? data.location : item.location
         }));
 
         const purchaseData = {
@@ -129,6 +134,8 @@ export function RecordPurchaseDialog({
         delete purchaseData.discountType;
         // @ts-ignore
         delete purchaseData.discountValue;
+        // @ts-ignore
+        delete purchaseData.location;
 
         const result = await addPurchase(userId, purchaseData);
         if (result?.success) {
@@ -159,22 +166,42 @@ export function RecordPurchaseDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto pr-4 pl-1 -mr-4 -ml-1 py-4">
               <div className="space-y-4 px-4">
-                <FormField
-                  control={form.control}
-                  name="supplier"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{storeType === 'pharmacy' ? 'Company Name' : 'Supplier Name'}</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder={storeType === 'pharmacy' ? 'e.g., Square Pharmaceuticals' : 'e.g., Global Publishing House'} 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="supplier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{storeType === 'pharmacy' ? 'Company Name' : 'Supplier Name'}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder={storeType === 'pharmacy' ? 'e.g., Square Pharmaceuticals' : 'e.g., Global Publishing House'} 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {storeType === 'pharmacy' && (
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Shelf / Row</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g., 2, Shelf-A, Row-3" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
+                </div>
                 <Separator />
                 
                 <FormLabel>Items</FormLabel>

@@ -24,9 +24,11 @@ export const purchaseItemSchema = z.object({
 
 export const purchaseFormSchema = z.object({
   supplier: z.string().min(1, 'Supplier is required'),
+  location: z.string().optional(),
   items: z.array(purchaseItemSchema).min(1, 'At least one item is required.'),
   discountType: z.enum(['amount', 'percentage']).default('amount'),
   discountValue: z.coerce.number().min(0, 'Discount must be non-negative').optional(),
+  vat: z.coerce.number().min(0, 'VAT must be non-negative').optional(),
   paymentMethod: z.enum(['Cash', 'Bank', 'Due', 'Split'], { required_error: 'Payment method is required.'}),
   amountPaid: z.coerce.number().optional(),
   splitPaymentMethod: z.enum(['Cash', 'Bank']).optional(),

@@ -13,6 +13,7 @@ export function PurchaseSummarySection() {
   const watchAmountPaid = watch('amountPaid') || 0;
   const watchDiscountType = watch('discountType');
   const watchDiscountValue = watch('discountValue') || 0;
+  const watchVat = watch('vat') || 0;
 
   const totalAmount = React.useMemo(() => {
     return watchItems.reduce((acc: number, item: any) => {
@@ -28,10 +29,15 @@ export function PurchaseSummarySection() {
       ? (totalAmount * discountValueParams) / 100 
       : discountValueParams;
   }, [totalAmount, watchDiscountType, watchDiscountValue]);
+
+  const vatAmount = React.useMemo(() => {
+    const vatVal = Number(watchVat) || 0;
+    return (totalAmount * vatVal) / 100;
+  }, [totalAmount, watchVat]);
     
   const finalAmount = React.useMemo(() => {
-    return totalAmount - discountAmount;
-  }, [totalAmount, discountAmount]);
+    return totalAmount + vatAmount - discountAmount;
+  }, [totalAmount, vatAmount, discountAmount]);
 
   const dueAmount = React.useMemo(() => {
     if (watchPaymentMethod === 'Due') {
@@ -49,15 +55,21 @@ export function PurchaseSummarySection() {
         <span>Total Amount</span>
         <span>৳{totalAmount.toFixed(2)}</span>
       </div>
+      {vatAmount > 0 && (
+        <div className="flex justify-between font-medium text-destructive/90">
+          <span>VAT ({watchVat}%)</span>
+          <span>+৳{vatAmount.toFixed(2)}</span>
+        </div>
+      )}
       {discountAmount > 0 && (
         <div className="flex justify-between font-medium text-green-600">
           <span>Discount</span>
           <span>-৳{discountAmount.toFixed(2)}</span>
         </div>
       )}
-      {discountAmount > 0 && (
-        <div className="flex justify-between font-bold text-base">
-          <span>Net Payable</span>
+      {(discountAmount > 0 || vatAmount > 0) && (
+        <div className="flex justify-between font-bold text-base border-t pt-1">
+          <span>Net Total</span>
           <span>৳{finalAmount.toFixed(2)}</span>
         </div>
       )}

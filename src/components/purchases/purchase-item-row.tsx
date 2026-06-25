@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 import type { Category } from '@/lib/types';
 
 interface PurchaseItemRowProps {
@@ -25,6 +26,9 @@ export function PurchaseItemRow({
   onRemove,
   disabledRemove,
 }: PurchaseItemRowProps) {
+  const { authUser } = useAuth();
+  const storeType = authUser?.storeType || 'general';
+
   const { control, watch, setValue } = useFormContext();
   const watchCategoryId = watch(`items.${index}.categoryId`);
   const selectedCategory = categories.find(c => c.id === watchCategoryId);
@@ -37,14 +41,14 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.itemName`}
           render={({ field }) => (
-            <FormItem className="md:col-span-2">
+            <FormItem className={isMedicine ? "md:col-span-3" : "md:col-span-2"}>
               <FormLabel className="text-xs">Item Name</FormLabel>
               <FormControl><Input placeholder="e.g., Napa 500mg" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <div className={cn("flex items-end gap-2", isMedicine ? "md:col-span-2" : "")}>
+        <div className={cn("flex items-end gap-2", isMedicine ? "md:col-span-3" : "")}>
           <FormField
             control={control}
             name={`items.${index}.categoryId`}
@@ -86,7 +90,7 @@ export function PurchaseItemRow({
               control={control}
               name={`items.${index}.medicineGroup`}
               render={({ field }) => (
-                <FormItem className="md:col-span-2">
+                <FormItem className={storeType === 'pharmacy' ? "md:col-span-3" : "md:col-span-2"}>
                   <FormLabel className="text-xs">Group (Generic)</FormLabel>
                   <FormControl><Input placeholder="e.g., Paracetamol" {...field} /></FormControl>
                   <FormMessage />
@@ -97,24 +101,26 @@ export function PurchaseItemRow({
               control={control}
               name={`items.${index}.expiryDate`}
               render={({ field }) => (
-                <FormItem className="md:col-span-2">
+                <FormItem className={storeType === 'pharmacy' ? "md:col-span-3" : "md:col-span-2"}>
                   <FormLabel className="text-xs">Expiry Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <FormField
-              control={control}
-              name={`items.${index}.location`}
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel className="text-xs">Shelf / Row</FormLabel>
-                  <FormControl><Input placeholder="e.g., Row A3" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {storeType !== 'pharmacy' && (
+              <FormField
+                control={control}
+                name={`items.${index}.location`}
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel className="text-xs">Shelf / Row</FormLabel>
+                    <FormControl><Input placeholder="e.g., Row A3" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </>
         )}
         <FormField
@@ -132,7 +138,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.cost`}
           render={({ field }) => (
-            <FormItem className={cn(isMedicine ? "md:col-span-3" : "", (selectedCategory?.name !== 'Book' && !isMedicine) ? 'md:col-start-4' : '')}>
+            <FormItem className={cn(storeType === 'pharmacy' ? "md:col-span-2" : isMedicine ? "md:col-span-3" : "", (selectedCategory?.name !== 'Book' && !isMedicine) ? 'md:col-start-4' : '')}>
               <FormLabel className="text-xs">Unit Cost</FormLabel>
               <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />
@@ -143,7 +149,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.sellingPrice`}
           render={({ field }) => (
-            <FormItem className={isMedicine ? "md:col-span-3" : ""}>
+            <FormItem className={storeType === 'pharmacy' ? "md:col-span-2" : isMedicine ? "md:col-span-3" : ""}>
               <FormLabel className="text-xs">Selling Price</FormLabel>
               <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />

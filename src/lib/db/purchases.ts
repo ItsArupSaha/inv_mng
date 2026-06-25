@@ -85,6 +85,8 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
               totalAmount += item.cost * item.quantity;
           }
           const discountAmount = data.discountAmount || 0;
+          const vat = data.vat || 0;
+          const vatAmount = (totalAmount * vat) / 100;
 
           const newPurchaseRef = doc(purchasesCollection);
           const purchaseData = {
@@ -94,6 +96,8 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
               dueDate: Timestamp.fromDate(new Date(data.dueDate)),
               totalAmount: totalAmount,
               discountAmount: discountAmount,
+              vat: vat,
+              vatAmount: vatAmount,
           };
           transaction.set(newPurchaseRef, purchaseData);
           transaction.set(metadataRef, { lastPurchaseNumber: newPurchaseNumber }, { merge: true });
@@ -158,7 +162,7 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
           // Get expense counter for generating expense IDs
           let lastExpenseNumber = (metadataDoc.data() as Metadata)?.lastExpenseNumber || 0;
 
-          const finalAmount = totalAmount - discountAmount;
+          const finalAmount = totalAmount + vatAmount - discountAmount;
 
           if (finalAmount > 0) {
               if (data.paymentMethod === 'Cash' || data.paymentMethod === 'Bank') {
