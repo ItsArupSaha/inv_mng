@@ -120,12 +120,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   // Dynamic Other items
   const otherItems = React.useMemo(() => [
-    ...(storeType !== 'pharmacy' ? [{ href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true }] : []),
-    { href: '/packages', icon: Package, label: 'Packages / Combos' },
+    ...(storeType !== 'pharmacy' ? [
+      { href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true },
+      { href: '/packages', icon: Package, label: 'Packages / Combos' },
+      { href: '/donations', icon: Gift, label: 'Donations' },
+      { href: '/authority-presentation', icon: Presentation, label: 'Authority View' }
+    ] : []),
     { href: '/payables', icon: ArrowRightLeft, label: 'Payables (Suppliers)' },
     { href: '/transfer', icon: ArrowLeftRight, label: 'Transfers (Cash/Bank)' },
-    { href: '/donations', icon: Gift, label: 'Donations' },
-    { href: '/authority-presentation', icon: Presentation, label: 'Authority View' },
   ], [storeType]);
 
   const allNavItems = React.useMemo(() => [...coreItems, ...otherItems], [coreItems, otherItems]);
