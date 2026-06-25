@@ -1,0 +1,212 @@
+
+
+export type AuthUser = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  isApproved: boolean;
+  createdAt: any; // Firestore Timestamp
+  
+  // Onboarding fields
+  companyName?: string;
+  subtitle?: string;
+  address?: string;
+  phone?: string;
+  bkashNumber?: string;
+  bankInfo?: string;
+  onboardingComplete?: boolean;
+  secretKey?: string;
+  // New fields for initial capital
+  initialCash?: number;
+  initialBank?: number;
+  storeType?: 'general' | 'pharmacy' | 'bookstore';
+};
+
+export type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  whatsapp?: string;
+  address: string;
+  openingBalance: number;
+  dueBalance: number;
+};
+
+export type CustomerWithDue = Customer & {
+  dueBalance: number;
+};
+
+export type Category = {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: Date;
+};
+
+export type Item = {
+  id: string;
+  title: string;
+  categoryId: string;
+  categoryName: string;
+  author?: string; // Optional, only for books
+  medicineGroup?: string; // Optional, only for medicines
+  company?: string; // Optional, only for medicines
+  expiryDate?: string; // Optional, only for medicines (stored as YYYY-MM-DD string)
+  location?: string; // Optional shelf/row storage location
+  productionPrice: number;
+  sellingPrice: number;
+  stock: number;
+};
+
+export type ClosingStock = Item & {
+  closingStock: number;
+};
+
+export type SaleItem = {
+    itemId: string;
+    quantity: number;
+    price: number; // This is the selling price at the time of sale
+};
+
+export type Sale = {
+  id: string;
+  saleId: string; // The auto-generated ID like SALE-0001
+  date: string; // Changed to string for serialization
+  customerId: string;
+  items: SaleItem[];
+  subtotal: number;
+  discountType: 'none' | 'percentage' | 'amount';
+  discountValue: number;
+  total: number;
+  paymentMethod: 'Cash' | 'Bank' | 'Due' | 'Split' | 'Paid by Credit';
+  amountPaid?: number;
+  splitPaymentMethod?: 'Cash' | 'Bank';
+  creditApplied?: number;
+};
+
+export type SalesReturnItem = {
+  itemId: string;
+  quantity: number;
+  price: number; // The price at which the item was sold, used for credit.
+};
+
+export type SalesReturn = {
+  id: string;
+  returnId: string;
+  date: string;
+  customerId: string;
+  items: SalesReturnItem[];
+  totalReturnValue: number;
+};
+
+
+export type PurchaseItem = {
+    itemName: string;
+    categoryId: string;
+    categoryName: string;
+    author?: string;
+    medicineGroup?: string;
+    company?: string;
+    expiryDate?: string;
+    quantity: number;
+    cost: number;
+    sellingPrice?: number;
+};
+
+export type Purchase = {
+    id: string;
+    purchaseId: string; // The auto-generated ID like PUR-0001
+    date: string;
+    supplier: string;
+    items: PurchaseItem[];
+    totalAmount: number;
+    discountAmount?: number;
+    paymentMethod: 'Cash' | 'Bank' | 'Due' | 'Split' | 'N/A';
+    amountPaid?: number;
+    splitPaymentMethod?: 'Cash' | 'Bank';
+    dueDate: string;
+};
+
+export type Expense = {
+  id: string;
+  expenseId: string; // The auto-generated ID like EXP-0001
+  date: string; // Changed to string for serialization
+  name: string;
+  description: string;
+  amount: number;
+  paymentMethod?: 'Cash' | 'Bank';
+};
+
+export type Donation = {
+  id: string;
+  donationId: string; // The auto-generated ID like DON-0001
+  date: string;
+  donorName: string;
+  amount: number;
+  paymentMethod: 'Cash' | 'Bank';
+  notes?: string;
+};
+
+export type Capital = {
+  id: string;
+  date: string;
+  source: 'Initial Capital' | 'Capital Adjustment';
+  amount: number;
+  paymentMethod: 'Cash' | 'Bank' | 'Asset';
+  notes?: string;
+};
+
+export type InitialCapital = {
+  cash: number;
+  bank: number;
+}
+
+export type Transaction = {
+  id: string;
+  description: string;
+  amount: number;
+  dueDate: string; // Changed to string for serialization
+  status: 'Pending' | 'Paid';
+  type: 'Receivable' | 'Payable';
+  paymentMethod?: 'Cash' | 'Bank';
+  customerId?: string;
+  customerName?: string;
+  saleId?: string; // Link to the sale
+  // New fields for profit tracking on receivables
+  totalSaleProfit?: number;
+  remainingProfit?: number;
+  recognizedProfit?: number;
+};
+
+export type Transfer = {
+    id: string;
+    date: string;
+    from: 'Cash' | 'Bank';
+    to: 'Cash' | 'Bank';
+    amount: number;
+    description: string;
+};
+
+// Metadata for counters, etc.
+export type Metadata = {
+  lastPurchaseNumber: number;
+  lastSaleNumber: number;
+  lastReturnNumber: number;
+  lastExpenseNumber: number;
+  lastDonationNumber: number;
+}
+
+export type PackageItem = {
+    itemId: string;
+    quantity: number;
+};
+
+export type PackageTemplate = {
+    id: string;
+    name: string;
+    description: string;
+    items: PackageItem[];
+    createdAt: string; // ISO string
+};
+
