@@ -11,6 +11,8 @@ interface BalanceSheetPdfData {
     totalAssets: number;
     payables: number;
     equity: number;
+    totalCapital: number;
+    retainedEarnings: number;
 }
 
 interface BalanceSheetPdfUser {
@@ -93,8 +95,10 @@ export function exportBalanceSheetPdf(
     const liabilitiesBody = [
         ['Payables', formatCurrencyForPdf(current.payables)],
         [{ content: 'Total Liabilities', styles: { fontStyle: 'bold' as const } }, { content: formatCurrencyForPdf(current.payables), styles: { fontStyle: 'bold' as const } }],
-        ['', ''],
-        [{ content: 'Owner\'s Equity / Net Worth', styles: { fontStyle: 'bold' as const } }, { content: formatCurrencyForPdf(current.equity), styles: { fontStyle: 'bold' as const } }],
+        [{ content: 'Owner\'s Equity', styles: { fontStyle: 'bold' as const, textColor: '#4F46E5' } }, ''],
+        ['  Capital Contributed', formatCurrencyForPdf(current.totalCapital)],
+        ['  Retained Earnings (Profit/Loss)', formatCurrencyForPdf(current.retainedEarnings)],
+        [{ content: 'Total Owner\'s Equity / Net Worth', styles: { fontStyle: 'bold' as const } }, { content: formatCurrencyForPdf(current.equity), styles: { fontStyle: 'bold' as const } }],
     ] as any;
 
     autoTable(doc, {

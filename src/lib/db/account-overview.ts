@@ -308,6 +308,9 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
     const totalAssets = cash + bank + receivables + stockValue + officeAssetsValue;
     const equity = totalAssets - payables;
 
+    const totalCapital = filteredCapital.reduce((sum, cap) => sum + toNum(cap.amount), 0);
+    const retainedEarnings = equity - totalCapital;
+
     return {
         cash,
         bank,
@@ -318,6 +321,8 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         payables,
         equity,
         otherAssets,
+        totalCapital,
+        retainedEarnings,
     };
 }
 

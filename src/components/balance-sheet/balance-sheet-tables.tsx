@@ -13,6 +13,8 @@ interface BalanceSheetTablesProps {
     totalAssets: number;
     payables: number;
     equity: number;
+    totalCapital: number;
+    retainedEarnings: number;
   };
   formatCurrency: (amount: number) => string;
 }
@@ -84,11 +86,30 @@ export function BalanceSheetTables({ current, formatCurrency }: BalanceSheetTabl
                 {formatCurrency(current.payables)}
               </TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell colSpan={2}>&nbsp;</TableCell>
+            
+            {/* Owner's Equity Section */}
+            <TableRow className="font-medium bg-muted/20">
+              <TableCell colSpan={2} className="text-primary font-headline py-1.5 text-xs uppercase tracking-wider">
+                Owner&apos;s Equity
+              </TableCell>
             </TableRow>
+            <TableRow>
+              <TableCell className="pl-6 text-muted-foreground">Capital Contributed</TableCell>
+              <TableCell className="text-right text-muted-foreground">
+                {formatCurrency(current.totalCapital)}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="pl-6">Retained Earnings (Profit/Loss)</TableCell>
+              <TableCell className="text-right">
+                <span className={current.retainedEarnings < 0 ? "text-destructive font-medium" : "text-primary font-medium"}>
+                  {formatCurrency(current.retainedEarnings)}
+                </span>
+              </TableCell>
+            </TableRow>
+
             <TableRow className="font-semibold bg-primary/10">
-              <TableCell>Owner&apos;s Equity / Net Worth</TableCell>
+              <TableCell>Total Owner&apos;s Equity / Net Worth</TableCell>
               <TableCell className="text-right">
                 {formatCurrency(current.equity)}
               </TableCell>
