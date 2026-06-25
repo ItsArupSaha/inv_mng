@@ -90,8 +90,13 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
           const vatAmount = vatType === 'percentage' ? (totalAmount * vatValue) / 100 : vatValue;
 
           const newPurchaseRef = doc(purchasesCollection);
+          const mappedItems = data.items.map(item => ({
+              ...item,
+              itemName: item.itemName.trim()
+          }));
           const purchaseData = {
               ...data,
+              items: mappedItems,
               purchaseId,
               date: Timestamp.fromDate(purchaseDate),
               dueDate: Timestamp.fromDate(new Date(data.dueDate)),
@@ -104,16 +109,20 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
           transaction.set(newPurchaseRef, purchaseData);
           transaction.set(metadataRef, { lastPurchaseNumber: newPurchaseNumber }, { merge: true });
 
-          for (const item of data.items) {
-              const q = query(itemsCollection, where("title", "==", item.itemName));
+          const factor = totalAmount > 0 ? (totalAmount + vatAmount - discountAmount) / totalAmount : 1;
+
+          for (const item of mappedItems) {
+              const trimmedName = item.itemName;
+              const q = query(itemsCollection, where("title", "==", trimmedName));
               const bookSnapshot = await getDocs(q); 
+              const capitalizedCost = Number(item.cost) * factor;
 
               if (!bookSnapshot.empty) {
                   const bookDoc = bookSnapshot.docs[0];
                   const bookData = bookDoc.data();
                   const currentStock = Number(bookData.stock) || 0;
                   const currentTotalValue = currentStock * (Number(bookData.productionPrice) || 0);
-                  const newTotalValue = Number(item.cost) * Number(item.quantity);
+                  const newTotalValue = capitalizedCost * Number(item.quantity);
                   const newStock = currentStock + Number(item.quantity);
                   const newProductionPrice = newStock > 0 ? (currentTotalValue + newTotalValue) / newStock : 0;
                   
@@ -135,14 +144,14 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   transaction.update(bookDoc.ref, updateData);
               } else {
                   const newItemRef = doc(itemsCollection);
-                  const sellingPrice = item.sellingPrice && item.sellingPrice > 0 ? item.sellingPrice : item.cost * 1.5;
+                  const sellingPrice = item.sellingPrice && item.sellingPrice > 0 ? item.sellingPrice : capitalizedCost * 1.5;
                   
                   const newItemData: Omit<Item, 'id'> = {
-                      title: item.itemName,
+                      title: trimmedName,
                       categoryId: item.categoryId,
                       categoryName: item.categoryName,
                       stock: item.quantity,
-                      productionPrice: item.cost,
+                      productionPrice: capitalizedCost,
                       sellingPrice: sellingPrice,
                   };
 
@@ -414,8 +423,8 @@ export async function updatePurchase(
       // Find all items affected by either old or new purchase
       const itemsCollection = collection(userRef, 'items');
       const itemNames = new Set<string>();
-      oldPurchase.items.forEach(item => itemNames.add(item.itemName));
-      data.items.forEach(item => itemNames.add(item.itemName));
+      oldPurchase.items.forEach(item => itemNames.add(item.itemName.trim()));
+      data.items.forEach(item => itemNames.add(item.itemName.trim()));
 
       const itemDocsMap: Record<string, { ref: any; data: any }> = {};
       for (const name of itemNames) {
@@ -428,6 +437,18 @@ export async function updatePurchase(
               };
           }
       }
+
+      // Calculate new purchase total, discount and VAT first
+      let totalAmount = 0;
+      for (const item of data.items) {
+          totalAmount += item.cost * item.quantity;
+      }
+      const discountAmount = data.discountAmount || 0;
+      const vatType = data.vatType || 'amount';
+      const vatValue = data.vatValue || 0;
+      const vatAmount = vatType === 'percentage' ? (totalAmount * vatValue) / 100 : vatValue;
+      const finalAmount = totalAmount + vatAmount - discountAmount;
+      const factor = totalAmount > 0 ? (totalAmount + vatAmount - discountAmount) / totalAmount : 1;
 
       const result = await runTransaction(db, async (transaction) => {
           const metadataRef = doc(userRef, 'metadata', 'counters');
@@ -476,14 +497,15 @@ export async function updatePurchase(
           // Apply new purchase quantities & value to the intermediate state
           for (const newItem of data.items) {
               const state = intermediateItems[newItem.itemName];
+              const capitalizedCost = newItem.cost * factor;
               if (state) {
-                  const newTotal = newItem.quantity * newItem.cost;
+                  const newTotal = newItem.quantity * capitalizedCost;
                   state.stock += newItem.quantity;
                   state.totalValue += newTotal;
               } else {
                   intermediateItems[newItem.itemName] = {
                       stock: newItem.quantity,
-                      totalValue: newItem.quantity * newItem.cost,
+                      totalValue: newItem.quantity * capitalizedCost,
                   };
               }
           }
@@ -517,7 +539,8 @@ export async function updatePurchase(
                   const newItem = data.items.find(i => i.itemName === name);
                   if (newItem) {
                       const newItemRef = doc(itemsCollection);
-                      const sellingPrice = newItem.sellingPrice && newItem.sellingPrice > 0 ? newItem.sellingPrice : newItem.cost * 1.5;
+                      const capitalizedCost = newItem.cost * factor;
+                      const sellingPrice = newItem.sellingPrice && newItem.sellingPrice > 0 ? newItem.sellingPrice : capitalizedCost * 1.5;
                       const newItemData: any = {
                           title: newItem.itemName,
                           categoryId: newItem.categoryId,
@@ -541,24 +564,18 @@ export async function updatePurchase(
               }
           }
 
-          // Calculate new purchase total, discount and VAT
-          let totalAmount = 0;
-          for (const item of data.items) {
-              totalAmount += item.cost * item.quantity;
-          }
-          const discountAmount = data.discountAmount || 0;
-          const vatType = data.vatType || 'amount';
-          const vatValue = data.vatValue || 0;
-          const vatAmount = vatType === 'percentage' ? (totalAmount * vatValue) / 100 : vatValue;
-          const finalAmount = totalAmount + vatAmount - discountAmount;
-
           // Delete old expenses and transactions
           relatedExpenseRefs.forEach(ref => transaction.delete(ref));
           relatedTransactionRefs.forEach(ref => transaction.delete(ref));
 
+          const mappedItems = data.items.map(item => ({
+              ...item,
+              itemName: item.itemName.trim()
+          }));
           // Set updated purchase data
           const purchaseData = {
               ...data,
+              items: mappedItems,
               purchaseId,
               date: oldPurchase.date, // keep original date
               dueDate: Timestamp.fromDate(new Date(data.dueDate)),
