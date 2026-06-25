@@ -1,9 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import type { DateRange } from 'react-day-picker';
 import { Download, FileSpreadsheet, FileText, Loader2, PlusCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -19,15 +16,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-import { addDonation, getDonations, getDonationsPaginated } from '@/lib/actions';
-import { useAuth } from '@/hooks/use-auth';
-import { useToast } from '@/hooks/use-toast';
-import type { Donation } from '@/lib/types';
-
-import { donationSchema, type DonationFormValues } from './donations/schema';
+import { useDonationsManagement } from '@/hooks/use-donations-management';
 import { RecordDonationDialog } from './donations/record-donation-dialog';
-import { exportDonationsToPdf, exportDonationsToXlsx } from './donations/donations-export-utils';
 import { DonationsTable } from './donations/donations-table';
 
 interface DonationsManagementProps {
@@ -35,122 +25,25 @@ interface DonationsManagementProps {
 }
 
 export default function DonationsManagement({ userId }: DonationsManagementProps) {
-  const { authUser } = useAuth();
-  const [donations, setDonations] = React.useState<Donation[]>([]);
-  const [hasMore, setHasMore] = React.useState(true);
-  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = React.useState(false);
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
-  const { toast } = useToast();
-  const [isPending, startTransition] = React.useTransition();
-
-  const loadInitialData = React.useCallback(async () => {
-    setIsInitialLoading(true);
-    const { donations: newDonations, hasMore: newHasMore } = await getDonationsPaginated({
-      userId,
-      pageLimit: 10,
-    });
-    setDonations(newDonations);
-    setHasMore(newHasMore);
-    setIsInitialLoading(false);
-  }, [userId]);
-
-  React.useEffect(() => {
-    if (userId) {
-      loadInitialData();
-    }
-  }, [userId, loadInitialData]);
-
-  const handleLoadMore = async () => {
-    if (!hasMore || isLoadingMore) return;
-    setIsLoadingMore(true);
-    const lastDonationId = donations.length > 0 ? donations[donations.length - 1]?.id : undefined;
-    const { donations: newDonations, hasMore: newHasMore } = await getDonationsPaginated({
-      userId,
-      pageLimit: 10,
-      lastVisibleId: lastDonationId,
-    });
-    setDonations((prev) => [...prev, ...newDonations]);
-    setHasMore(newHasMore);
-    setIsLoadingMore(false);
-  };
-
-  const form = useForm<DonationFormValues>({
-    resolver: zodResolver(donationSchema),
-    defaultValues: {
-      donorName: '',
-      amount: 0,
-      paymentMethod: 'Cash',
-      notes: '',
-    },
-  });
-
-  const handleAddNew = () => {
-    form.reset({ donorName: '', amount: 0, date: new Date(), paymentMethod: 'Cash', notes: '' });
-    setIsDialogOpen(true);
-  };
-
-  const onSubmit = (data: DonationFormValues) => {
-    startTransition(async () => {
-      const newDonation = await addDonation(userId, data);
-      setDonations((prev) => [newDonation, ...prev]);
-      toast({ title: 'Donation Added', description: 'The new donation has been recorded.' });
-      setIsDialogOpen(false);
-    });
-  };
-
-  const getFilteredDonations = async () => {
-    if (!dateRange?.from) {
-      toast({
-        variant: 'destructive',
-        title: 'Please select a start date.',
-      });
-      return null;
-    }
-
-    const allDonations = await getDonations(userId);
-    const from = dateRange.from;
-    const to = dateRange.to || dateRange.from;
-    const tempTo = new Date(to);
-    tempTo.setHours(23, 59, 59, 999);
-
-    return allDonations.filter((donation) => {
-      const donationDate = new Date(donation.date);
-      return donationDate >= from && donationDate <= tempTo;
-    });
-  };
-
-  const handleDownloadPdf = async () => {
-    const filtered = await getFilteredDonations();
-    if (!filtered || !authUser) return;
-
-    if (filtered.length === 0) {
-      toast({
-        title: 'No Donations Found',
-        description: 'There are no donations in the selected date range.',
-      });
-      return;
-    }
-
-    exportDonationsToPdf(filtered, authUser, { from: dateRange!.from!, to: dateRange!.to });
-  };
-
-  const handleDownloadXlsx = async () => {
-    const filtered = await getFilteredDonations();
-    if (!filtered) return;
-
-    if (filtered.length === 0) {
-      toast({
-        title: 'No Donations Found',
-        description: 'There are no donations in the selected date range.',
-      });
-      return;
-    }
-
-    exportDonationsToXlsx(filtered, { from: dateRange!.from!, to: dateRange!.to });
-  };
+  const {
+    donations,
+    hasMore,
+    isInitialLoading,
+    isLoadingMore,
+    isDialogOpen,
+    setIsDialogOpen,
+    isDownloadDialogOpen,
+    setIsDownloadDialogOpen,
+    dateRange,
+    setDateRange,
+    form,
+    isPending,
+    handleLoadMore,
+    handleAddNew,
+    onSubmit,
+    handleDownloadPdf,
+    handleDownloadXlsx,
+  } = useDonationsManagement({ userId });
 
   return (
     <Card className="animate-in fade-in-50">

@@ -1,15 +1,9 @@
-
 'use client';
 
-import { useToast } from '@/hooks/use-toast';
-import { addOfficeAsset } from '@/lib/actions';
 import { cn } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -18,16 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-
-const assetSchema = z.object({
-  itemName: z.string().min(2, { message: 'Asset name must be at least 2 characters.' }),
-  quantity: z.coerce.number().int().min(1, { message: 'Quantity must be at least 1.' }),
-  cost: z.coerce.number().min(0.01, { message: 'Cost must be a positive number.' }),
-  date: z.date({ required_error: 'A purchase date is required.' }),
-  paymentMethod: z.enum(['Cash', 'Bank'], { required_error: 'A payment method is required.' }),
-});
-
-type AssetFormValues = z.infer<typeof assetSchema>;
+import { useAddOfficeAsset } from '@/hooks/use-add-office-asset';
 
 interface AddOfficeAssetDialogProps {
   userId: string;
@@ -36,41 +21,10 @@ interface AddOfficeAssetDialogProps {
 }
 
 export function AddOfficeAssetDialog({ userId, onAssetAdded, children }: AddOfficeAssetDialogProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [isPending, startTransition] = React.useTransition();
-  const { toast } = useToast();
-
-  const form = useForm<AssetFormValues>({
-    resolver: zodResolver(assetSchema),
-    defaultValues: {
-      itemName: '',
-      quantity: 1,
-      cost: 0,
-      date: new Date(),
-      paymentMethod: 'Cash',
-    },
+  const { isOpen, setIsOpen, isPending, form, onSubmit } = useAddOfficeAsset({
+    userId,
+    onAssetAdded,
   });
-
-  const onSubmit = (data: AssetFormValues) => {
-    startTransition(async () => {
-      const result = await addOfficeAsset(userId, data);
-      if (result.success) {
-        toast({
-          title: 'Office Asset Added',
-          description: `Successfully recorded the purchase of ${data.itemName}.`,
-        });
-        onAssetAdded(); // Refresh data on the parent page
-        setIsOpen(false);
-        form.reset();
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'error' in result ? result.error : 'Failed to add office asset.',
-        });
-      }
-    });
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -14,25 +13,10 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useToast } from '@/hooks/use-toast';
-import { addPayment, getCustomersWithDueBalance } from '@/lib/actions';
-import type { CustomerWithDue } from '@/lib/types';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useReceivePayment } from '@/hooks/use-receive-payment';
 import { Loader2 } from 'lucide-react';
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-
-const paymentSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  amount: z.coerce.number().min(0.01, 'Amount must be positive'),
-  paymentMethod: z.enum(['Cash', 'Bank'], {
-    required_error: 'You need to select a payment method.',
-  }),
-});
-
-type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 interface ReceivePaymentDialogProps {
   customerId?: string;
@@ -42,68 +26,19 @@ interface ReceivePaymentDialogProps {
 }
 
 export default function ReceivePaymentDialog({ customerId, userId, children, onPaymentReceived }: ReceivePaymentDialogProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [isPending, startTransition] = React.useTransition();
-  const [customersWithDue, setCustomersWithDue] = React.useState<CustomerWithDue[]>([]);
-  const [isLoadingCustomers, setIsLoadingCustomers] = React.useState(false);
-  const { toast } = useToast();
-
-  React.useEffect(() => {
-    async function loadCustomersWithDue() {
-      if (isOpen && !customerId && userId) {
-        setIsLoadingCustomers(true);
-        try {
-          const dueCustomers = await getCustomersWithDueBalance(userId);
-          setCustomersWithDue(dueCustomers);
-        } catch (error) {
-           toast({ variant: 'destructive', title: 'Error', description: 'Could not load customers with due balance.' });
-        } finally {
-            setIsLoadingCustomers(false);
-        }
-      }
-    }
-    
-    loadCustomersWithDue();
-  }, [isOpen, customerId, userId, toast]);
-
-  const form = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentSchema),
-    defaultValues: {
-      customerId: customerId || '',
-      amount: 0,
-      paymentMethod: 'Cash',
-    },
+  const {
+    isOpen,
+    setIsOpen,
+    isPending,
+    customersWithDue,
+    isLoadingCustomers,
+    form,
+    onSubmit,
+  } = useReceivePayment({
+    customerId,
+    userId,
+    onPaymentReceived,
   });
-
-  React.useEffect(() => {
-    form.reset({
-      customerId: customerId || '',
-      amount: 0,
-      paymentMethod: 'Cash',
-    });
-  }, [customerId, form, isOpen]);
-
-
-  const onSubmit = (data: PaymentFormValues) => {
-    startTransition(async () => {
-      try {
-        await addPayment(userId, data);
-        toast({
-          title: 'Payment Received',
-          description: 'The customer payment has been successfully recorded.',
-        });
-        onPaymentReceived();
-        setIsOpen(false);
-        form.reset();
-      } catch (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to record payment.',
-        });
-      }
-    });
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
