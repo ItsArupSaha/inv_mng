@@ -113,8 +113,14 @@ export function RecordPurchaseDialog({
             ? (calculatedTotal * (data.discountValue || 0)) / 100 
             : (data.discountValue || 0);
 
+        const mappedItems = data.items.map(item => ({
+          ...item,
+          company: storeType === 'pharmacy' ? data.supplier : item.company
+        }));
+
         const purchaseData = {
           ...data,
+          items: mappedItems,
           discountAmount: calculatedDiscount,
           dueDate: data.dueDate.toISOString()
         };

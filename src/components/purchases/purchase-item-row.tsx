@@ -95,17 +95,6 @@ export function PurchaseItemRow({
             />
             <FormField
               control={control}
-              name={`items.${index}.company`}
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel className="text-xs">Company</FormLabel>
-                  <FormControl><Input placeholder="e.g., Beximco" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={control}
               name={`items.${index}.expiryDate`}
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
@@ -143,7 +132,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.cost`}
           render={({ field }) => (
-            <FormItem className={cn(isMedicine ? "md:col-span-2" : "", (selectedCategory?.name !== 'Book' && !isMedicine) ? 'md:col-start-4' : '')}>
+            <FormItem className={cn(isMedicine ? "md:col-span-3" : "", (selectedCategory?.name !== 'Book' && !isMedicine) ? 'md:col-start-4' : '')}>
               <FormLabel className="text-xs">Unit Cost</FormLabel>
               <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />
@@ -154,7 +143,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.sellingPrice`}
           render={({ field }) => (
-            <FormItem className={isMedicine ? "md:col-span-2" : ""}>
+            <FormItem className={isMedicine ? "md:col-span-3" : ""}>
               <FormLabel className="text-xs">Selling Price</FormLabel>
               <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />
