@@ -13,7 +13,8 @@ export function PurchaseSummarySection() {
   const watchAmountPaid = watch('amountPaid') || 0;
   const watchDiscountType = watch('discountType');
   const watchDiscountValue = watch('discountValue') || 0;
-  const watchVat = watch('vat') || 0;
+  const watchVatType = watch('vatType');
+  const watchVatValue = watch('vatValue') || 0;
 
   const totalAmount = React.useMemo(() => {
     return watchItems.reduce((acc: number, item: any) => {
@@ -31,9 +32,11 @@ export function PurchaseSummarySection() {
   }, [totalAmount, watchDiscountType, watchDiscountValue]);
 
   const vatAmount = React.useMemo(() => {
-    const vatVal = Number(watchVat) || 0;
-    return (totalAmount * vatVal) / 100;
-  }, [totalAmount, watchVat]);
+    const vatVal = Number(watchVatValue) || 0;
+    return watchVatType === 'percentage' 
+      ? (totalAmount * vatVal) / 100 
+      : vatVal;
+  }, [totalAmount, watchVatType, watchVatValue]);
     
   const finalAmount = React.useMemo(() => {
     return totalAmount + vatAmount - discountAmount;
@@ -57,7 +60,7 @@ export function PurchaseSummarySection() {
       </div>
       {vatAmount > 0 && (
         <div className="flex justify-between font-medium text-destructive/90">
-          <span>VAT ({watchVat}%)</span>
+          <span>VAT {watchVatType === 'percentage' ? `(${watchVatValue}%)` : ''}</span>
           <span>+৳{vatAmount.toFixed(2)}</span>
         </div>
       )}

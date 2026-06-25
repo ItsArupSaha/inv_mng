@@ -123,7 +123,8 @@ export type Purchase = {
     items: PurchaseItem[];
     totalAmount: number;
     discountAmount?: number;
-    vat?: number;
+    vatType?: 'amount' | 'percentage';
+    vatValue?: number;
     vatAmount?: number;
     paymentMethod: 'Cash' | 'Bank' | 'Due' | 'Split' | 'N/A';
     amountPaid?: number;

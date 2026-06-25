@@ -59,7 +59,7 @@ export function PurchasesTable({
               <TableCell className="hidden sm:table-cell">{purchase.paymentMethod}</TableCell>
               <TableCell className="text-right font-medium hidden sm:table-cell">৳{purchase.totalAmount.toFixed(2)}</TableCell>
               <TableCell className="text-right text-muted-foreground hidden sm:table-cell">{purchase.discountAmount ? `৳${purchase.discountAmount.toFixed(2)}` : '-'}</TableCell>
-              <TableCell className="text-right font-bold">৳{(purchase.totalAmount - (purchase.discountAmount || 0)).toFixed(2)}</TableCell>
+              <TableCell className="text-right font-bold">৳{(purchase.totalAmount + (purchase.vatAmount || 0) - (purchase.discountAmount || 0)).toFixed(2)}</TableCell>
             </TableRow>
           )) : (
             <TableRow>

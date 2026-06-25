@@ -85,8 +85,9 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
               totalAmount += item.cost * item.quantity;
           }
           const discountAmount = data.discountAmount || 0;
-          const vat = data.vat || 0;
-          const vatAmount = (totalAmount * vat) / 100;
+          const vatType = data.vatType || 'amount';
+          const vatValue = data.vatValue || 0;
+          const vatAmount = vatType === 'percentage' ? (totalAmount * vatValue) / 100 : vatValue;
 
           const newPurchaseRef = doc(purchasesCollection);
           const purchaseData = {
@@ -96,7 +97,8 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
               dueDate: Timestamp.fromDate(new Date(data.dueDate)),
               totalAmount: totalAmount,
               discountAmount: discountAmount,
-              vat: vat,
+              vatType: vatType,
+              vatValue: vatValue,
               vatAmount: vatAmount,
           };
           transaction.set(newPurchaseRef, purchaseData);

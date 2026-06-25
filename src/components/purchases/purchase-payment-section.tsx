@@ -17,10 +17,11 @@ export function PurchasePaymentSection() {
   const { control, watch } = useFormContext();
   const watchPaymentMethod = watch('paymentMethod');
   const watchDiscountType = watch('discountType');
+  const watchVatType = watch('vatType');
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           control={control}
           name="discountType"
@@ -49,20 +50,44 @@ export function PurchasePaymentSection() {
             <FormItem>
               <FormLabel>Discount {watchDiscountType === 'percentage' ? '(%)' : '(৳)'}</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" placeholder="0" {...field} />
+                <Input type="number" step="0.01" placeholder="0" {...field} value={field.value ?? ''} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          control={control}
+          name="vatType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>VAT Type</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="amount">Amount (৳)</SelectItem>
+                  <SelectItem value="percentage">Percentage (%)</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
         />
         <FormField
           control={control}
-          name="vat"
+          name="vatValue"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>VAT (%)</FormLabel>
+              <FormLabel>VAT {watchVatType === 'percentage' ? '(%)' : '(৳)'}</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" placeholder="0" {...field} />
+                <Input type="number" step="0.01" placeholder="0" {...field} value={field.value ?? ''} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -113,7 +138,7 @@ export function PurchasePaymentSection() {
                 <FormItem>
                   <FormLabel>Amount Paid Now</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="Enter amount paid" {...field} />
+                    <Input type="number" step="0.01" placeholder="Enter amount paid" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
