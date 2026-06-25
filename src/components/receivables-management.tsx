@@ -1,19 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import type { DateRange } from 'react-day-picker';
 import { DollarSign, FileSpreadsheet, FileText, Loader2, MoreVertical } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/hooks/use-auth';
-import { useToast } from '@/hooks/use-toast';
-import {
-  getCustomersWithDueBalance,
-  getCustomersWithDueBalancePaginated,
-  getPaidReceivablesForDateRange,
-} from '@/lib/actions';
-import type { CustomerWithDue, Transaction } from '@/lib/types';
 import { Calendar } from './ui/calendar';
 import {
   Dialog,
@@ -34,143 +25,34 @@ import { ScrollArea } from './ui/scroll-area';
 import ReceivePaymentDialog from './receive-payment-dialog';
 
 import {
-  generatePdf,
-  generateXlsx,
-  generateReceivedPaymentsPdf,
-  generateReceivedPaymentsXlsx,
-} from './receivables/receivables-export-utils';
-import {
   PendingReceivablesTable,
   ReceivedPaymentsTable,
 } from './receivables/receivables-list-tables';
+import { useReceivablesManagement } from '@/hooks/use-receivables-management';
 
 interface ReceivablesManagementProps {
   userId: string;
 }
 
 export default function ReceivablesManagement({ userId }: ReceivablesManagementProps) {
-  const { authUser } = useAuth();
-  const [customers, setCustomers] = React.useState<CustomerWithDue[]>([]);
-  const [receivedPayments, setReceivedPayments] = React.useState<Transaction[]>([]);
-  const [hasMore, setHasMore] = React.useState(true);
-  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
-  const [isLoadingReceived, setIsLoadingReceived] = React.useState(true);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = React.useState(false);
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
-  const [reportType, setReportType] = React.useState<'pending' | 'received'>('pending');
-  const { toast } = useToast();
-
-  const loadInitialData = React.useCallback(async () => {
-    setIsInitialLoading(true);
-    try {
-      const { customersWithDue, hasMore: hasMoreData } = await getCustomersWithDueBalancePaginated({
-        userId,
-        pageLimit: 10,
-      });
-      setCustomers(customersWithDue);
-      setHasMore(hasMoreData);
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load receivables.' });
-    } finally {
-      setIsInitialLoading(false);
-    }
-  }, [userId, toast]);
-
-  const loadReceivedPayments = React.useCallback(async () => {
-    setIsLoadingReceived(true);
-    try {
-      const startDate = new Date(2000, 0, 1);
-      const endDate = new Date();
-      const received = await getPaidReceivablesForDateRange(userId, startDate, endDate);
-      setReceivedPayments(received);
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load received payments.' });
-    } finally {
-      setIsLoadingReceived(false);
-    }
-  }, [userId, toast]);
-
-  React.useEffect(() => {
-    if (userId) {
-      loadInitialData();
-      loadReceivedPayments();
-    }
-  }, [userId, loadInitialData, loadReceivedPayments]);
-
-  const handleLoadMore = async () => {
-    if (!hasMore || isLoadingMore) return;
-    setIsLoadingMore(true);
-    const lastCustomer = customers[customers.length - 1];
-
-    const lastVisible = {
-      id: lastCustomer.id,
-      dueBalance: lastCustomer.dueBalance,
-    };
-
-    try {
-      const { customersWithDue: newCustomers, hasMore: newHasMore } =
-        await getCustomersWithDueBalancePaginated({ userId, pageLimit: 10, lastVisible });
-      setCustomers((prev) => [...prev, ...newCustomers]);
-      setHasMore(newHasMore);
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load more receivables.' });
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
-  const handleDownload = async (formatType: 'pdf' | 'xlsx') => {
-    if (!authUser) return;
-
-    if (reportType === 'pending') {
-      await handlePendingDuesReport(formatType);
-    } else {
-      await handleReceivedPaymentsReport(formatType);
-    }
-    setIsDownloadDialogOpen(false);
-  };
-
-  const handlePendingDuesReport = async (formatType: 'pdf' | 'xlsx') => {
-    let data;
-    const targetDate = dateRange?.from || new Date();
-
-    if (dateRange?.from) {
-      const { getCustomersWithDueBalanceAsOfDate } = await import('@/lib/db/account-overview');
-      data = await getCustomersWithDueBalanceAsOfDate(userId, targetDate);
-    } else {
-      data = await getCustomersWithDueBalance(userId);
-    }
-
-    if (data.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data', description: 'There are no pending receivables to download.' });
-      return;
-    }
-
-    if (formatType === 'pdf') {
-      generatePdf(data, targetDate, authUser!);
-    } else {
-      generateXlsx(data, targetDate);
-    }
-  };
-
-  const handleReceivedPaymentsReport = async (formatType: 'pdf' | 'xlsx') => {
-    if (!dateRange || !dateRange.from) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please select a date range for the report.' });
-      return;
-    }
-    const received = await getPaidReceivablesForDateRange(userId, dateRange.from, dateRange.to);
-
-    if (received.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data', description: 'No payments were received in this date range.' });
-      return;
-    }
-    if (formatType === 'pdf') {
-      generateReceivedPaymentsPdf(received, dateRange, authUser!);
-    } else {
-      generateReceivedPaymentsXlsx(received);
-    }
-  };
+  const {
+    customers,
+    receivedPayments,
+    hasMore,
+    isInitialLoading,
+    isLoadingReceived,
+    isLoadingMore,
+    isDownloadDialogOpen,
+    setIsDownloadDialogOpen,
+    dateRange,
+    setDateRange,
+    reportType,
+    setReportType,
+    loadInitialData,
+    loadReceivedPayments,
+    handleLoadMore,
+    handleDownload,
+  } = useReceivablesManagement({ userId });
 
   return (
     <Card className="animate-in fade-in-50">
@@ -292,3 +174,4 @@ export default function ReceivablesManagement({ userId }: ReceivablesManagementP
     </Card>
   );
 }
+

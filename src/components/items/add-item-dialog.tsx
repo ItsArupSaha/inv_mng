@@ -1,10 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,29 +19,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
-import { addItem, updateItem } from '@/lib/actions';
+import { useAddItem } from '@/hooks/use-add-item';
 import type { Category, Item } from '@/lib/types';
 import { ItemFormFields } from './item-form-fields';
-
-const itemSchema = z.object({
-  title: z.string().min(1, 'Name is required'),
-  categoryId: z.string().min(1, 'Category is required'),
-  author: z.string().optional(),
-  medicineGroup: z.string().optional(),
-  company: z.string().optional(),
-  expiryDate: z.string().optional(),
-  location: z.string().optional(),
-  productionPrice: z.coerce.number().min(0, 'Production price must be positive'),
-  sellingPrice: z.coerce.number().min(0, 'Selling price must be positive'),
-  stock: z.coerce.number().int().min(0, 'Stock must be a non-negative integer'),
-}).refine(data => data.sellingPrice >= data.productionPrice, {
-  message: "Selling price cannot be less than production price.",
-  path: ["sellingPrice"],
-});
-
-type ItemFormValues = z.infer<typeof itemSchema>;
 
 interface AddItemDialogProps {
   userId: string;
@@ -66,103 +42,22 @@ export function AddItemDialog({
   onSuccess,
   onAddCategoryClick,
 }: AddItemDialogProps) {
-  const { toast } = useToast();
-  const { authUser } = useAuth();
-  const [isPending, startTransition] = React.useTransition();
-  const [showAdvanced, setShowAdvanced] = React.useState(false);
-
-  const storeType = authUser?.storeType || 'general';
-
-  const itemForm = useForm<ItemFormValues>({
-    resolver: zodResolver(itemSchema),
-    defaultValues: {
-      title: '',
-      categoryId: '',
-      author: '',
-      medicineGroup: '',
-      company: '',
-      expiryDate: '',
-      location: '',
-      productionPrice: 0,
-      sellingPrice: 0,
-      stock: 0,
-    },
+  const {
+    itemForm,
+    isPending,
+    showAdvanced,
+    setShowAdvanced,
+    storeType,
+    onSubmit,
+    nameLabel,
+  } = useAddItem({
+    userId,
+    isOpen,
+    onOpenChange,
+    editingItem,
+    categories,
+    onSuccess,
   });
-
-  // Reset form when dialog opens or editing item changes
-  React.useEffect(() => {
-    if (isOpen) {
-      if (editingItem) {
-        itemForm.reset({
-          title: editingItem.title,
-          categoryId: editingItem.categoryId,
-          author: editingItem.author || '',
-          medicineGroup: editingItem.medicineGroup || '',
-          company: editingItem.company || '',
-          expiryDate: editingItem.expiryDate || '',
-          location: editingItem.location || '',
-          productionPrice: editingItem.productionPrice,
-          sellingPrice: editingItem.sellingPrice,
-          stock: editingItem.stock,
-        });
-        // Auto-show advanced fields if any are pre-filled on edit
-        if (editingItem.author || editingItem.medicineGroup || editingItem.company || editingItem.expiryDate || editingItem.location) {
-          setShowAdvanced(true);
-        }
-      } else {
-        itemForm.reset({
-          title: '',
-          categoryId: '',
-          author: '',
-          medicineGroup: '',
-          company: '',
-          expiryDate: '',
-          location: '',
-          productionPrice: 0,
-          sellingPrice: 0,
-          stock: 0,
-        });
-        setShowAdvanced(false);
-      }
-    }
-  }, [isOpen, editingItem, itemForm]);
-
-  const selectedCategory = categories.find(cat => cat.id === itemForm.watch('categoryId'));
-
-  const onSubmit = (data: ItemFormValues) => {
-    startTransition(async () => {
-      try {
-        const itemData: Omit<Item, 'id'> = {
-          title: data.title,
-          categoryId: data.categoryId,
-          categoryName: selectedCategory?.name || '',
-          author: data.author || undefined,
-          medicineGroup: data.medicineGroup || undefined,
-          company: data.company || undefined,
-          expiryDate: data.expiryDate || undefined,
-          location: data.location || undefined,
-          productionPrice: data.productionPrice,
-          sellingPrice: data.sellingPrice,
-          stock: data.stock,
-        };
-
-        if (editingItem) {
-          await updateItem(userId, editingItem.id, itemData);
-          toast({ title: "Item Updated", description: "The item details have been saved." });
-        } else {
-          await addItem(userId, itemData);
-          toast({ title: "Item Added", description: "The new item is now in your inventory." });
-        }
-        onSuccess();
-        onOpenChange(false);
-      } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "Failed to save the item." });
-      }
-    });
-  };
-
-  // Label configuration based on store type
-  const nameLabel = storeType === 'pharmacy' ? 'Medicine Name' : storeType === 'bookstore' ? 'Book Title' : 'Item Name';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

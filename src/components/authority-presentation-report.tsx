@@ -24,14 +24,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { useAuth } from '@/hooks/use-auth';
-import {
-  getAuthorityPresentationReport,
-  type AuthorityPresentationReport as AuthorityReportData,
-} from '@/lib/db/authority-presentation-report';
-
 import { OverviewTables } from './authority/overview-tables';
-import { exportAuthorityReportPdf } from './authority/authority-export-utils';
+import { useAuthorityPresentationReport } from '@/hooks/use-authority-presentation-report';
 
 const formatCurrency = (amount: number) =>
   `BDT ${amount.toLocaleString(undefined, {
@@ -46,36 +40,19 @@ interface AuthorityPresentationReportProps {
 export default function AuthorityPresentationReport({
   userId,
 }: AuthorityPresentationReportProps) {
-  const { authUser } = useAuth();
-  const [startDate, setStartDate] = React.useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = React.useState<Date | undefined>(undefined);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [report, setReport] = React.useState<AuthorityReportData | null>(null);
+  const {
+    authUser,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+    loading,
+    error,
+    report,
+    runReport,
+    handleDownloadPdf,
+  } = useAuthorityPresentationReport({ userId });
 
-  const runReport = async () => {
-    if (!startDate || !endDate) {
-      setError('Choose both a start date and an end date.');
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    setReport(null);
-    const startYmd = format(startDate, 'yyyy-MM-dd');
-    const endYmd = format(endDate, 'yyyy-MM-dd');
-    const res = await getAuthorityPresentationReport(userId, startYmd, endYmd);
-    setLoading(false);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
-    setReport(res.data);
-  };
-
-  const handleDownloadPdf = () => {
-    if (!authUser || !report || !startDate || !endDate) return;
-    exportAuthorityReportPdf(report, startDate, endDate, authUser);
-  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 animate-in fade-in-50">
