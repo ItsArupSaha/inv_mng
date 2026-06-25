@@ -124,6 +124,7 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   if (item.medicineGroup) updateData.medicineGroup = item.medicineGroup;
                   if (item.company) updateData.company = item.company;
                   if (item.expiryDate) updateData.expiryDate = item.expiryDate;
+                  if (item.location) updateData.location = item.location;
 
                   transaction.update(bookDoc.ref, updateData);
               } else {
@@ -143,6 +144,7 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   if (item.medicineGroup) newItemData.medicineGroup = item.medicineGroup;
                   if (item.company) newItemData.company = item.company;
                   if (item.expiryDate) newItemData.expiryDate = item.expiryDate;
+                  if (item.location) newItemData.location = item.location;
 
                   transaction.set(newItemRef, newItemData);
               }

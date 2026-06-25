@@ -26,15 +26,13 @@ export function PurchaseItemRow({
   disabledRemove,
 }: PurchaseItemRowProps) {
   const { control, watch, setValue } = useFormContext();
-  const watchCategoryName = watch(`items.${index}.categoryName`);
-  const isMedicine = watchCategoryName?.toLowerCase().includes('medicine');
+  const watchCategoryId = watch(`items.${index}.categoryId`);
+  const selectedCategory = categories.find(c => c.id === watchCategoryId);
+  const isMedicine = selectedCategory?.name?.toLowerCase().includes('medicine');
 
   return (
     <div className="flex gap-2 items-start p-3 border rounded-md relative">
-      <div className={cn(
-        "flex-1 grid grid-cols-1 gap-3",
-        isMedicine ? "md:grid-cols-4" : "md:grid-cols-6"
-      )}>
+      <div className="flex-1 grid grid-cols-1 gap-3 md:grid-cols-6">
         <FormField
           control={control}
           name={`items.${index}.itemName`}
@@ -46,7 +44,7 @@ export function PurchaseItemRow({
             </FormItem>
           )}
         />
-        <div className="flex items-end gap-2">
+        <div className={cn("flex items-end gap-2", isMedicine ? "md:col-span-2" : "")}>
           <FormField
             control={control}
             name={`items.${index}.categoryId`}
@@ -69,12 +67,12 @@ export function PurchaseItemRow({
           />
           <Button type="button" variant="outline" size="icon" onClick={onAddCategoryClick}><Plus className="h-4 w-4" /></Button>
         </div>
-        {watchCategoryName === 'Book' && (
+        {selectedCategory?.name === 'Book' && (
           <FormField
             control={control}
             name={`items.${index}.author`}
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-2">
                 <FormLabel className="text-xs">Author</FormLabel>
                 <FormControl><Input placeholder="e.g., Matt Haig" {...field} /></FormControl>
                 <FormMessage />
@@ -88,7 +86,7 @@ export function PurchaseItemRow({
               control={control}
               name={`items.${index}.medicineGroup`}
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-2">
                   <FormLabel className="text-xs">Group (Generic)</FormLabel>
                   <FormControl><Input placeholder="e.g., Paracetamol" {...field} /></FormControl>
                   <FormMessage />
@@ -99,7 +97,7 @@ export function PurchaseItemRow({
               control={control}
               name={`items.${index}.company`}
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-2">
                   <FormLabel className="text-xs">Company</FormLabel>
                   <FormControl><Input placeholder="e.g., Beximco" {...field} /></FormControl>
                   <FormMessage />
@@ -110,9 +108,20 @@ export function PurchaseItemRow({
               control={control}
               name={`items.${index}.expiryDate`}
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-2">
                   <FormLabel className="text-xs">Expiry Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={control}
+              name={`items.${index}.location`}
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel className="text-xs">Shelf / Row</FormLabel>
+                  <FormControl><Input placeholder="e.g., Row A3" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -123,7 +132,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.quantity`}
           render={({ field }) => (
-            <FormItem>
+            <FormItem className={isMedicine ? "md:col-span-2" : ""}>
               <FormLabel className="text-xs">Qty</FormLabel>
               <FormControl><Input type="number" min="1" placeholder="1" {...field} /></FormControl>
               <FormMessage />
@@ -134,7 +143,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.cost`}
           render={({ field }) => (
-            <FormItem className={(watchCategoryName !== 'Book' && !isMedicine) ? 'md:col-start-4' : ''}>
+            <FormItem className={cn(isMedicine ? "md:col-span-2" : "", (selectedCategory?.name !== 'Book' && !isMedicine) ? 'md:col-start-4' : '')}>
               <FormLabel className="text-xs">Unit Cost</FormLabel>
               <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />
@@ -145,7 +154,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.sellingPrice`}
           render={({ field }) => (
-            <FormItem>
+            <FormItem className={isMedicine ? "md:col-span-2" : ""}>
               <FormLabel className="text-xs">Selling Price</FormLabel>
               <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
               <FormMessage />

@@ -54,7 +54,7 @@ export function RecordPurchaseDialog({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       supplier: '',
-      items: [{ itemName: '', categoryId: '', categoryName: '', author: '', medicineGroup: '', company: '', expiryDate: '', quantity: 1, cost: 0, sellingPrice: 0 }],
+      items: [{ itemName: '', categoryId: '', categoryName: '', author: '', medicineGroup: '', company: '', expiryDate: '', location: '', quantity: 1, cost: 0, sellingPrice: 0 }],
       discountType: 'amount',
       discountValue: 0,
       paymentMethod: 'Due',
@@ -71,9 +71,30 @@ export function RecordPurchaseDialog({
 
   React.useEffect(() => {
     if (isOpen) {
+      const defaultCategory = categories.find(c => {
+        const name = c.name.toLowerCase();
+        if (storeType === 'pharmacy') return name.includes('medicine');
+        if (storeType === 'bookstore') return name.includes('book');
+        return false;
+      });
+      const initialCategoryId = defaultCategory?.id || '';
+      const initialCategoryName = defaultCategory?.name || '';
+
       form.reset({
         supplier: '',
-        items: [{ itemName: '', categoryId: '', categoryName: '', author: '', medicineGroup: '', company: '', expiryDate: '', quantity: 1, cost: 0, sellingPrice: 0 }],
+        items: [{ 
+          itemName: '', 
+          categoryId: initialCategoryId, 
+          categoryName: initialCategoryName, 
+          author: '', 
+          medicineGroup: '', 
+          company: '', 
+          expiryDate: '', 
+          location: '', 
+          quantity: 1, 
+          cost: 0, 
+          sellingPrice: 0 
+        }],
         discountType: 'amount',
         discountValue: 0,
         paymentMethod: 'Due',
@@ -82,7 +103,7 @@ export function RecordPurchaseDialog({
         dueDate: new Date(),
       });
     }
-  }, [isOpen, form]);
+  }, [isOpen, form, categories, storeType]);
 
   const onSubmit = (data: PurchaseFormValues) => {
     startTransition(async () => {
@@ -167,7 +188,29 @@ export function RecordPurchaseDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ itemName: '', categoryId: '', categoryName: '', author: '', medicineGroup: '', company: '', expiryDate: '', quantity: 1, cost: 0, sellingPrice: 0 })}
+                  onClick={() => {
+                    const defaultCategory = categories.find(c => {
+                      const name = c.name.toLowerCase();
+                      if (storeType === 'pharmacy') return name.includes('medicine');
+                      if (storeType === 'bookstore') return name.includes('book');
+                      return false;
+                    });
+                    const initialCategoryId = defaultCategory?.id || '';
+                    const initialCategoryName = defaultCategory?.name || '';
+                    append({ 
+                      itemName: '', 
+                      categoryId: initialCategoryId, 
+                      categoryName: initialCategoryName, 
+                      author: '', 
+                      medicineGroup: '', 
+                      company: '', 
+                      expiryDate: '', 
+                      location: '', 
+                      quantity: 1, 
+                      cost: 0, 
+                      sellingPrice: 0 
+                    });
+                  }}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Item
                 </Button>

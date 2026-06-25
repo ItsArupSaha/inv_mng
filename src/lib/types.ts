@@ -109,6 +109,7 @@ export type PurchaseItem = {
     medicineGroup?: string;
     company?: string;
     expiryDate?: string;
+    location?: string;
     quantity: number;
     cost: number;
     sellingPrice?: number;

@@ -8,6 +8,7 @@ export const purchaseItemSchema = z.object({
   medicineGroup: z.string().optional(),
   company: z.string().optional(),
   expiryDate: z.string().optional(),
+  location: z.string().optional(),
   quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1'),
   cost: z.coerce.number().min(0, 'Cost must be non-negative'),
   sellingPrice: z.coerce.number().optional(),
