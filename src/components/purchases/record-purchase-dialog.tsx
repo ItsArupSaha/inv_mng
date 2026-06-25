@@ -19,8 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { addPurchase } from '@/lib/actions';
-import type { Category } from '@/lib/types';
+import { addPurchase, updatePurchase } from '@/lib/actions';
+import type { Category, Purchase } from '@/lib/types';
 
 import { purchaseFormSchema, type PurchaseFormValues } from './schema';
 import { PurchaseItemRow } from './purchase-item-row';
@@ -32,6 +32,7 @@ interface RecordPurchaseDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   categories: Category[];
+  editingPurchase?: Purchase | null;
   onSuccess: () => void;
   onAddCategoryClick: () => void;
 }
@@ -41,6 +42,7 @@ export function RecordPurchaseDialog({
   isOpen,
   onOpenChange,
   categories,
+  editingPurchase,
   onSuccess,
   onAddCategoryClick,
 }: RecordPurchaseDialogProps) {
@@ -72,44 +74,86 @@ export function RecordPurchaseDialog({
     name: 'items',
   });
 
+  const wasOpenRef = React.useRef(false);
+  const prevPurchaseIdRef = React.useRef<string | null>(null);
+
   React.useEffect(() => {
     if (isOpen) {
-      const defaultCategory = categories.find(c => {
-        const name = c.name.toLowerCase();
-        if (storeType === 'pharmacy') return name.includes('medicine');
-        if (storeType === 'bookstore') return name.includes('book');
-        return false;
-      });
-      const initialCategoryId = defaultCategory?.id || '';
-      const initialCategoryName = defaultCategory?.name || '';
+      const purchaseId = editingPurchase?.id || null;
+      const isNewSession = !wasOpenRef.current || (purchaseId !== prevPurchaseIdRef.current);
 
-      form.reset({
-        supplier: '',
-        location: '',
-        items: [{ 
-          itemName: '', 
-          categoryId: initialCategoryId, 
-          categoryName: initialCategoryName, 
-          author: '', 
-          medicineGroup: '', 
-          company: '', 
-          expiryDate: '', 
-          location: '', 
-          quantity: 1, 
-          cost: 0, 
-          sellingPrice: 0 
-        }],
-        discountType: 'amount',
-        discountValue: 0,
-        vatType: 'amount',
-        vatValue: 0,
-        paymentMethod: 'Due',
-        amountPaid: 0,
-        splitPaymentMethod: 'Cash',
-        dueDate: new Date(),
-      });
+      if (isNewSession) {
+        if (editingPurchase) {
+          const mappedItems = editingPurchase.items.map(item => ({
+            itemName: item.itemName,
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            author: item.author || '',
+            medicineGroup: item.medicineGroup || '',
+            company: item.company || '',
+            expiryDate: item.expiryDate || '',
+            location: item.location || '',
+            quantity: item.quantity,
+            cost: item.cost,
+            sellingPrice: item.sellingPrice || 0
+          }));
+
+          form.reset({
+            supplier: editingPurchase.supplier || '',
+            location: editingPurchase.items[0]?.location || '',
+            items: mappedItems,
+            discountType: 'amount',
+            discountValue: editingPurchase.discountAmount || 0,
+            vatType: editingPurchase.vatType || 'amount',
+            vatValue: editingPurchase.vatValue || 0,
+            paymentMethod: editingPurchase.paymentMethod === 'N/A' ? 'Due' : editingPurchase.paymentMethod,
+            amountPaid: editingPurchase.amountPaid || 0,
+            splitPaymentMethod: editingPurchase.splitPaymentMethod || 'Cash',
+            dueDate: editingPurchase.dueDate ? new Date(editingPurchase.dueDate) : new Date(),
+          });
+        } else {
+          const defaultCategory = categories.find(c => {
+            const name = c.name.toLowerCase();
+            if (storeType === 'pharmacy') return name.includes('medicine');
+            if (storeType === 'bookstore') return name.includes('book');
+            return false;
+          });
+          const initialCategoryId = defaultCategory?.id || '';
+          const initialCategoryName = defaultCategory?.name || '';
+
+          form.reset({
+            supplier: '',
+            location: '',
+            items: [{ 
+              itemName: '', 
+              categoryId: initialCategoryId, 
+              categoryName: initialCategoryName, 
+              author: '', 
+              medicineGroup: '', 
+              company: '', 
+              expiryDate: '', 
+              location: '', 
+              quantity: 1, 
+              cost: 0, 
+              sellingPrice: 0 
+            }],
+            discountType: 'amount',
+            discountValue: 0,
+            vatType: 'amount',
+            vatValue: 0,
+            paymentMethod: 'Due',
+            amountPaid: 0,
+            splitPaymentMethod: 'Cash',
+            dueDate: new Date(),
+          });
+        }
+        prevPurchaseIdRef.current = purchaseId;
+      }
+    } else {
+      prevPurchaseIdRef.current = null;
     }
-  }, [isOpen, form, categories, storeType]);
+    wasOpenRef.current = isOpen;
+  }, [isOpen, form, categories, storeType, editingPurchase]);
 
   const onSubmit = (data: PurchaseFormValues) => {
     startTransition(async () => {
@@ -139,13 +183,19 @@ export function RecordPurchaseDialog({
         // @ts-ignore
         delete purchaseData.location;
 
-        const result = await addPurchase(userId, purchaseData);
+        const result = editingPurchase 
+          ? await updatePurchase(userId, editingPurchase.id, purchaseData)
+          : await addPurchase(userId, purchaseData);
+
         if (result?.success) {
-          toast({ title: 'Purchase Recorded', description: 'The new purchase has been added and stock updated.' });
+          toast({ 
+            title: editingPurchase ? 'Purchase Updated' : 'Purchase Recorded', 
+            description: editingPurchase ? 'The purchase details and inventory have been updated.' : 'The new purchase has been added and stock updated.' 
+          });
           onSuccess();
           onOpenChange(false);
         } else {
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to record purchase.' });
+          toast({ variant: 'destructive', title: 'Error', description: (result as any)?.error || 'Failed to save purchase.' });
         }
       } catch (err) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to save the purchase.' });
@@ -157,11 +207,13 @@ export function RecordPurchaseDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="font-headline">Record New Purchase</DialogTitle>
+          <DialogTitle className="font-headline">{editingPurchase ? 'Edit Purchase Details' : 'Record New Purchase'}</DialogTitle>
           <DialogDescription>
-            {storeType === 'pharmacy' 
-              ? 'Enter company details and the items purchased. New items will be created automatically.' 
-              : 'Enter supplier details and the items purchased. New items will be created automatically.'}
+            {editingPurchase 
+              ? 'Update the purchase details. Stock levels and financial transactions will reconcile automatically.'
+              : (storeType === 'pharmacy' 
+                  ? 'Enter company details and the items purchased. New items will be created automatically.' 
+                  : 'Enter supplier details and the items purchased. New items will be created automatically.')}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -259,7 +311,7 @@ export function RecordPurchaseDialog({
               <PurchaseSummarySection />
               <DialogFooter>
                 <Button type="submit" disabled={isPending || !form.formState.isValid}>
-                  {isPending ? "Saving..." : "Confirm Purchase"}
+                  {isPending ? "Saving..." : editingPurchase ? "Update Purchase" : "Confirm Purchase"}
                 </Button>
               </DialogFooter>
             </div>

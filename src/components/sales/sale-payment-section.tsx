@@ -23,7 +23,7 @@ export function SalePaymentSection() {
             name="discountType"
             render={({ field }) => (
               <FormItem className="w-1/2">
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Type" />
@@ -102,7 +102,7 @@ export function SalePaymentSection() {
               <FormItem className="flex-1 space-y-3">
                 <FormLabel>Paid Via</FormLabel>
                 <FormControl>
-                  <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                  <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
                     <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Cash" /></FormControl><FormLabel className="font-normal">Cash</FormLabel></FormItem>
                     <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Bank" /></FormControl><FormLabel className="font-normal">Bank</FormLabel></FormItem>
                   </RadioGroup>

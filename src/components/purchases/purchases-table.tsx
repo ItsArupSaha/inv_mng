@@ -2,19 +2,23 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
+import { Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import type { Purchase } from '@/lib/types';
 
 interface PurchasesTableProps {
   purchases: Purchase[];
   isInitialLoading: boolean;
+  onEdit?: (purchase: Purchase) => void;
 }
 
 export function PurchasesTable({
   purchases,
   isInitialLoading,
+  onEdit,
 }: PurchasesTableProps) {
   const { authUser } = useAuth();
   const storeType = authUser?.storeType || 'general';
@@ -32,6 +36,7 @@ export function PurchasesTable({
             <TableHead className="text-right hidden sm:table-cell">Total</TableHead>
             <TableHead className="text-right hidden sm:table-cell">Discount</TableHead>
             <TableHead className="text-right">Net</TableHead>
+            <TableHead className="text-right w-[80px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -43,6 +48,7 @@ export function PurchasesTable({
                 <TableCell><Skeleton className="h-5 w-2/4" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-1/4 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-1/4 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-1/4 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-1/4 ml-auto" /></TableCell>
@@ -60,10 +66,15 @@ export function PurchasesTable({
               <TableCell className="text-right font-medium hidden sm:table-cell">৳{purchase.totalAmount.toFixed(2)}</TableCell>
               <TableCell className="text-right text-muted-foreground hidden sm:table-cell">{purchase.discountAmount ? `৳${purchase.discountAmount.toFixed(2)}` : '-'}</TableCell>
               <TableCell className="text-right font-bold">৳{(purchase.totalAmount + (purchase.vatAmount || 0) - (purchase.discountAmount || 0)).toFixed(2)}</TableCell>
+              <TableCell className="text-right">
+                <Button variant="ghost" size="icon" onClick={() => onEdit?.(purchase)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           )) : (
             <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">No purchases recorded yet.</TableCell>
+              <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">No purchases recorded yet.</TableCell>
             </TableRow>
           )}
         </TableBody>

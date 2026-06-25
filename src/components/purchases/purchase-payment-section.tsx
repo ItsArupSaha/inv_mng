@@ -28,7 +28,7 @@ export function PurchasePaymentSection() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Discount Type</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Type" />
@@ -65,7 +65,7 @@ export function PurchasePaymentSection() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>VAT Type</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Type" />
@@ -104,7 +104,7 @@ export function PurchasePaymentSection() {
               <FormControl>
                 <RadioGroup
                   onValueChange={field.onChange}
-                  defaultValue={field.value}
+                  value={field.value}
                   className="flex flex-wrap gap-4 pt-2"
                 >
                   <FormItem className="flex items-center space-x-2">
@@ -151,7 +151,7 @@ export function PurchasePaymentSection() {
                 <FormItem className="space-y-2">
                   <FormLabel className="text-sm">Paid Via</FormLabel>
                   <FormControl>
-                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
                       <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Cash" /></FormControl><FormLabel className="font-normal">Cash</FormLabel></FormItem>
                       <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Bank" /></FormControl><FormLabel className="font-normal">Bank</FormLabel></FormItem>
                     </RadioGroup>

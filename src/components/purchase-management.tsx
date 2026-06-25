@@ -35,6 +35,7 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
   const { toast } = useToast();
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [editingPurchase, setEditingPurchase] = React.useState<Purchase | null>(null);
 
   const loadInitialData = React.useCallback(async () => {
     setIsInitialLoading(true);
@@ -73,30 +74,20 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
   };
 
   const handleDownloadPdf = async () => {
-    try {
-      const success = await downloadPurchasesPdf(userId, dateRange, authUser);
-      if (!success) {
-        toast({ title: 'No Purchases Found', description: 'There are no purchases in the selected date range.' });
-      }
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Failed to download PDF." });
-    }
+    if (!dateRange) return;
+    setIsDownloadDialogOpen(false);
+    await downloadPurchasesPdf(userId, dateRange, authUser);
   };
 
   const handleDownloadXlsx = async () => {
-    try {
-      const success = await downloadPurchasesXlsx(userId, dateRange);
-      if (!success) {
-        toast({ title: 'No Purchases Found', description: 'There are no purchases in the selected date range.' });
-      }
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Failed to download Excel." });
-    }
+    if (!dateRange) return;
+    setIsDownloadDialogOpen(false);
+    await downloadPurchasesXlsx(userId, dateRange);
   };
 
   return (
     <>
-      <Card className="animate-in fade-in-50">
+      <Card className="w-full">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
@@ -104,7 +95,7 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
               <CardDescription>Manage purchases of items and other assets for the store.</CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
-              <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto">
+              <Button onClick={() => { setEditingPurchase(null); setIsDialogOpen(true); }} className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" /> Record New Purchase
               </Button>
               <AddOfficeAssetDialog userId={userId} onAssetAdded={loadInitialData}>
@@ -148,6 +139,10 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
           <PurchasesTable 
             purchases={purchases}
             isInitialLoading={isInitialLoading}
+            onEdit={(purchase) => {
+              setEditingPurchase(purchase);
+              setIsDialogOpen(true);
+            }}
           />
           {hasMore && (
             <div className="flex justify-center mt-4">
@@ -162,8 +157,12 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
       <RecordPurchaseDialog
         userId={userId}
         isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) setEditingPurchase(null);
+        }}
         categories={categories}
+        editingPurchase={editingPurchase}
         onSuccess={loadInitialData}
         onAddCategoryClick={() => setIsCategoryDialogOpen(true)}
       />
