@@ -3,6 +3,7 @@
 // This allows components to import from a single file, while keeping the actions organized.
 
 export * from './db/account-overview';
+export * from './db/assets';
 export * from './db/categories';
 export * from './db/customers';
 export * from './db/dashboard';

@@ -1,10 +1,6 @@
-
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -31,84 +27,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, LogOut, Package } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
-import { completeOnboarding } from '@/lib/actions';
-import { useRouter } from 'next/navigation';
-
-const onboardingSchema = z.object({
-  companyName: z.string().min(2, 'Store name must be at least 2 characters.'),
-  subtitle: z.string().optional(),
-  storeType: z.enum(['general', 'pharmacy', 'bookstore']),
-  address: z.string().min(5, 'Please enter a valid address.'),
-  phone: z.string().min(5, 'Please enter a valid phone number.'),
-  bkashNumber: z.string().optional(),
-  bankInfo: z.string().optional(),
-  secretKey: z.string().optional(),
-  initialCash: z.coerce.number().min(0).default(0),
-  initialBank: z.coerce.number().min(0).default(0),
-});
-
-type OnboardingFormValues = z.infer<typeof onboardingSchema>;
+import { Loader2, LogOut } from 'lucide-react';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
 export default function OnboardingPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
-  const { toast } = useToast();
-  const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  const form = useForm<OnboardingFormValues>({
-    resolver: zodResolver(onboardingSchema),
-    defaultValues: {
-      companyName: '',
-      subtitle: '',
-      storeType: 'general',
-      address: '',
-      phone: '',
-      bkashNumber: '',
-      bankInfo: '',
-      secretKey: '',
-      initialCash: 0,
-      initialBank: 0,
-    },
-  });
-
-  const handleSignOut = async () => {
-    await signOut();
-    router.push('/login');
-  };
-
-  const onSubmit = async (data: OnboardingFormValues) => {
-    if (!user) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'You must be logged in to complete onboarding.',
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    try {
-      await completeOnboarding(user.uid, data);
-      toast({
-        title: 'Setup Complete!',
-        description: 'Your shop inventory is now ready to use.',
-      });
-      // Force a reload to ensure the auth state is updated with onboarding status
-      window.location.href = '/dashboard';
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: 'Could not save your store details. Please try again.',
-      });
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
+  const {
+    authLoading,
+    isSubmitting,
+    form,
+    handleSignOut,
+    onSubmit,
+  } = useOnboarding();
 
   if (authLoading) {
     return (
@@ -117,6 +46,7 @@ export default function OnboardingPage() {
         </div>
     );
   }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
