@@ -135,11 +135,16 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                       title: item.itemName,
                       categoryId: item.categoryId,
                       categoryName: item.categoryName,
-                      author: item.author || 'Unknown',
                       stock: item.quantity,
                       productionPrice: item.cost,
                       sellingPrice: sellingPrice,
                   };
+
+                  if (item.author) {
+                      newItemData.author = item.author;
+                  } else if (item.categoryName === 'Book') {
+                      newItemData.author = 'Unknown';
+                  }
 
                   if (item.medicineGroup) newItemData.medicineGroup = item.medicineGroup;
                   if (item.company) newItemData.company = item.company;

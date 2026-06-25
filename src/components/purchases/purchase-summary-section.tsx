@@ -1,11 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 
 export function PurchaseSummarySection() {
-  const { watch } = useFormContext();
-  const watchItems = watch('items') || [];
+  const { control, watch } = useFormContext();
+  const watchItems = useWatch({
+    control,
+    name: 'items',
+  }) || [];
   const watchPaymentMethod = watch('paymentMethod');
   const watchAmountPaid = watch('amountPaid') || 0;
   const watchDiscountType = watch('discountType');
@@ -13,7 +16,7 @@ export function PurchaseSummarySection() {
 
   const totalAmount = React.useMemo(() => {
     return watchItems.reduce((acc: number, item: any) => {
-      const cost = item?.cost || 0;
+      const cost = Number(item?.cost) || 0;
       const quantity = Number(item?.quantity) || 0;
       return acc + (cost * quantity);
     }, 0);

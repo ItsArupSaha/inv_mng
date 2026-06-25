@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useAuth } from '@/hooks/use-auth';
 import type { ClosingStock } from '@/lib/types';
 
 interface ClosingStockResultsProps {
@@ -29,7 +30,12 @@ export function ClosingStockResults({
   onDownloadXlsx,
   onClear
 }: ClosingStockResultsProps) {
+  const { authUser } = useAuth();
+  const storeType = authUser?.storeType || 'general';
+
   if (closingStockData.length === 0) return null;
+
+  const detailHeader = storeType === 'pharmacy' ? 'Group (Generic)' : storeType === 'bookstore' ? 'Author' : 'Author/Group';
 
   return (
     <div className="mb-6">
@@ -42,7 +48,7 @@ export function ClosingStockResults({
             <TableRow>
               <TableHead>Title</TableHead>
               <TableHead>Category</TableHead>
-              <TableHead>Author/Group</TableHead>
+              <TableHead>{detailHeader}</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Expiry Date</TableHead>
               <TableHead className="text-right">Prod. Price</TableHead>
@@ -55,7 +61,9 @@ export function ClosingStockResults({
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.title}</TableCell>
                 <TableCell>{item.categoryName}</TableCell>
-                <TableCell>{item.author || item.medicineGroup || '-'}</TableCell>
+                <TableCell>
+                  {storeType === 'pharmacy' ? (item.medicineGroup || '-') : storeType === 'bookstore' ? (item.author || '-') : (item.author || item.medicineGroup || '-')}
+                </TableCell>
                 <TableCell>{item.company || '-'}</TableCell>
                 <TableCell>
                   {item.expiryDate ? format(new Date(item.expiryDate), 'yyyy-MM-dd') : '-'}

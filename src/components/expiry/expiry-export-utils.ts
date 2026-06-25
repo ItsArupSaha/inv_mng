@@ -37,7 +37,7 @@ export function handleDownloadPdf(filteredAndSortedItems: Item[], authUser: Expo
 
   autoTable(doc, {
     startY: 60,
-    head: [['Title', 'Generic / Group', 'Company', 'Expiry Date', 'Stock', 'Selling Price (TK)']],
+    head: [['Title', 'Group (Generic)', 'Company', 'Expiry Date', 'Stock', 'Selling Price (TK)']],
     body: filteredAndSortedItems.map(item => [
       item.title,
       item.medicineGroup || '-',
@@ -56,7 +56,7 @@ export function handleDownloadXlsx(filteredAndSortedItems: Item[]) {
 
   const dataToExport = filteredAndSortedItems.map(item => ({
     Title: item.title,
-    'Generic Group': item.medicineGroup || '-',
+    'Group (Generic)': item.medicineGroup || '-',
     Company: item.company || '-',
     'Expiry Date': item.expiryDate || '-',
     Stock: item.stock,

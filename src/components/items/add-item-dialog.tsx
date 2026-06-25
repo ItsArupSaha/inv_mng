@@ -262,7 +262,7 @@ export function AddItemDialog({
                       name="medicineGroup"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Generic Name (Group)</FormLabel>
+                          <FormLabel>Group (Generic)</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g. Paracetamol, Omeprazole" {...field} />
                           </FormControl>
@@ -364,7 +364,7 @@ export function AddItemDialog({
                           name="medicineGroup"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Specification Group / Generic Group</FormLabel>
+                              <FormLabel>Specification Group / Group (Generic)</FormLabel>
                               <FormControl>
                                 <Input placeholder="e.g., Electronic, Organic, Tablets" {...field} />
                               </FormControl>

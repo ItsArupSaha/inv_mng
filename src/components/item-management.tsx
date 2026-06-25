@@ -155,7 +155,7 @@ export default function ItemManagement({ userId }: ItemManagementProps) {
 
   const handleDownloadClosingStockXlsx = () => {
     if (!closingStockDate) return;
-    exportClosingStockXlsx(closingStockData, closingStockDate);
+    exportClosingStockXlsx(closingStockData, closingStockDate, authUser?.storeType);
   };
 
   const expiringAndExpiredMedicines = React.useMemo(() => {
@@ -420,7 +420,7 @@ export default function ItemManagement({ userId }: ItemManagementProps) {
             className="rounded-full h-8 px-3.5 text-xs font-semibold"
             onClick={() => setSortBy(sortBy === 'group-asc' ? 'title-asc' : 'group-asc')}
           >
-            By Generic Group
+            By Group (Generic)
           </Button>
           <Button
             variant={sortBy === 'company-asc' ? 'default' : 'outline'}

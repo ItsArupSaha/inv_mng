@@ -38,7 +38,7 @@ export function ItemsTable({
 
   // Label configuration based on store type
   const titleHeader = storeType === 'pharmacy' ? 'Medicine Name' : storeType === 'bookstore' ? 'Book Title' : 'Item Name';
-  const detailHeader = storeType === 'pharmacy' ? 'Generic Group' : storeType === 'bookstore' ? 'Author' : 'Brand / Detail';
+  const detailHeader = storeType === 'pharmacy' ? 'Group (Generic)' : storeType === 'bookstore' ? 'Author' : 'Brand / Detail';
   const companyHeader = storeType === 'pharmacy' ? 'Manufacturer' : storeType === 'bookstore' ? 'Publisher / Company' : 'Company / Brand';
   const locationHeader = storeType === 'pharmacy' ? 'Shelf / Row' : storeType === 'bookstore' ? 'Shelf Location' : 'Storage Loc';
 
@@ -95,7 +95,9 @@ export function ItemsTable({
                     </div>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">{item.categoryName}</TableCell>
-                  <TableCell className="hidden md:table-cell">{item.author || item.medicineGroup || '-'}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {storeType === 'pharmacy' ? (item.medicineGroup || '-') : storeType === 'bookstore' ? (item.author || '-') : (item.author || item.medicineGroup || '-')}
+                  </TableCell>
                   <TableCell className="hidden md:table-cell">{item.company || '-'}</TableCell>
                   <TableCell className={cn(
                     "hidden sm:table-cell",
