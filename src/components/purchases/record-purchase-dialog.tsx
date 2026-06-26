@@ -58,6 +58,10 @@ export function RecordPurchaseDialog({
     onSuccess,
   });
 
+  const onError = (errors: any) => {
+    console.log("Purchase Form Validation Errors:", errors);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
@@ -72,7 +76,7 @@ export function RecordPurchaseDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
+          <form onSubmit={form.handleSubmit(onSubmit, onError)} className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto pr-4 pl-1 -mr-4 -ml-1 py-4">
               <div className="space-y-4 px-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -143,7 +147,7 @@ export function RecordPurchaseDialog({
             <div className="mt-auto pt-4 space-y-4 border-t px-6 pb-6 bg-background">
               <PurchaseSummarySection />
               <DialogFooter>
-                <Button type="submit" disabled={isPending || !form.formState.isValid}>
+                <Button type="submit" disabled={isPending}>
                   {isPending ? "Saving..." : editingPurchase ? "Update Purchase" : "Confirm Purchase"}
                 </Button>
               </DialogFooter>
