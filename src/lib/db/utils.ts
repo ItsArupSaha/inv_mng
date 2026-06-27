@@ -68,3 +68,14 @@ export function docToTransfer(d: any): Transfer {
         date: data.date.toDate().toISOString(),
     } as Transfer;
 }
+
+export function isOperatingExpense(description: string): boolean {
+  const desc = description || '';
+  if (desc.startsWith('Transfer to')) return false;
+  if (desc.startsWith('Payment for Purchase')) return false;
+  if (desc.startsWith('Partial payment for Purchase')) return false;
+  if (desc.startsWith('Paid Payable:')) return false;
+  if (desc.startsWith('Asset Purchase:')) return false;
+  if (desc.startsWith('Customer Refund:')) return false;
+  return true;
+}

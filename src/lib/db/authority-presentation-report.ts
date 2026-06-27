@@ -6,6 +6,7 @@ import { getAccountOverview } from './account-overview';
 import { getExpenses } from './expenses';
 import { getPurchases } from './purchases';
 import { getSales } from './sales';
+import { isOperatingExpense } from './utils';
 
 export type AuthorityPeriodRow = {
     label: string;
@@ -121,7 +122,7 @@ export async function getAuthorityPresentationReport(
             .reduce((sum, s) => sum + (s.total || 0), 0);
 
         const expense = expenses
-            .filter((e) => !e.description.startsWith('Transfer to'))
+            .filter((e) => isOperatingExpense(e.description))
             .filter((e) => inInclusiveDayRange(e.date, from, to))
             .reduce((sum, e) => sum + (e.amount || 0), 0);
 

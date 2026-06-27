@@ -1,5 +1,6 @@
 
 import type { Donation, Expense, Item, Sale, Transaction } from './types';
+import { isOperatingExpense } from './db/utils';
 
 export interface ReportAnalysis {
   monthlyActivity: {
@@ -140,8 +141,9 @@ export function generateMonthlyReport(input: ReportInput): ReportAnalysis {
     { cash: 0, bank: 0 }
   );
 
-  const totalExpenses = expensesData.reduce((sum, expense) => sum + expense.amount, 0);
-  const expensesCashBank = expensesData.reduce(
+  const operatingExpenses = expensesData.filter(expense => isOperatingExpense(expense.description));
+  const totalExpenses = operatingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const expensesCashBank = operatingExpenses.reduce(
     (acc, expense) => {
       if (expense.paymentMethod === 'Cash') {
         acc.cash += expense.amount;

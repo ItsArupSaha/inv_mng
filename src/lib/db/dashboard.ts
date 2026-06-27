@@ -5,7 +5,7 @@ import { collection, doc, getDocs, query, Timestamp, where } from 'firebase/fire
 import { db } from '../firebase';
 import { getCustomersWithDueBalance } from './customers';
 import { getExpensesForMonth } from './expenses';
-import { docToItem, docToSale, docToSalesReturn } from './utils';
+import { docToItem, docToSale, docToSalesReturn, isOperatingExpense } from './utils';
 
 export async function getDashboardStats(userId: string) {
     if (!db || !userId) {
@@ -96,7 +96,8 @@ export async function getDashboardStats(userId: string) {
     const monthlySalesValue = salesThisMonth.reduce((sum, sale) => sum + sale.total, 0);
     const monthlySalesCount = salesThisMonth.length;
     
-    const monthlyExpenses = expensesThisMonth.reduce((sum: number, expense: any) => sum + expense.amount, 0);
+    const operatingExpensesThisMonth = expensesThisMonth.filter((expense: any) => isOperatingExpense(expense.description));
+    const monthlyExpenses = operatingExpensesThisMonth.reduce((sum: number, expense: any) => sum + expense.amount, 0);
 
     const grossProfitThisMonth = salesThisMonth.reduce((totalProfit, sale) => {
         const saleProfit = sale.items.reduce((currentSaleProfit, item) => {
