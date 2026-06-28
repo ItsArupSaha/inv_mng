@@ -50,7 +50,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
   } = useSalesManagement({ userId });
 
   return (
-    <div className="space-y-6 animate-in fade-in-50">
+    <div className="space-y-6 animate-in fade-in-50 w-full max-w-none">
       {/* Tab toggle buttons */}
       <div className="flex gap-2 border-b pb-4">
         <Button
@@ -70,7 +70,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
       </div>
 
       {activeTab === 'checkout' ? (
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle className="font-headline text-2xl">POS Receipt Checkout</CardTitle>
             <CardDescription>Select items, adjust prices, and confirm transactions instantly.</CardDescription>
@@ -86,7 +86,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
               <div>

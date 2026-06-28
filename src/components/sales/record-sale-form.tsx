@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,19 @@ export function RecordSaleForm({
   const walkInCustomer = React.useMemo(() => {
     return customers.find(c => c.name === 'Walk-in Customer') || customers[0];
   }, [customers]);
+
+  const watchItems = useWatch({
+    control: form.control,
+    name: 'items',
+  }) || [];
+  const subtotal = React.useMemo(() => {
+    return watchItems.reduce((acc: number, item: any) => {
+      if (!item?.itemId) return acc;
+      const price = Number(item?.price) || 0;
+      const quantity = Number(item?.quantity) || 0;
+      return acc + (price * quantity);
+    }, 0);
+  }, [watchItems]);
 
   const handleAddNewRow = () => {
     append({ itemId: '', quantity: 1, price: 0 });
@@ -121,7 +134,7 @@ export function RecordSaleForm({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-none">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <SalePaymentToggle />
@@ -133,7 +146,7 @@ export function RecordSaleForm({
             appendRow={handleAddNewRow} 
           />
 
-          <SaleSummaryCard />
+          <SaleSummaryCard subtotal={subtotal} />
 
           {/* Form Actions */}
           <div className="flex justify-end gap-2 border-t pt-4">

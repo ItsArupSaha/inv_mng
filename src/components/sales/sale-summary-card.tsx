@@ -5,24 +5,28 @@ import { useFormContext } from 'react-hook-form';
 import { FormField, FormItem, FormControl } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 
-export function SaleSummaryCard() {
-  const { control, watch, setValue } = useFormContext();
-  const watchItems = watch('items') || [];
+interface SaleSummaryCardProps {
+  subtotal: number;
+}
 
-  // Calculate Subtotal dynamically from all non-empty rows
-  const subtotal = React.useMemo(() => {
-    return watchItems.reduce((acc: number, item: any) => {
-      if (!item?.itemId) return acc;
-      const price = Number(item?.price) || 0;
-      const quantity = Number(item?.quantity) || 0;
-      return acc + (price * quantity);
-    }, 0);
-  }, [watchItems]);
+export function SaleSummaryCard({ subtotal }: SaleSummaryCardProps) {
+  const { control, setValue, watch } = useFormContext();
+  const [isTotalEdited, setIsTotalEdited] = React.useState(false);
+  const totalValue = watch('total');
 
-  // Auto-update final total in form when subtotal changes
+  // Auto-update final total in form when subtotal changes, unless manually overridden
   React.useEffect(() => {
-    setValue('total', subtotal);
-  }, [subtotal, setValue]);
+    if (!isTotalEdited) {
+      setValue('total', subtotal);
+    }
+  }, [subtotal, setValue, isTotalEdited]);
+
+  // Reset override state when subtotal and total value both become zero (e.g. on form reset)
+  React.useEffect(() => {
+    if (subtotal === 0 && (Number(totalValue) === 0 || !totalValue)) {
+      setIsTotalEdited(false);
+    }
+  }, [subtotal, totalValue]);
 
   return (
     <div className="flex flex-col sm:flex-row justify-end">
@@ -45,9 +49,12 @@ export function SaleSummaryCard() {
                       type="number"
                       step="0.01"
                       min="0"
-                      className="w-28 text-right h-8 font-bold font-mono tabular-nums"
+                      className="w-28 text-right h-8 font-bold font-mono tabular-nums bg-background border rounded-md"
                       {...totalField}
-                      onChange={(e) => totalField.onChange(Number(e.target.value) || '')}
+                      onChange={(e) => {
+                        setIsTotalEdited(true);
+                        totalField.onChange(Number(e.target.value) || '');
+                      }}
                     />
                   </FormControl>
                 </FormItem>

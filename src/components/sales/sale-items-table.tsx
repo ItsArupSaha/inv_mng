@@ -28,11 +28,12 @@ export function SaleItemsTable({
   return (
     <div className="space-y-4">
       <div className="border rounded-lg overflow-x-auto bg-card">
-        <table className="w-full text-sm text-left border-collapse">
+        <table className="w-full min-w-full text-sm text-left border-collapse">
           <thead className="bg-muted/50 border-b text-xs font-semibold uppercase text-muted-foreground">
             <tr>
               <th className="p-3 w-8 text-center">#</th>
-              <th className="p-3 w-[50%] min-w-[450px]">Medicine / Item</th>
+              <th className="p-3">Medicine / Item</th>
+              <th className="p-3 w-36">Company & Shelf</th>
               <th className="p-3 w-16 text-center">In Stock</th>
               <th className="p-3 w-16 text-center">Quantity</th>
               <th className="p-3 w-20 text-right">Price (৳)</th>
@@ -64,9 +65,9 @@ export function SaleItemsTable({
                               onChange={(value) => {
                                 const item = items.find(i => i.id === value);
                                 selectField.onChange(value);
-                                setValue(`items.${index}.price`, item?.sellingPrice || 0);
-                                setValue(`items.${index}.quantity`, 1);
-
+                                setValue(`items.${index}.price`, item?.sellingPrice || 0, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+                                setValue(`items.${index}.quantity`, 1, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+                                
                                 // Auto-append another row if we selected an item in the last row
                                 if (index === fields.length - 1) {
                                   appendRow();
@@ -80,6 +81,20 @@ export function SaleItemsTable({
                         </FormItem>
                       )}
                     />
+                  </td>
+                  <td className="p-3">
+                    {selectedItem ? (
+                      <div className="flex flex-col text-xs leading-normal">
+                        <span className="font-semibold text-foreground truncate max-w-[130px]" title={selectedItem.company || '—'}>
+                          {selectedItem.company || '—'}
+                        </span>
+                        <span className="text-muted-foreground truncate max-w-[130px]" title={selectedItem.location ? `Shelf: ${selectedItem.location}` : 'No Shelf'}>
+                          {selectedItem.location ? `Shelf: ${selectedItem.location}` : 'No Shelf'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
                   </td>
                   <td className="p-3 text-center text-muted-foreground font-mono">
                     {selectedItem ? selectedItem.stock : '—'}
@@ -96,7 +111,7 @@ export function SaleItemsTable({
                               min="1"
                               max={selectedItem?.stock}
                               placeholder="0"
-                              className="w-full text-center h-8 bg-transparent"
+                              className="w-full text-center h-8 bg-background border rounded-md"
                               {...qtyField}
                               disabled={!watchItemId}
                               onChange={(e) => qtyField.onChange(Number(e.target.value) || '')}
@@ -118,7 +133,7 @@ export function SaleItemsTable({
                               step="0.01"
                               min="0"
                               placeholder="0.00"
-                              className="w-full text-right h-8 bg-transparent"
+                              className="w-full text-right h-8 bg-background border rounded-md px-2"
                               {...priceField}
                               disabled={!watchItemId}
                               onChange={(e) => priceField.onChange(Number(e.target.value) || '')}

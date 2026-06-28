@@ -135,7 +135,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen w-full bg-background">
         <Sidebar className="border-r bg-card/60 backdrop-blur-md">
           <SidebarHeader className="p-4 border-b">
             <div className="flex items-center gap-3">
@@ -228,7 +228,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </h2>
             </div>
           </header>
-          <main className="p-4 sm:p-6">{children}</main>
+          <main className="p-4 sm:p-6 w-full flex-1">{children}</main>
         </SidebarInset>
       </div>
     </SidebarProvider>
