@@ -16,7 +16,7 @@ import { docToSale } from './utils';
 
 export async function addSale(
   userId: string,
-  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & { creditApplied?: number }
+  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & { creditApplied?: number; total?: number }
 ): Promise<{ success: boolean; error?: string; sale?: Sale }> {
   if (!db || !userId) return { success: false, error: "Database not configured." };
 
@@ -63,21 +63,24 @@ export async function addSale(
           throw new Error(`Not enough stock for ${itemData.title}. Available: ${itemData.stock}, Requested: ${saleItem.quantity}`);
         }
 
-        const price = Number(itemData.sellingPrice);
+        const price = saleItem.price !== undefined && saleItem.price !== null ? Number(saleItem.price) : Number(itemData.sellingPrice);
         calculatedSubtotal += price * Number(saleItem.quantity);
         totalProductionCost += Number(itemData.productionPrice) * Number(saleItem.quantity);
         itemsWithPrices.push({ ...saleItem, price });
       }
 
       let discountAmount = 0;
-      if (data.discountType === 'percentage') {
+      if (data.discountType === 'percentage' && data.discountValue !== undefined) {
         discountAmount = calculatedSubtotal * (data.discountValue / 100);
-      } else if (data.discountType === 'amount') {
+      } else if (data.discountType === 'amount' && data.discountValue !== undefined) {
         discountAmount = data.discountValue;
       }
       discountAmount = Math.min(calculatedSubtotal, discountAmount);
 
-      const totalAfterDiscount = calculatedSubtotal - discountAmount;
+      let totalAfterDiscount = calculatedSubtotal - discountAmount;
+      if (data.total !== undefined && data.total !== null && data.total >= 0) {
+        totalAfterDiscount = data.total;
+      }
       const totalSaleProfit = totalAfterDiscount - totalProductionCost;
 
       const creditApplied = data.creditApplied || 0;

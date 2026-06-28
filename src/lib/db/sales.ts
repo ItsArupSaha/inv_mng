@@ -39,7 +39,7 @@ export async function searchSales(userId: string, searchTerm: string): Promise<S
 
 export async function addSale(
   userId: string,
-  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & { creditApplied?: number }
+  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & { creditApplied?: number; total?: number }
 ): Promise<{ success: boolean; error?: string; sale?: Sale }> {
   return addSaleImpl(userId, data);
 }
