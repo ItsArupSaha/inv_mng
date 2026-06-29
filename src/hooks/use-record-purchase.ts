@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -62,27 +62,34 @@ export function useRecordPurchase({
     }
   }, [isOpen, userId]);
 
-  const supplierName = form.watch('supplier');
+  const supplierName = useWatch({
+    control: form.control,
+    name: 'supplier'
+  }) || '';
 
   React.useEffect(() => {
-    if (storeType === 'pharmacy' && supplierName && existingItems.length > 0) {
-      const matchingItem = existingItems.find(
-        (item) =>
-          item.company &&
-          item.company.trim().toLowerCase() === supplierName.trim().toLowerCase()
-      );
-      if (matchingItem && matchingItem.location) {
-        const currentLocation = form.getValues('location');
-        if (!currentLocation) {
-          form.setValue('location', matchingItem.location, { 
-            shouldDirty: true, 
-            shouldTouch: true, 
-            shouldValidate: true 
-          });
+    if (supplierName && existingItems.length > 0) {
+      const typed = supplierName.trim().toLowerCase();
+      if (typed.length >= 2) {
+        const matchingItem = existingItems.find((item) => {
+          if (!item.company || !item.location) return false;
+          const comp = item.company.trim().toLowerCase();
+          return comp.startsWith(typed) || typed.startsWith(comp) || (typed.length >= 4 && comp.includes(typed));
+        });
+
+        if (matchingItem && matchingItem.location) {
+          const currentLocation = form.getValues('location');
+          if (!currentLocation) {
+            form.setValue('location', matchingItem.location, { 
+              shouldDirty: true, 
+              shouldTouch: true, 
+              shouldValidate: true 
+            });
+          }
         }
       }
     }
-  }, [supplierName, existingItems, storeType, form]);
+  }, [supplierName, existingItems, form]);
 
   const wasOpenRef = React.useRef(false);
   const prevPurchaseIdRef = React.useRef<string | null>(null);
