@@ -5,7 +5,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { addPurchase, updatePurchase } from '@/lib/actions';
+import { addPurchase, updatePurchase, getItems } from '@/lib/actions';
 import type { Category, Purchase } from '@/lib/types';
 import { purchaseFormSchema, type PurchaseFormValues } from '@/components/purchases/schema';
 
@@ -53,6 +53,36 @@ export function useRecordPurchase({
     control: form.control,
     name: 'items',
   });
+
+  const [existingItems, setExistingItems] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (isOpen && userId && storeType === 'pharmacy') {
+      getItems(userId).then(setExistingItems).catch(console.error);
+    }
+  }, [isOpen, userId, storeType]);
+
+  const supplierName = form.watch('supplier');
+
+  React.useEffect(() => {
+    if (storeType === 'pharmacy' && supplierName && existingItems.length > 0) {
+      const matchingItem = existingItems.find(
+        (item) =>
+          item.company &&
+          item.company.trim().toLowerCase() === supplierName.trim().toLowerCase()
+      );
+      if (matchingItem && matchingItem.location) {
+        const currentLocation = form.getValues('location');
+        if (!currentLocation) {
+          form.setValue('location', matchingItem.location, { 
+            shouldDirty: true, 
+            shouldTouch: true, 
+            shouldValidate: true 
+          });
+        }
+      }
+    }
+  }, [supplierName, existingItems, storeType, form]);
 
   const wasOpenRef = React.useRef(false);
   const prevPurchaseIdRef = React.useRef<string | null>(null);
