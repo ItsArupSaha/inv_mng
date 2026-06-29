@@ -137,7 +137,7 @@ export function SearchableItemSelect({
             >
               <div className="font-semibold">{item.title}</div>
               <div className="text-xs text-muted-foreground">
-                {item.company} {item.medicineGroup ? ` - ${item.medicineGroup}` : ''} | Stock: {item.stock}
+                {item.company} {item.medicineGroup ? ` - ${item.medicineGroup}` : ''} {item.expiryDate ? ` | Exp: ${item.expiryDate}` : ''} | Stock: {item.stock}
               </div>
             </button>
           ))}

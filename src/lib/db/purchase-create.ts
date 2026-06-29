@@ -68,7 +68,10 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
 
           for (const item of mappedItems) {
               const trimmedName = item.itemName;
-              const q = query(itemsCollection, where("title", "==", trimmedName));
+              let q = query(itemsCollection, where("title", "==", trimmedName));
+              if (item.expiryDate) {
+                  q = query(itemsCollection, where("title", "==", trimmedName), where("expiryDate", "==", item.expiryDate));
+              }
               const bookSnapshot = await getDocs(q); 
               const capitalizedCost = Number(item.cost) * factor;
 

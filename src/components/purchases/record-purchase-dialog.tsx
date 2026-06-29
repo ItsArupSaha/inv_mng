@@ -49,6 +49,7 @@ export function RecordPurchaseDialog({
     storeType,
     onSubmit,
     handleAddItem,
+    existingItems,
   } = useRecordPurchase({
     userId,
     isOpen,
@@ -124,6 +125,7 @@ export function RecordPurchaseDialog({
                       key={field.id}
                       index={index}
                       categories={categories}
+                      existingItems={existingItems}
                       onAddCategoryClick={onAddCategoryClick}
                       onRemove={() => remove(index)}
                       disabledRemove={fields.length === 1}

@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
-import type { Metadata, Purchase } from '../types';
+import type { Metadata, Purchase, Item } from '../types';
 
 export async function updatePurchase(
   userId: string,
@@ -48,18 +48,26 @@ export async function updatePurchase(
           .filter(docSnap => docSnap.data().description?.includes(purchaseId))
           .map(docSnap => docSnap.ref);
 
-      // Find all items affected by either old or new purchase
+      // Find all items affected by either old or new purchase, keyed by title + expiry
       const itemsCollection = collection(userRef, 'items');
-      const itemNames = new Set<string>();
-      oldPurchase.items.forEach(item => itemNames.add(item.itemName.trim()));
-      data.items.forEach(item => itemNames.add(item.itemName.trim()));
+      const itemKeys = new Set<string>();
+      oldPurchase.items.forEach(item => {
+          itemKeys.add(`${item.itemName.trim()}||${item.expiryDate || ''}`);
+      });
+      data.items.forEach(item => {
+          itemKeys.add(`${item.itemName.trim()}||${item.expiryDate || ''}`);
+      });
 
       const itemDocsMap: Record<string, { ref: any; data: any }> = {};
-      for (const name of itemNames) {
-          const q = query(itemsCollection, where("title", "==", name));
+      for (const key of itemKeys) {
+          const [name, expiryDate] = key.split('||');
+          let q = query(itemsCollection, where("title", "==", name));
+          if (expiryDate) {
+              q = query(itemsCollection, where("title", "==", name), where("expiryDate", "==", expiryDate));
+          }
           const snap = await getDocs(q);
           if (!snap.empty) {
-              itemDocsMap[name] = {
+              itemDocsMap[key] = {
                   ref: snap.docs[0].ref,
                   data: snap.docs[0].data(),
               };
@@ -84,29 +92,29 @@ export async function updatePurchase(
 
           // Get current state of each item inside the transaction to prevent race conditions
           const currentItemDataMap: Record<string, any> = {};
-          for (const name of itemNames) {
-              const itemRef = itemDocsMap[name]?.ref;
+          for (const key of itemKeys) {
+              const itemRef = itemDocsMap[key]?.ref;
               if (itemRef) {
                   const snap = await transaction.get(itemRef);
                   if (snap.exists()) {
-                      currentItemDataMap[name] = snap.data();
+                      currentItemDataMap[key] = snap.data();
                   }
               }
           }
 
           // Calculate intermediate state (after subtracting old purchase quantities & value)
           const intermediateItems: Record<string, { stock: number; totalValue: number }> = {};
-          for (const name of itemNames) {
-              const currentData = currentItemDataMap[name];
+          for (const key of itemKeys) {
+              const currentData = currentItemDataMap[key];
               if (currentData) {
                   const stock = Number(currentData.stock) || 0;
                   const price = Number(currentData.productionPrice) || 0;
-                  intermediateItems[name] = {
+                  intermediateItems[key] = {
                       stock,
                       totalValue: stock * price,
                   };
               } else {
-                  intermediateItems[name] = {
+                  intermediateItems[key] = {
                       stock: 0,
                       totalValue: 0,
                   };
@@ -114,7 +122,8 @@ export async function updatePurchase(
           }
 
           for (const oldItem of oldPurchase.items) {
-              const state = intermediateItems[oldItem.itemName];
+              const key = `${oldItem.itemName.trim()}||${oldItem.expiryDate || ''}`;
+              const state = intermediateItems[key];
               if (state) {
                   const oldTotal = oldItem.quantity * oldItem.cost;
                   state.stock = Math.max(0, state.stock - oldItem.quantity);
@@ -124,14 +133,15 @@ export async function updatePurchase(
 
           // Apply new purchase quantities & value to the intermediate state
           for (const newItem of data.items) {
-              const state = intermediateItems[newItem.itemName];
+              const key = `${newItem.itemName.trim()}||${newItem.expiryDate || ''}`;
+              const state = intermediateItems[key];
               const capitalizedCost = newItem.cost * factor;
               if (state) {
                   const newTotal = newItem.quantity * capitalizedCost;
                   state.stock += newItem.quantity;
                   state.totalValue += newTotal;
               } else {
-                  intermediateItems[newItem.itemName] = {
+                  intermediateItems[key] = {
                       stock: newItem.quantity,
                       totalValue: newItem.quantity * capitalizedCost,
                   };
@@ -139,13 +149,14 @@ export async function updatePurchase(
           }
 
           // Update items in database
-          for (const name of itemNames) {
-              const state = intermediateItems[name];
+          for (const key of itemKeys) {
+              const [name, expiryDate] = key.split('||');
+              const state = intermediateItems[key];
               const finalStock = state.stock;
               const finalProductionPrice = finalStock > 0 ? state.totalValue / finalStock : 0;
 
-              const itemRef = itemDocsMap[name]?.ref;
-              const currentData = currentItemDataMap[name];
+              const itemRef = itemDocsMap[key]?.ref;
+              const currentData = currentItemDataMap[key];
 
               if (itemRef && currentData) {
                   const updateData: any = {
@@ -153,7 +164,7 @@ export async function updatePurchase(
                       productionPrice: finalProductionPrice,
                   };
 
-                  const newItem = data.items.find(i => i.itemName === name);
+                  const newItem = data.items.find(i => `${i.itemName.trim()}||${i.expiryDate || ''}` === key);
                   if (newItem) {
                       if (newItem.sellingPrice && newItem.sellingPrice > 0) updateData.sellingPrice = newItem.sellingPrice;
                       if (newItem.medicineGroup) updateData.medicineGroup = newItem.medicineGroup;
@@ -164,13 +175,13 @@ export async function updatePurchase(
 
                   transaction.update(itemRef, updateData);
               } else {
-                  const newItem = data.items.find(i => i.itemName === name);
+                  const newItem = data.items.find(i => `${i.itemName.trim()}||${i.expiryDate || ''}` === key);
                   if (newItem) {
                       const newItemRef = doc(itemsCollection);
                       const capitalizedCost = newItem.cost * factor;
                       const sellingPrice = newItem.sellingPrice && newItem.sellingPrice > 0 ? newItem.sellingPrice : capitalizedCost * 1.5;
                       const newItemData: any = {
-                          title: newItem.itemName,
+                          title: name,
                           categoryId: newItem.categoryId,
                           categoryName: newItem.categoryName,
                           stock: finalStock,

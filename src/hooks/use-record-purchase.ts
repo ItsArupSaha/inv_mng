@@ -57,10 +57,10 @@ export function useRecordPurchase({
   const [existingItems, setExistingItems] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    if (isOpen && userId && storeType === 'pharmacy') {
+    if (isOpen && userId) {
       getItems(userId).then(setExistingItems).catch(console.error);
     }
-  }, [isOpen, userId, storeType]);
+  }, [isOpen, userId]);
 
   const supplierName = form.watch('supplier');
 
@@ -246,5 +246,6 @@ export function useRecordPurchase({
     storeType,
     onSubmit,
     handleAddItem,
+    existingItems,
   };
 }

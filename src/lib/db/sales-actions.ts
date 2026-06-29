@@ -4,6 +4,7 @@ import {
   Timestamp,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   runTransaction,
@@ -21,27 +22,73 @@ export async function addSale(
   if (!db || !userId) return { success: false, error: "Database not configured." };
 
   try {
+    const userRef = doc(db, 'users', userId);
+    const itemsCollection = collection(userRef, 'items');
+    const customersCollection = collection(userRef, 'customers');
+    const salesCollection = collection(userRef, 'sales');
+    const transactionsCollection = collection(userRef, 'transactions');
+    const metadataRef = doc(userRef, 'metadata', 'counters');
+    const customerRef = doc(customersCollection, data.customerId);
+    const saleDate = new Date(data.date) || new Date();
+
+    // 1. Pre-fetch selected items and retrieve all alternative expiry batches (outside the transaction)
+    const selectedItemRefs = data.items.map(item => doc(itemsCollection, item.itemId));
+    const selectedItemSnaps = await Promise.all(selectedItemRefs.map(ref => getDoc(ref)));
+
+    const batchRefsMap: Record<string, { ref: any; isMedicine: boolean; title: string }[]> = {};
+    const allBatchRefs: any[] = [];
+
+    for (let i = 0; i < selectedItemSnaps.length; i++) {
+      const snap = selectedItemSnaps[i];
+      if (!snap.exists()) {
+        return { success: false, error: `Item with id ${data.items[i].itemId} does not exist.` };
+      }
+      const itemData = snap.data() as Item;
+      const isMedicine = itemData.categoryName?.toLowerCase().includes('medicine') || !!itemData.expiryDate;
+      const itemId = snap.id;
+
+      if (isMedicine) {
+        // Query all items with the same title to find alternative expiry batches
+        const q = query(itemsCollection, where("title", "==", itemData.title));
+        const batchSnap = await getDocs(q);
+        const batches = batchSnap.docs.map(doc => ({
+          ref: doc.ref,
+          isMedicine: true,
+          title: itemData.title,
+        }));
+        batchRefsMap[itemId] = batches;
+        batches.forEach(b => {
+          if (!allBatchRefs.some(ref => ref.path === b.ref.path)) {
+            allBatchRefs.push(b.ref);
+          }
+        });
+      } else {
+        batchRefsMap[itemId] = [{ ref: snap.ref, isMedicine: false, title: itemData.title }];
+        if (!allBatchRefs.some(ref => ref.path === snap.ref.path)) {
+          allBatchRefs.push(snap.ref);
+        }
+      }
+    }
+
     const result = await runTransaction(db, async (transaction) => {
-      const userRef = doc(db!, 'users', userId);
-      const metadataRef = doc(userRef, 'metadata', 'counters');
-      const itemsCollection = collection(userRef, 'items');
-      const customersCollection = collection(userRef, 'customers');
-      const salesCollection = collection(userRef, 'sales');
-      const transactionsCollection = collection(userRef, 'transactions');
-
-      const saleDate = new Date(data.date) || new Date();
-      const itemRefs = data.items.map(item => doc(itemsCollection, item.itemId));
-      const customerRef = doc(customersCollection, data.customerId);
-
-      const [metadataDoc, ...itemDocs] = await Promise.all([
-        transaction.get(metadataRef),
-        ...itemRefs.map(ref => transaction.get(ref)),
-      ]);
+      const metadataDoc = await transaction.get(metadataRef);
       const customerDoc = await transaction.get(customerRef);
+      const batchDocs = await Promise.all(allBatchRefs.map(ref => transaction.get(ref)));
 
       if (!customerDoc.exists()) {
         throw new Error(`Customer with id ${data.customerId} does not exist!`);
       }
+
+      const batchDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
+      batchDocs.forEach(doc => {
+        if (doc.exists()) {
+          batchDocsMap[doc.id] = {
+            ref: doc.ref,
+            data: doc.data() as Item,
+            id: doc.id,
+          };
+        }
+      });
 
       const lastSaleNumber = (metadataDoc.data() as Metadata)?.lastSaleNumber || 0;
       const newSaleNumber = lastSaleNumber + 1;
@@ -51,21 +98,69 @@ export async function addSale(
       let totalProductionCost = 0;
       const itemsWithPrices: SaleItem[] = [];
 
+      // Array to keep track of updates we need to make to batch stocks
+      const stockUpdatesToMake: { ref: any; newStock: number }[] = [];
+
       for (let i = 0; i < data.items.length; i++) {
-        const itemDoc = itemDocs[i];
         const saleItem = data.items[i];
+        const batches = batchRefsMap[saleItem.itemId];
+        const itemTitle = batches[0]?.title || '';
 
-        if (!itemDoc.exists()) {
-          throw new Error(`Item with id ${saleItem.itemId} does not exist!`);
-        }
-        const itemData = itemDoc.data() as Item;
-        if (Number(itemData.stock) < Number(saleItem.quantity)) {
-          throw new Error(`Not enough stock for ${itemData.title}. Available: ${itemData.stock}, Requested: ${saleItem.quantity}`);
+        // Calculate total available stock across all batches
+        const totalAvailableStock = batches.reduce((sum, b) => {
+          const docState = batchDocsMap[b.ref.id];
+          return sum + (docState ? Number(docState.data.stock) || 0 : 0);
+        }, 0);
+
+        if (totalAvailableStock < Number(saleItem.quantity)) {
+          throw new Error(`Not enough stock for ${itemTitle}. Available: ${totalAvailableStock}, Requested: ${saleItem.quantity}`);
         }
 
-        const price = saleItem.price !== undefined && saleItem.price !== null ? Number(saleItem.price) : Number(itemData.sellingPrice);
+        // Sort batches: earliest expiry date first
+        const sortedBatches = [...batches]
+          .map(b => batchDocsMap[b.ref.id])
+          .filter(Boolean);
+
+        if (batches[0]?.isMedicine) {
+          sortedBatches.sort((a, b) => {
+            const expA = a.data.expiryDate || '';
+            const expB = b.data.expiryDate || '';
+            if (!expA && !expB) return 0;
+            if (!expA) return 1; // place items without expiry date at the end
+            if (!expB) return -1;
+            return expA.localeCompare(expB);
+          });
+        }
+
+        let remainingQtyToDeduct = Number(saleItem.quantity);
+        let itemProductionCost = 0;
+
+        for (const batch of sortedBatches) {
+          if (remainingQtyToDeduct <= 0) break;
+          const currentStock = Number(batch.data.stock) || 0;
+          if (currentStock <= 0) continue;
+
+          const qtyToDeductFromThisBatch = Math.min(currentStock, remainingQtyToDeduct);
+          const newStock = currentStock - qtyToDeductFromThisBatch;
+
+          itemProductionCost += (Number(batch.data.productionPrice) || 0) * qtyToDeductFromThisBatch;
+          
+          stockUpdatesToMake.push({ ref: batch.ref, newStock });
+          
+          // Update local map state so other items in this transaction (if any) see intermediate stocks
+          batch.data.stock = newStock;
+          remainingQtyToDeduct -= qtyToDeductFromThisBatch;
+        }
+
+        totalProductionCost += itemProductionCost;
+        
+        // Price for this sale item
+        const primaryDocState = batchDocsMap[saleItem.itemId];
+        const price = saleItem.price !== undefined && saleItem.price !== null 
+          ? Number(saleItem.price) 
+          : Number(primaryDocState?.data.sellingPrice || 0);
+
         calculatedSubtotal += price * Number(saleItem.quantity);
-        totalProductionCost += Number(itemData.productionPrice) * Number(saleItem.quantity);
         itemsWithPrices.push({ ...saleItem, price });
       }
 
@@ -91,7 +186,6 @@ export async function addSale(
       // Clean up data: only include amountPaid and splitPaymentMethod for Split payments
       const cleanedData: any = { ...data };
       if (data.paymentMethod !== 'Split') {
-        // Remove amountPaid and splitPaymentMethod for non-Split payments
         delete cleanedData.amountPaid;
         delete cleanedData.splitPaymentMethod;
       }
@@ -109,11 +203,10 @@ export async function addSale(
       transaction.set(newSaleRef, saleDataToSave);
       transaction.set(metadataRef, { lastSaleNumber: newSaleNumber }, { merge: true });
 
-      for (let i = 0; i < itemDocs.length; i++) {
-        const saleItem = data.items[i];
-        const newStock = Number(itemDocs[i].data()!.stock) - Number(saleItem.quantity);
-        transaction.update(itemRefs[i], { stock: newStock });
-      }
+      // Apply batch stock updates
+      stockUpdatesToMake.forEach(update => {
+        transaction.update(update.ref, { stock: update.newStock });
+      });
 
       const currentDue = customerDoc.data()?.dueBalance || 0;
       let finalDue = currentDue;
