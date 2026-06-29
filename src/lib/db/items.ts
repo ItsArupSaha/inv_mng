@@ -84,3 +84,38 @@ export async function deleteItem(userId: string, id: string) {
   await deleteDoc(itemRef);
   revalidatePath('/items');
 }
+
+export async function bulkUpdateItemLocationByCompany(
+  userId: string,
+  companyName: string,
+  newLocation: string
+) {
+  if (!db || !userId || !companyName) {
+    return { success: false, error: 'Missing required parameters.' };
+  }
+  try {
+    const itemsCollection = collection(db, 'users', userId, 'items');
+    const snapshot = await getDocs(itemsCollection);
+    
+    const batchPromises = snapshot.docs
+      .filter(doc => {
+        const data = doc.data();
+        return data.company && data.company.trim().toLowerCase() === companyName.trim().toLowerCase();
+      })
+      .map(doc => {
+        const docRef = doc.ref;
+        return updateDoc(docRef, { location: newLocation });
+      });
+
+    if (batchPromises.length === 0) {
+      return { success: true, updatedCount: 0 };
+    }
+
+    await Promise.all(batchPromises);
+    revalidatePath('/items');
+    return { success: true, updatedCount: batchPromises.length };
+  } catch (error: any) {
+    console.error('Failed to bulk update location:', error);
+    return { success: false, error: error?.message || 'Failed to update location' };
+  }
+}

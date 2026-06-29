@@ -19,6 +19,7 @@ import {
   ShoppingCart,
   AlertTriangle,
   Loader2,
+  FolderSync,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -128,6 +129,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     ] : []),
     { href: '/payables', icon: ArrowRightLeft, label: 'Payables (Suppliers)' },
     { href: '/transfer', icon: ArrowLeftRight, label: 'Transfers (Cash/Bank)' },
+    ...(storeType === 'pharmacy' ? [
+      { href: '/bulk-shelf-update', icon: FolderSync, label: 'Shelf Update (Bulk)' }
+    ] : []),
   ], [storeType]);
 
   const allNavItems = React.useMemo(() => [...coreItems, ...otherItems], [coreItems, otherItems]);
