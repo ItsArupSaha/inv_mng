@@ -13,6 +13,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { SalesTable } from './sales/sales-table';
 import { RecordSaleForm } from './sales/record-sale-form';
 import { useSalesManagement } from '@/hooks/use-sales-management';
+import type { Item } from '@/lib/types';
 
 interface SalesManagementProps {
   userId: string;
@@ -54,12 +55,38 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
   const filteredDirectoryItems = React.useMemo(() => {
     const q = directoryQuery.trim().toLowerCase();
     if (!q) return items.slice(0, 8);
-    return items.filter(item => 
+    
+    const matches = items.filter(item => 
       (item.title || '').toLowerCase().includes(q) ||
       (item.medicineGroup || '').toLowerCase().includes(q) ||
       (item.company || '').toLowerCase().includes(q) ||
       (item.location || '').toLowerCase().includes(q)
-    ).slice(0, 50);
+    );
+
+    const getRelevanceScore = (item: Item) => {
+      const title = (item.title || '').toLowerCase();
+      const group = (item.medicineGroup || '').toLowerCase();
+      const company = (item.company || '').toLowerCase();
+      const location = (item.location || '').toLowerCase();
+
+      if (title.startsWith(q)) return 1;
+      if (title.includes(q)) return 2;
+      if (group.startsWith(q)) return 3;
+      if (group.includes(q)) return 4;
+      if (company.startsWith(q)) return 5;
+      if (company.includes(q)) return 6;
+      if (location.includes(q)) return 7;
+      return 8;
+    };
+
+    return matches.sort((a, b) => {
+      const scoreA = getRelevanceScore(a);
+      const scoreB = getRelevanceScore(b);
+      if (scoreA !== scoreB) {
+        return scoreA - scoreB;
+      }
+      return (a.title || '').localeCompare(b.title || '');
+    }).slice(0, 50);
   }, [directoryQuery, items]);
 
   return (

@@ -2,14 +2,14 @@
 
 import * as React from 'react';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import type { Item } from '@/lib/types';
 
-interface SearchableItemSelectProps {
+interface SearchableItemSelectProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
   items: Item[];
   value: string;
   onChange: (value: string) => void;
   disabledItemIds: string[];
-  placeholder?: string;
 }
 
 export function SearchableItemSelect({
@@ -18,6 +18,8 @@ export function SearchableItemSelect({
   onChange,
   disabledItemIds,
   placeholder = "Select item",
+  className,
+  ...props
 }: SearchableItemSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -29,6 +31,11 @@ export function SearchableItemSelect({
   const selectedItem = React.useMemo(() => {
     return items.find(item => item.id === value);
   }, [items, value]);
+
+  const selectedItemRef = React.useRef(selectedItem);
+  React.useEffect(() => {
+    selectedItemRef.current = selectedItem;
+  }, [selectedItem]);
 
   // Sync searchQuery with value changes
   React.useEffect(() => {
@@ -43,19 +50,42 @@ export function SearchableItemSelect({
   const filteredItems = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     
+    if (!query) return []; // Disable suggestions when input query is empty
+
     // Include current value, exclude other disabled values
     const list = items.filter(item => {
       if (item.id === value) return true;
       return !disabledItemIds.includes(item.id);
     });
 
-    if (!query) return list.slice(0, 50); // limit to 50 items if empty query
-
-    return list.filter(item => {
+    const matches = list.filter(item => {
       const title = (item.title || '').toLowerCase();
       const company = (item.company || '').toLowerCase();
       const group = (item.medicineGroup || '').toLowerCase();
       return title.includes(query) || company.includes(query) || group.includes(query);
+    });
+
+    const getRelevanceScore = (item: Item) => {
+      const title = (item.title || '').toLowerCase();
+      const group = (item.medicineGroup || '').toLowerCase();
+      const company = (item.company || '').toLowerCase();
+
+      if (title.startsWith(query)) return 1;
+      if (title.includes(query)) return 2;
+      if (group.startsWith(query)) return 3;
+      if (group.includes(query)) return 4;
+      if (company.startsWith(query)) return 5;
+      if (company.includes(query)) return 6;
+      return 7;
+    };
+
+    return matches.sort((a, b) => {
+      const scoreA = getRelevanceScore(a);
+      const scoreB = getRelevanceScore(b);
+      if (scoreA !== scoreB) {
+        return scoreA - scoreB;
+      }
+      return (a.title || '').localeCompare(b.title || '');
     }).slice(0, 50);
   }, [items, searchQuery, value, disabledItemIds]);
 
@@ -80,20 +110,20 @@ export function SearchableItemSelect({
   // Key navigation handler
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') {
-        setIsOpen(true);
-      }
-      return;
+      return; // Allow arrow key events to bubble up for grid row navigation when closed
     }
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      e.stopPropagation();
       setHighlightedIndex(prev => (prev + 1) % filteredItems.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopPropagation();
       setHighlightedIndex(prev => (prev - 1 + filteredItems.length) % filteredItems.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       if (filteredItems[highlightedIndex]) {
         const item = filteredItems[highlightedIndex];
         onChange(item.id);
@@ -101,6 +131,8 @@ export function SearchableItemSelect({
         setIsOpen(false);
       }
     } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
       setIsOpen(false);
       setSearchQuery(selectedItem ? selectedItem.title : '');
     }
@@ -113,12 +145,25 @@ export function SearchableItemSelect({
         placeholder={placeholder}
         value={searchQuery}
         onChange={(e) => {
-          setSearchQuery(e.target.value);
-          setIsOpen(true);
+          const val = e.target.value;
+          setSearchQuery(val);
+          setIsOpen(!!val.trim());
         }}
-        onFocus={() => setIsOpen(true)}
+        onFocus={() => {
+          if (searchQuery.trim()) {
+            setIsOpen(true);
+          }
+        }}
+        onBlur={() => {
+          setTimeout(() => {
+            setIsOpen(false);
+            const currentItem = selectedItemRef.current;
+            setSearchQuery(currentItem ? currentItem.title : '');
+          }, 200);
+        }}
         onKeyDown={handleKeyDown}
-        className="w-full h-8 px-3 text-sm font-medium"
+        className={cn("w-full h-8 px-3 text-sm font-medium", className)}
+        {...props}
       />
       {isOpen && filteredItems.length > 0 && (
         <div className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto bg-popover text-popover-foreground border rounded-md shadow-lg p-1">
