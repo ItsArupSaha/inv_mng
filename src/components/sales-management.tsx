@@ -49,6 +49,19 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
     handleDownloadItemsXlsx,
   } = useSalesManagement({ userId });
 
+  const [directoryQuery, setDirectoryQuery] = React.useState('');
+
+  const filteredDirectoryItems = React.useMemo(() => {
+    const q = directoryQuery.trim().toLowerCase();
+    if (!q) return items.slice(0, 8);
+    return items.filter(item => 
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.medicineGroup || '').toLowerCase().includes(q) ||
+      (item.company || '').toLowerCase().includes(q) ||
+      (item.location || '').toLowerCase().includes(q)
+    ).slice(0, 50);
+  }, [directoryQuery, items]);
+
   return (
     <div className="space-y-6 animate-in fade-in-50 w-full max-w-none">
       {/* Tab toggle buttons */}
@@ -70,21 +83,102 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
       </div>
 
       {activeTab === 'checkout' ? (
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle className="font-headline text-2xl">POS Receipt Checkout</CardTitle>
-            <CardDescription>Select items, adjust prices, and confirm transactions instantly.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecordSaleForm
-              userId={userId}
-              items={items}
-              customers={customers}
-              onSuccess={loadInitialData}
-              authUser={authUser}
-            />
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start w-full">
+          <Card className="xl:col-span-3 w-full">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl">POS Receipt Checkout</CardTitle>
+              <CardDescription>Select items, adjust prices, and confirm transactions instantly.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RecordSaleForm
+                userId={userId}
+                items={items}
+                customers={customers}
+                onSuccess={loadInitialData}
+                authUser={authUser}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Directory Deep Search Panel */}
+          <Card className="xl:col-span-1 w-full h-fit sticky top-20">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-headline text-lg flex items-center gap-2">
+                <Search className="h-4 w-4 text-primary" />
+                Directory Deep Search
+              </CardTitle>
+              <CardDescription className="text-xs">Search medicines by name, company, generic group, or shelf.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Type to search directory..."
+                  className="pl-8 w-full h-9 text-xs"
+                  value={directoryQuery}
+                  onChange={(e) => setDirectoryQuery(e.target.value)}
+                />
+                {directoryQuery && (
+                  <button
+                    onClick={() => setDirectoryQuery('')}
+                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <ScrollArea className="h-[520px] pr-2">
+                <div className="space-y-2">
+                  {filteredDirectoryItems.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-8">No matching medicines found.</p>
+                  ) : (
+                    filteredDirectoryItems.map((item) => (
+                      <div key={item.id} className="p-2.5 border rounded-lg bg-card/40 hover:bg-card/85 transition-all duration-200 space-y-1.5 text-xs">
+                        <div className="flex justify-between items-start gap-1">
+                          <div className="font-bold text-foreground truncate flex-1" title={item.title}>{item.title}</div>
+                          <div className="font-bold text-primary shrink-0">৳{Number(item.sellingPrice).toFixed(2)}</div>
+                        </div>
+                        
+                        <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                          {item.company} {item.medicineGroup ? ` • ${item.medicineGroup}` : ''}
+                        </div>
+
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                            item.stock <= 5 
+                              ? 'bg-destructive/15 text-destructive animate-pulse' 
+                              : item.stock <= 20 
+                                ? 'bg-amber-500/15 text-amber-600' 
+                                : 'bg-emerald-500/15 text-emerald-600'
+                          }`}>
+                            Stock: {item.stock}
+                          </span>
+                          
+                          {item.location && (
+                            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold truncate max-w-[120px]">
+                              Shelf: {item.location}
+                            </span>
+                          )}
+
+                          {item.expiryDate && (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                              new Date(item.expiryDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                                ? 'bg-destructive/20 text-destructive animate-pulse'
+                                : 'bg-secondary text-secondary-foreground'
+                            }`}>
+                              Exp: {item.expiryDate}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <Card className="w-full">
           <CardHeader>

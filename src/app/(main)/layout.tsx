@@ -105,13 +105,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   // Dynamic Core items
   const coreItems = React.useMemo(() => [
-    { href: '/dashboard', icon: Home, label: 'Dashboard' },
+    { href: '/sales', icon: ShoppingCart, label: 'Sell' },
     { 
       href: '/items', 
       icon: Package, 
       label: storeType === 'pharmacy' ? 'Items / Stocks' : storeType === 'bookstore' ? 'Books / Stocks' : 'Items & Stocks' 
     },
-    { href: '/sales', icon: ShoppingCart, label: 'Sell' },
     { href: '/expenses', icon: CreditCard, label: 'Expense' },
     { href: '/purchases', icon: ShoppingBag, label: 'Purchase' },
     ...(storeType === 'pharmacy' ? [{ href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true }] : []),
@@ -135,7 +134,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   ], [storeType]);
 
   const allNavItems = React.useMemo(() => [...coreItems, ...otherItems], [coreItems, otherItems]);
-  const pageTitle = allNavItems.find(item => pathname.startsWith(item.href))?.label || 'Dashboard';
+  const pageTitle = allNavItems.find(item => pathname.startsWith(item.href))?.label || 'Sell';
 
   return (
     <SidebarProvider>

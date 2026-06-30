@@ -31,7 +31,7 @@ export function AppWithAuthProvider({ children }: { children: React.ReactNode })
       } else {
         // ...and onboarding is complete, but they are on an auth page, redirect to dashboard
         if (isAuthPage) {
-          router.replace('/dashboard');
+          router.replace('/sales');
         }
       }
     }
