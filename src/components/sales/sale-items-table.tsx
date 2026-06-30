@@ -136,6 +136,7 @@ export function SaleItemsTable({
                               data-row={index}
                               data-col={0}
                               onChange={(value) => {
+                                if (value === selectField.value) return;
                                 const item = items.find(i => i.id === value);
                                 selectField.onChange(value);
                                 setValue(`items.${index}.price`, item?.sellingPrice || 0, { shouldDirty: true, shouldTouch: true, shouldValidate: true });

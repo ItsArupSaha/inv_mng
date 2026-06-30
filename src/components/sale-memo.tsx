@@ -117,9 +117,17 @@ export function SaleMemo({ sale, customer, items, user, onNewSale }: SaleMemoPro
             `TK ${(item.quantity * item.price).toFixed(2)}`
         ]);
 
+        const discountDiff = sale.subtotal - sale.total;
+        const discountLabel = discountDiff >= 0 
+            ? `Discount${sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}`
+            : 'Extra Profit';
+        const discountValueStr = discountDiff >= 0
+            ? `-TK ${discountDiff.toFixed(2)}`
+            : `+TK ${(sale.total - sale.subtotal).toFixed(2)}`;
+
         const footContent = [
             [{ content: 'Subtotal', colSpan: 3, styles: { halign: 'right', textColor: [100, 100, 100] } }, { content: `TK ${sale.subtotal.toFixed(2)}`, styles: { textColor: [100, 100, 100] } }],
-            [{ content: `Discount${sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}`, colSpan: 3, styles: { halign: 'right', textColor: [34, 197, 94] } }, { content: `-TK ${(sale.subtotal - sale.total).toFixed(2)}`, styles: { textColor: [34, 197, 94] } }],
+            [{ content: discountLabel, colSpan: 3, styles: { halign: 'right', textColor: [34, 197, 94] } }, { content: discountValueStr, styles: { textColor: [34, 197, 94] } }],
             [{ content: 'Grand Total', colSpan: 3, styles: { halign: 'right', fontSize: 12, textColor: [0, 0, 0] } }, { content: `TK ${sale.total.toFixed(2)}`, styles: { textColor: [0, 0, 0], fontSize: 12 } }],
         ];
 
@@ -203,10 +211,15 @@ export function SaleMemo({ sale, customer, items, user, onNewSale }: SaleMemoPro
                             <span className="text-muted-foreground">Subtotal</span>
                             <span>TK {sale.subtotal.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-green-600">
-                            <span>Discount{sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}</span>
-                            <span>-TK {(sale.subtotal - sale.total).toFixed(2)}</span>
-                        </div>
+                        {(() => {
+                            const diff = sale.subtotal - sale.total;
+                            return (
+                                <div className="flex justify-between text-green-600">
+                                    <span>{diff >= 0 ? `Discount${sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}` : 'Extra Profit'}</span>
+                                    <span>{diff >= 0 ? `-TK ${diff.toFixed(2)}` : `+TK ${(sale.total - sale.subtotal).toFixed(2)}`}</span>
+                                </div>
+                            );
+                        })()}
                         <div className="flex justify-between font-bold text-base border-t pt-2">
                             <span>Grand Total</span>
                             <span>TK {sale.total.toFixed(2)}</span>

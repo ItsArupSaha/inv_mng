@@ -26,6 +26,7 @@ export function SearchableItemSelect({
   const [highlightedIndex, setHighlightedIndex] = React.useState(0);
   
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
   
   // Find current selected item
   const selectedItem = React.useMemo(() => {
@@ -149,11 +150,6 @@ export function SearchableItemSelect({
           setSearchQuery(val);
           setIsOpen(!!val.trim());
         }}
-        onFocus={() => {
-          if (searchQuery.trim()) {
-            setIsOpen(true);
-          }
-        }}
         onBlur={() => {
           setTimeout(() => {
             setIsOpen(false);
@@ -164,6 +160,7 @@ export function SearchableItemSelect({
         onKeyDown={handleKeyDown}
         className={cn("w-full h-8 px-3 text-sm font-medium", className)}
         {...props}
+        ref={inputRef}
       />
       {isOpen && filteredItems.length > 0 && (
         <div className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto bg-popover text-popover-foreground border rounded-md shadow-lg p-1">
@@ -178,6 +175,9 @@ export function SearchableItemSelect({
                 onChange(item.id);
                 setSearchQuery(item.title);
                 setIsOpen(false);
+                setTimeout(() => {
+                  inputRef.current?.focus();
+                }, 50);
               }}
             >
               <div className="font-semibold">{item.title}</div>
