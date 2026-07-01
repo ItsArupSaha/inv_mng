@@ -105,7 +105,10 @@ export function calculateStockAndAssets(
   filteredPurchases: Purchase[],
   isBeforeOrOnCutoff: (date: any) => boolean
 ) {
-    const stockValue = allItems.reduce((sum: number, item: any) => {
+    let stockValue = 0;
+    let assetItemsValue = 0;
+
+    allItems.forEach((item: any) => {
         const itemSalesAfterCutoff = allSales
             .filter((sale: any) => !isBeforeOrOnCutoff(sale.date))
             .reduce((saleSum: number, sale: any) => {
@@ -134,13 +137,19 @@ export function calculateStockAndAssets(
             toNum(item.stock) + itemSalesAfterCutoff - itemPurchasesAfterCutoff;
         const unitCost = toNum(item.productionPrice);
         const value = closingStockAsOfDate > 0 ? unitCost * closingStockAsOfDate : 0;
-        return sum + value;
-    }, 0);
+        
+        const catName = (item.categoryName || '').toLowerCase();
+        if (catName === 'assets' || catName === 'surgicals') {
+            assetItemsValue += value;
+        } else {
+            stockValue += value;
+        }
+    });
 
     const officeAssetsValue = filteredPurchases
         .flatMap((p: any) => p.items)
         .filter((i: any) => i.categoryName === 'Office Asset')
-        .reduce((sum: number, item: any) => sum + toNum(item.cost) * toNum(item.quantity), 0);
+        .reduce((sum: number, item: any) => sum + toNum(item.cost) * toNum(item.quantity), 0) + assetItemsValue;
 
     return { stockValue, officeAssetsValue };
 }

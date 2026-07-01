@@ -46,6 +46,13 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
     handleDownloadItemsXlsx,
   } = useSalesManagement({ userId });
 
+  const sellableItems = React.useMemo(() => {
+    return items.filter(item => {
+      const catName = (item.categoryName || '').toLowerCase();
+      return catName !== 'assets' && catName !== 'surgicals';
+    });
+  }, [items]);
+
   return (
     <div className="space-y-6 animate-in fade-in-50 w-full max-w-none">
       {/* Tab toggle buttons */}
@@ -85,7 +92,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
           </Card>
 
           {/* Directory Deep Search Panel */}
-          <SalesDirectorySearch items={items} />
+          <SalesDirectorySearch items={sellableItems} />
         </div>
       ) : (
         <Card className="w-full">

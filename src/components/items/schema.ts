@@ -11,9 +11,6 @@ export const itemSchema = z.object({
   productionPrice: z.coerce.number().min(0, 'Production price must be positive'),
   sellingPrice: z.coerce.number().min(0, 'Selling price must be positive'),
   stock: z.coerce.number().int().min(0, 'Stock must be a non-negative integer'),
-}).refine(data => data.sellingPrice >= data.productionPrice, {
-  message: "Selling price cannot be less than production price.",
-  path: ["sellingPrice"],
 });
 
 export type ItemFormValues = z.infer<typeof itemSchema>;

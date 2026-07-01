@@ -50,6 +50,7 @@ export function AddItemDialog({
     storeType,
     onSubmit,
     nameLabel,
+    isAssetOrSurgical,
   } = useAddItem({
     userId,
     isOpen,
@@ -116,7 +117,7 @@ export function AddItemDialog({
                       <FormItem>
                         <FormLabel>Selling Price (৳)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="10.99" {...field} />
+                          <Input type="number" step="0.01" placeholder="10.99" disabled={isAssetOrSurgical} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

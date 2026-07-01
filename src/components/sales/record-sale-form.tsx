@@ -135,6 +135,13 @@ export function RecordSaleForm({
     });
   };
 
+  const sellableItems = React.useMemo(() => {
+    return items.filter(item => {
+      const catName = (item.categoryName || '').toLowerCase();
+      return catName !== 'assets' && catName !== 'surgicals';
+    });
+  }, [items]);
+
   return (
     <div className="space-y-6 w-full max-w-none">
       <Form {...form}>
@@ -142,7 +149,7 @@ export function RecordSaleForm({
           <SalePaymentToggle />
           
           <SaleItemsTable 
-            items={items} 
+            items={sellableItems} 
             fields={fields} 
             remove={remove} 
             appendRow={handleAddNewRow} 

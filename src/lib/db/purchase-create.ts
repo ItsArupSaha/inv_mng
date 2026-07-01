@@ -84,10 +84,15 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   const newStock = currentStock + Number(item.quantity);
                   const newProductionPrice = newStock > 0 ? (currentTotalValue + newTotalValue) / newStock : 0;
                   
-                   // Optionally keep the higher selling price or recalculate standard markup
-                  const newSellingPrice = item.sellingPrice && item.sellingPrice > 0 
-                                            ? item.sellingPrice 
-                                            : Math.max(bookData.sellingPrice || 0, newProductionPrice * 1.5);
+                  const catNameLower = (item.categoryName || '').toLowerCase();
+                  const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+
+                  // Optionally keep the higher selling price or recalculate standard markup
+                  const newSellingPrice = isAssetOrSurgical
+                                            ? 0
+                                            : (item.sellingPrice && item.sellingPrice > 0 
+                                                ? item.sellingPrice 
+                                                : Math.max(bookData.sellingPrice || 0, newProductionPrice * 1.5));
                   
                   const updateData: any = { 
                       stock: newStock,
@@ -102,7 +107,12 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   transaction.update(bookDoc.ref, updateData);
               } else {
                   const newItemRef = doc(itemsCollection);
-                  const sellingPrice = item.sellingPrice && item.sellingPrice > 0 ? item.sellingPrice : capitalizedCost * 1.5;
+                  const catNameLower = (item.categoryName || '').toLowerCase();
+                  const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+
+                  const sellingPrice = isAssetOrSurgical
+                                        ? 0
+                                        : (item.sellingPrice && item.sellingPrice > 0 ? item.sellingPrice : capitalizedCost * 1.5);
                   
                   const newItemData: Omit<Item, 'id'> = {
                       title: trimmedName,

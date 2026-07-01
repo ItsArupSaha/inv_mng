@@ -44,6 +44,10 @@ export async function addSale(
         return { success: false, error: `Item with id ${data.items[i].itemId} does not exist.` };
       }
       const itemData = snap.data() as Item;
+      const catNameLower = (itemData.categoryName || '').toLowerCase();
+      if (catNameLower === 'assets' || catNameLower === 'surgicals') {
+        return { success: false, error: `Item "${itemData.title}" is an asset/surgical product and cannot be sold.` };
+      }
       const isMedicine = itemData.categoryName?.toLowerCase().includes('medicine') || !!itemData.expiryDate;
       const itemId = snap.id;
 

@@ -166,7 +166,13 @@ export async function updatePurchase(
 
                   const newItem = data.items.find(i => `${i.itemName.trim()}||${i.expiryDate || ''}` === key);
                   if (newItem) {
-                      if (newItem.sellingPrice && newItem.sellingPrice > 0) updateData.sellingPrice = newItem.sellingPrice;
+                      const catNameLower = (newItem.categoryName || '').toLowerCase();
+                      const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+                      if (isAssetOrSurgical) {
+                          updateData.sellingPrice = 0;
+                      } else if (newItem.sellingPrice && newItem.sellingPrice > 0) {
+                          updateData.sellingPrice = newItem.sellingPrice;
+                      }
                       if (newItem.medicineGroup) updateData.medicineGroup = newItem.medicineGroup;
                       if (newItem.company) updateData.company = newItem.company;
                       if (newItem.expiryDate) updateData.expiryDate = newItem.expiryDate;
@@ -179,7 +185,9 @@ export async function updatePurchase(
                   if (newItem) {
                       const newItemRef = doc(itemsCollection);
                       const capitalizedCost = newItem.cost * factor;
-                      const sellingPrice = newItem.sellingPrice && newItem.sellingPrice > 0 ? newItem.sellingPrice : capitalizedCost * 1.5;
+                      const catNameLower = (newItem.categoryName || '').toLowerCase();
+                      const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+                      const sellingPrice = isAssetOrSurgical ? 0 : (newItem.sellingPrice && newItem.sellingPrice > 0 ? newItem.sellingPrice : capitalizedCost * 1.5);
                       const newItemData: any = {
                           title: name,
                           categoryId: newItem.categoryId,

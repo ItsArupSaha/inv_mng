@@ -23,10 +23,33 @@ export async function getItems(userId: string): Promise<Item[]> {
   if (!db || !userId) return [];
   const itemsCollection = collection(db, 'users', userId, 'items');
   const snapshot = await getDocs(query(itemsCollection, orderBy('title')));
-  return snapshot.docs.map(doc => ({
+  const items = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   } as Item));
+
+  // Auto-migrate: check if any Assets or Surgicals have a non-zero sellingPrice
+  const legacyItems = items.filter(item => {
+    const catNameLower = (item.categoryName || '').toLowerCase();
+    const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+    return isAssetOrSurgical && item.sellingPrice !== 0;
+  });
+
+  if (legacyItems.length > 0) {
+    Promise.all(legacyItems.map(async (item) => {
+      try {
+        const itemRef = doc(db!, 'users', userId, 'items', item.id);
+        await updateDoc(itemRef, { sellingPrice: 0 });
+        item.sellingPrice = 0; // update local copy
+      } catch (e) {
+        console.error(`Failed to auto-migrate item ${item.id} sellingPrice:`, e);
+      }
+    })).then(() => {
+      revalidatePath('/items');
+    });
+  }
+
+  return items;
 }
 
 export async function getItemsPaginated({ userId, pageLimit = 10, lastVisibleId }: { userId: string, pageLimit?: number, lastVisibleId?: string }): Promise<{ items: Item[], hasMore: boolean }> {
@@ -47,10 +70,16 @@ export async function getItemsPaginated({ userId, pageLimit = 10, lastVisibleId 
   }
 
   const snapshot = await getDocs(q);
-  const items = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Item));
+  const items = snapshot.docs.map(doc => {
+    const data = doc.data();
+    const catNameLower = (data.categoryName || '').toLowerCase();
+    const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+    return {
+      id: doc.id,
+      ...data,
+      sellingPrice: isAssetOrSurgical ? 0 : (data.sellingPrice || 0)
+    } as Item;
+  });
   
   const lastDoc = snapshot.docs[snapshot.docs.length - 1];
   let hasMore = false;
@@ -65,6 +94,11 @@ export async function getItemsPaginated({ userId, pageLimit = 10, lastVisibleId 
 
 export async function addItem(userId: string, data: Omit<Item, 'id'>) {
   if (!db || !userId) return;
+  const catNameLower = (data.categoryName || '').toLowerCase();
+  const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+  if (isAssetOrSurgical) {
+    data.sellingPrice = 0;
+  }
   const itemsCollection = collection(db, 'users', userId, 'items');
   const newDocRef = await addDoc(itemsCollection, data);
   revalidatePath('/items');
@@ -73,6 +107,11 @@ export async function addItem(userId: string, data: Omit<Item, 'id'>) {
 
 export async function updateItem(userId: string, id: string, data: Omit<Item, 'id'>) {
   if (!db || !userId) return;
+  const catNameLower = (data.categoryName || '').toLowerCase();
+  const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+  if (isAssetOrSurgical) {
+    data.sellingPrice = 0;
+  }
   const itemRef = doc(db, 'users', userId, 'items', id);
   await updateDoc(itemRef, data);
   revalidatePath('/items');

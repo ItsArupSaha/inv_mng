@@ -33,8 +33,25 @@ export function useAddItem({
 
   const storeType = authUser?.storeType || 'general';
 
+  const dynamicSchema = React.useMemo(() => {
+    return itemSchema.refine(data => {
+      const cat = categories.find(c => c.id === data.categoryId);
+      const isAssetOrSurgical = cat && (
+        cat.name.toLowerCase() === 'assets' || 
+        cat.name.toLowerCase() === 'surgicals'
+      );
+      if (isAssetOrSurgical) {
+        return true;
+      }
+      return data.sellingPrice >= data.productionPrice;
+    }, {
+      message: "Selling price cannot be less than production price.",
+      path: ["sellingPrice"],
+    });
+  }, [categories]);
+
   const itemForm = useForm<ItemFormValues>({
-    resolver: zodResolver(itemSchema),
+    resolver: zodResolver(dynamicSchema),
     defaultValues: {
       title: '',
       categoryId: '',
@@ -48,6 +65,23 @@ export function useAddItem({
       stock: 0,
     },
   });
+
+  const categoryId = itemForm.watch('categoryId');
+  const selectedCategory = React.useMemo(() => {
+    return categories.find(cat => cat.id === categoryId);
+  }, [categories, categoryId]);
+
+  const isAssetOrSurgical = React.useMemo(() => {
+    if (!selectedCategory) return false;
+    const name = selectedCategory.name.toLowerCase();
+    return name === 'assets' || name === 'surgicals';
+  }, [selectedCategory]);
+
+  React.useEffect(() => {
+    if (isAssetOrSurgical) {
+      itemForm.setValue('sellingPrice', 0, { shouldValidate: true });
+    }
+  }, [isAssetOrSurgical, itemForm]);
 
   // Reset form when dialog opens or editing item changes
   React.useEffect(() => {
@@ -131,5 +165,6 @@ export function useAddItem({
     storeType,
     onSubmit,
     nameLabel,
+    isAssetOrSurgical,
   };
 }

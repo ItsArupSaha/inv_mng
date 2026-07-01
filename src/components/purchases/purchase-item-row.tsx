@@ -35,6 +35,15 @@ export function PurchaseItemRow({
   const watchCategoryId = watch(`items.${index}.categoryId`);
   const selectedCategory = categories.find(c => c.id === watchCategoryId);
   const isMedicine = selectedCategory?.name?.toLowerCase().includes('medicine');
+  
+  const categoryName = (selectedCategory?.name || '').toLowerCase();
+  const isAssetOrSurgical = categoryName === 'assets' || categoryName === 'surgicals';
+
+  React.useEffect(() => {
+    if (isAssetOrSurgical) {
+      setValue(`items.${index}.sellingPrice`, 0);
+    }
+  }, [isAssetOrSurgical, index, setValue]);
 
   const itemName = useWatch({
     control,
@@ -259,7 +268,9 @@ export function PurchaseItemRow({
           render={({ field }) => (
             <FormItem className={storeType === 'pharmacy' ? "md:col-span-2" : isMedicine ? "md:col-span-3" : ""}>
               <FormLabel className="text-xs">Selling Price</FormLabel>
-              <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+              <FormControl>
+                <Input type="number" step="0.01" placeholder="0.00" disabled={isAssetOrSurgical} {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
