@@ -6,12 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { deleteSale, getCustomers, getItems, getSalesPaginated, searchSales } from '@/lib/actions';
 import type { Customer, Item, Sale } from '@/lib/types';
-import {
-  downloadSalesPdf,
-  downloadSalesXlsx,
-  downloadSalesItemsPdf,
-  downloadSalesItemsXlsx,
-} from '@/components/sales/sales-export-utils';
+import { useSalesExport } from './use-sales-export';
 
 interface UseSalesManagementProps {
   userId: string;
@@ -47,11 +42,11 @@ export function useSalesManagement({ userId }: UseSalesManagementProps) {
       setItems(itemsData);
       setCustomers(customersData);
     } catch (error) {
-      console.error("Failed to load initial sales data:", error);
+      console.error('Failed to load initial sales data:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not load data. Please try again later.",
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not load data. Please try again later.',
       });
     } finally {
       setIsInitialLoading(false);
@@ -74,9 +69,9 @@ export function useSalesManagement({ userId }: UseSalesManagementProps) {
       setHasMore(newHasMore);
     } catch (e) {
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not load more sales.",
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not load more sales.',
       });
     } finally {
       setIsLoadingMore(false);
@@ -117,49 +112,14 @@ export function useSalesManagement({ userId }: UseSalesManagementProps) {
     });
   };
 
-  const handleDownloadPdf = async () => {
-    try {
-      const success = await downloadSalesPdf(userId, dateRange, authUser, items, customers);
-      if (!success) {
-        toast({ title: 'No Sales Found', description: 'There are no sales in the selected date range.' });
-      }
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Failed to download PDF." });
-    }
-  };
-
-  const handleDownloadXlsx = async () => {
-    try {
-      const success = await downloadSalesXlsx(userId, dateRange, items, customers);
-      if (!success) {
-        toast({ title: 'No Sales Found', description: 'There are no sales in the selected date range.' });
-      }
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Failed to download Excel." });
-    }
-  };
-
-  const handleDownloadItemsPdf = async () => {
-    try {
-      const success = await downloadSalesItemsPdf(userId, dateRange, authUser, items);
-      if (!success) {
-        toast({ title: 'No Sales Found', description: 'There are no sales in the selected date range.' });
-      }
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Failed to download PDF." });
-    }
-  };
-
-  const handleDownloadItemsXlsx = async () => {
-    try {
-      const success = await downloadSalesItemsXlsx(userId, dateRange, items);
-      if (!success) {
-        toast({ title: 'No Sales Found', description: 'There are no sales in the selected date range.' });
-      }
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Failed to download Excel." });
-    }
-  };
+  // Call the sales export sub-hook
+  const salesExport = useSalesExport({
+    userId,
+    dateRange,
+    authUser,
+    items,
+    customers,
+  });
 
   return {
     authUser,
@@ -185,9 +145,9 @@ export function useSalesManagement({ userId }: UseSalesManagementProps) {
     handleSearch,
     handleClearSearch,
     handleDelete,
-    handleDownloadPdf,
-    handleDownloadXlsx,
-    handleDownloadItemsPdf,
-    handleDownloadItemsXlsx,
+    handleDownloadPdf: salesExport.handleDownloadPdf,
+    handleDownloadXlsx: salesExport.handleDownloadXlsx,
+    handleDownloadItemsPdf: salesExport.handleDownloadItemsPdf,
+    handleDownloadItemsXlsx: salesExport.handleDownloadItemsXlsx,
   };
 }

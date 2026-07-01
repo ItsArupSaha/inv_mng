@@ -1,14 +1,14 @@
-
 'use client';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/use-auth';
 import type { ReportAnalysis } from '@/lib/report-generator';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Download } from 'lucide-react';
+import { ReportActivityTable } from './reports/report-activity-table';
+import { ReportCashflowOverview } from './reports/report-cashflow-overview';
 
 interface ReportPreviewProps {
   reportData: ReportAnalysis;
@@ -23,7 +23,6 @@ const formatCurrency = (amount: number) => {
   }).format(amount)}`;
 };
 
-// Separate function for PDF formatting to avoid BDT symbol issues
 const formatCurrencyForPdf = (amount: number) => {
   return `BDT ${new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
@@ -128,11 +127,11 @@ export default function ReportPreview({ reportData, month, year }: ReportPreview
     // Net Result
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text("Net Profit / Loss for the Month:", 14, finalY + 15);
+    doc.text('Net Profit / Loss for the Month:', 14, finalY + 15);
     const netColor = netResult.netProfitOrLoss >= 0 ? '#306754' : '#E53E3E';
     doc.setTextColor(netColor);
     doc.text(formatCurrencyForPdf(netResult.netProfitOrLoss), 200, finalY + 15, { align: 'right' });
-    doc.setTextColor(0); // Reset color
+    doc.setTextColor(0);
 
     doc.save(`report-${month}-${year}.pdf`);
   };
@@ -155,20 +154,9 @@ export default function ReportPreview({ reportData, month, year }: ReportPreview
       </CardHeader>
       <CardContent className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Tables */}
+          {/* Activity Table */}
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-2 font-headline">Monthly Activity</h3>
-              <Table>
-                <TableBody>
-                  <TableRow><TableCell>Total Sales</TableCell><TableCell className="text-right">{formatCurrency(monthlyActivity.totalSales)}</TableCell></TableRow>
-                  <TableRow><TableCell>Total Profit</TableCell><TableCell className="text-right">{formatCurrency(monthlyActivity.totalProfit)}</TableCell></TableRow>
-                  <TableRow><TableCell>Received Payments from Dues</TableCell><TableCell className="text-right">{formatCurrency(monthlyActivity.receivedPaymentsFromDues)}</TableCell></TableRow>
-                  <TableRow><TableCell>Total Donations</TableCell><TableCell className="text-right text-primary">{formatCurrency(monthlyActivity.totalDonations)}</TableCell></TableRow>
-                  <TableRow><TableCell>Total Expenses</TableCell><TableCell className="text-right text-destructive">({formatCurrency(monthlyActivity.totalExpenses)})</TableCell></TableRow>
-                </TableBody>
-              </Table>
-            </div>
+            <ReportActivityTable monthlyActivity={monthlyActivity} formatCurrency={formatCurrency} />
           </div>
           {/* Net Result & Cash Flow */}
           <div className="space-y-6">
@@ -179,71 +167,11 @@ export default function ReportPreview({ reportData, month, year }: ReportPreview
                 <p className={`text-3xl font-bold ${netColor}`}>{formatCurrency(netResult.netProfitOrLoss)}</p>
               </div>
             </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold font-headline">Cash Flow Overview</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-primary/5">
-                  <p className="text-xs text-muted-foreground mb-1">Sales Overview</p>
-                  <div className="flex justify-between text-sm">
-                    <span>Paid Sale</span>
-                    <span className="font-semibold">{formatCurrency(salesBreakdown.paid)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Due Sale</span>
-                    <span className="font-semibold">{formatCurrency(salesBreakdown.due)}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-primary/5">
-                  <p className="text-xs text-muted-foreground mb-1">Sales</p>
-                  <div className="flex justify-between text-sm">
-                    <span>Cash</span>
-                    <span className="font-semibold">{formatCurrency(cashFlow.sales.cash)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Bank</span>
-                    <span className="font-semibold">{formatCurrency(cashFlow.sales.bank)}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-primary/5">
-                  <p className="text-xs text-muted-foreground mb-1">Due Payments (Received)</p>
-                  <div className="flex justify-between text-sm">
-                    <span>Cash</span>
-                    <span className="font-semibold">{formatCurrency(cashFlow.duePayments.cash)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Bank</span>
-                    <span className="font-semibold">{formatCurrency(cashFlow.duePayments.bank)}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
-                  <p className="text-xs text-muted-foreground mb-1">Donations</p>
-                  <div className="flex justify-between text-sm">
-                    <span>Cash</span>
-                    <span className="font-semibold">{formatCurrency(cashFlow.donations.cash)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Bank</span>
-                    <span className="font-semibold">{formatCurrency(cashFlow.donations.bank)}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20">
-                  <p className="text-xs text-muted-foreground mb-1">Expenses (Outflow)</p>
-                  <div className="flex justify-between text-sm">
-                    <span>Cash</span>
-                    <span className="font-semibold text-destructive">({formatCurrency(cashFlow.expenses.cash)})</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Bank</span>
-                    <span className="font-semibold text-destructive">({formatCurrency(cashFlow.expenses.bank)})</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ReportCashflowOverview
+              salesBreakdown={salesBreakdown}
+              cashFlow={cashFlow}
+              formatCurrency={formatCurrency}
+            />
           </div>
         </div>
       </CardContent>

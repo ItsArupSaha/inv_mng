@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import type { DateRange } from 'react-day-picker';
 import { useAuth } from '@/hooks/use-auth';
@@ -5,17 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 import {
   getCustomersWithNegativeBalance,
   getPaidPayables,
-  getPaidPayablesForDateRange,
   getTransactionsPaginated,
 } from '@/lib/actions';
-import { getPayablesAsOfDate } from '@/lib/db/account-overview';
 import type { CustomerWithDue, Transaction } from '@/lib/types';
-import {
-  generatePendingPayablesPdf,
-  generatePendingPayablesXlsx,
-  generatePaidPayablesPdf,
-  generatePaidPayablesXlsx,
-} from '@/components/payables/payables-export-utils';
+import { usePayablesExport } from './use-payables-export';
 
 export function usePayablesManagement(userId: string) {
   const { authUser } = useAuth();
@@ -114,60 +109,15 @@ export function usePayablesManagement(userId: string) {
     }
   };
 
-  const handlePendingPayablesReport = async (formatType: 'pdf' | 'xlsx') => {
-    let data;
-    const targetDate = asOfDate || new Date();
-
-    if (asOfDate) {
-      data = await getPayablesAsOfDate(userId, targetDate);
-    } else {
-      data = await getTransactionsPaginated({ userId, type: 'Payable', pageLimit: 1000 }).then(
-        (res) => res.transactions
-      );
-    }
-
-    if (data.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data', description: 'There are no pending payables to download.' });
-      return;
-    }
-
-    if (formatType === 'pdf') {
-      generatePendingPayablesPdf(data, targetDate, authUser!);
-    } else {
-      generatePendingPayablesXlsx(data, targetDate);
-    }
-  };
-
-  const handlePaidPayablesReport = async (formatType: 'pdf' | 'xlsx') => {
-    if (!dateRange?.from) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please select a date range for the report.' });
-      return;
-    }
-
-    const paid = await getPaidPayablesForDateRange(userId, dateRange.from, dateRange.to);
-
-    if (paid.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data', description: 'No paid payables found in this date range.' });
-      return;
-    }
-
-    if (formatType === 'pdf') {
-      generatePaidPayablesPdf(paid, dateRange.from, dateRange.to, authUser!);
-    } else {
-      generatePaidPayablesXlsx(paid, dateRange.from, dateRange.to);
-    }
-  };
-
-  const handleDownload = async (formatType: 'pdf' | 'xlsx') => {
-    if (!authUser) return;
-
-    if (reportType === 'pending') {
-      await handlePendingPayablesReport(formatType);
-    } else {
-      await handlePaidPayablesReport(formatType);
-    }
-    setIsDownloadDialogOpen(false);
-  };
+  // Call the exports sub-hook
+  const payablesExport = usePayablesExport({
+    userId,
+    authUser,
+    asOfDate,
+    dateRange,
+    reportType,
+    setIsDownloadDialogOpen,
+  });
 
   return {
     authUser,
@@ -189,6 +139,6 @@ export function usePayablesManagement(userId: string) {
     setReportType,
     loadAllData,
     handleLoadMorePayables,
-    handleDownload
+    handleDownload: payablesExport.handleDownload,
   };
 }

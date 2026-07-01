@@ -1,10 +1,13 @@
+'use client';
+
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { adjustInitialCapital, getAccountBalances, updateCompanyDetails } from '@/lib/actions';
+import { updateCompanyDetails } from '@/lib/actions';
 import type { AuthUser } from '@/lib/types';
+import { useCapitalAdjustments } from './use-capital-adjustments';
 
 export const companyDetailsSchema = z.object({
   companyName: z.string().min(2, 'Company name must be at least 2 characters.'),
@@ -29,20 +32,9 @@ export function useEditCompanyDetails({ user }: UseEditCompanyDetailsProps) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [balances, setBalances] = React.useState<{ cash: number; bank: number } | null>(null);
-  const [isLoadingCapital, setIsLoadingCapital] = React.useState(true);
 
-  React.useEffect(() => {
-    async function loadCapital() {
-      if (isOpen && user.uid) {
-        setIsLoadingCapital(true);
-        const balanceData = await getAccountBalances(user.uid);
-        setBalances({ cash: balanceData.cash, bank: balanceData.bank });
-        setIsLoadingCapital(false);
-      }
-    }
-    loadCapital();
-  }, [isOpen, user.uid]);
+  // Call the capital adjustments sub-hook
+  const capital = useCapitalAdjustments({ userId: user.uid, isOpen });
 
   const form = useForm<CompanyDetailsFormValues>({
     resolver: zodResolver(companyDetailsSchema),
@@ -87,10 +79,10 @@ export function useEditCompanyDetails({ user }: UseEditCompanyDetailsProps) {
         bank: bankAdjustment || 0,
       };
 
-      // Run both updates in parallel
+      // Run details update and capital adjustments in parallel
       await Promise.all([
         updateCompanyDetails(user.uid, companyData),
-        adjustInitialCapital(user.uid, adjustments),
+        capital.adjustCapital(adjustments),
       ]);
 
       toast({
@@ -116,9 +108,9 @@ export function useEditCompanyDetails({ user }: UseEditCompanyDetailsProps) {
     isOpen,
     setIsOpen,
     isSubmitting,
-    balances,
-    isLoadingCapital,
+    balances: capital.balances,
+    isLoadingCapital: capital.isLoadingCapital,
     form,
-    onSubmit
+    onSubmit,
   };
 }
