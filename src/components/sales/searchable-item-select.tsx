@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { isFuzzyMatch, normalizePhonetic } from '@/lib/search-utils';
 import type { Item } from '@/lib/types';
 
 interface SearchableItemSelectProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
@@ -59,12 +60,22 @@ export function SearchableItemSelect({
       return !disabledItemIds.includes(item.id);
     });
 
-    const matches = list.filter(item => {
+    // Try exact matching first
+    let matches = list.filter(item => {
       const title = (item.title || '').toLowerCase();
       const company = (item.company || '').toLowerCase();
       const group = (item.medicineGroup || '').toLowerCase();
       return title.includes(query) || company.includes(query) || group.includes(query);
     });
+
+    // Fallback to fuzzy matching if no exact matches found
+    if (matches.length === 0) {
+      matches = list.filter(item => {
+        return isFuzzyMatch(item.title, query) ||
+               isFuzzyMatch(item.medicineGroup, query) ||
+               isFuzzyMatch(item.company, query);
+      });
+    }
 
     const getRelevanceScore = (item: Item) => {
       const title = (item.title || '').toLowerCase();
@@ -77,7 +88,20 @@ export function SearchableItemSelect({
       if (group.includes(query)) return 4;
       if (company.startsWith(query)) return 5;
       if (company.includes(query)) return 6;
-      return 7;
+
+      const normTitle = normalizePhonetic(title);
+      const normGroup = normalizePhonetic(group);
+      const normCompany = normalizePhonetic(company);
+      const normQuery = normalizePhonetic(query);
+
+      if (normTitle.startsWith(normQuery)) return 7;
+      if (normTitle.includes(normQuery)) return 8;
+      if (normGroup.startsWith(normQuery)) return 9;
+      if (normGroup.includes(normQuery)) return 10;
+      if (normCompany.startsWith(normQuery)) return 11;
+      if (normCompany.includes(normQuery)) return 12;
+
+      return 13;
     };
 
     return matches.sort((a, b) => {

@@ -1,12 +1,16 @@
+'use client';
+
 import * as React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { deleteCategory, deleteItem, getCategories, getItems, calculateClosingStock } from '@/lib/actions';
-import type { Category, ClosingStock, Item } from '@/lib/types';
-import { exportClosingStockPdf, exportClosingStockXlsx } from '@/components/items/items-export-utils';
+import { deleteCategory, deleteItem, getCategories, getItems } from '@/lib/actions';
+import type { Category, Item } from '@/lib/types';
+import { useClosingStock } from './use-closing-stock';
+import { useItemFilters } from './use-item-filters';
 
 export function useItemManagement(userId: string) {
   const { authUser } = useAuth();
+  const { toast } = useToast();
   const [allItems, setAllItems] = React.useState<Item[]>([]);
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [isInitialLoading, setIsInitialLoading] = React.useState(true);
@@ -14,27 +18,14 @@ export function useItemManagement(userId: string) {
   // Dialog Open States
   const [isItemDialogOpen, setIsItemDialogOpen] = React.useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = React.useState(false);
-  const [isStockDialogOpen, setIsStockDialogOpen] = React.useState(false);
 
   // Editing States
   const [editingItem, setEditingItem] = React.useState<Item | null>(null);
   const [editingCategory, setEditingCategory] = React.useState<Category | null>(null);
 
-  // Closing Stock
-  const [closingStockDate, setClosingStockDate] = React.useState<Date | undefined>(new Date());
-  const [closingStockData, setClosingStockData] = React.useState<ClosingStock[]>([]);
-  const [isCalculating, setIsCalculating] = React.useState(false);
-
-  const { toast } = useToast();
   const [isPending, startTransition] = React.useTransition();
 
-  // Search and Filter States
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState('all');
-  const [selectedStatusFilter, setSelectedStatusFilter] = React.useState('all');
-  const [sortBy, setSortBy] = React.useState('title-asc');
-  const [visibleCount, setVisibleCount] = React.useState(10);
-
+  // Load inventory lists
   const loadData = React.useCallback(async () => {
     setIsInitialLoading(true);
     try {
@@ -61,6 +52,7 @@ export function useItemManagement(userId: string) {
     }
   }, [userId, loadData]);
 
+  // Editing Actions
   const handleEditItem = (item: Item) => {
     setEditingItem(item);
     setIsItemDialogOpen(true);
@@ -105,34 +97,7 @@ export function useItemManagement(userId: string) {
     });
   };
 
-  const handleCalculateClosingStock = async () => {
-    if (!closingStockDate) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please select a date.' });
-      return;
-    }
-
-    setIsCalculating(true);
-    try {
-      const calculatedData = await calculateClosingStock(userId, closingStockDate);
-      setClosingStockData(calculatedData);
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not calculate closing stock.' });
-    } finally {
-      setIsCalculating(false);
-      setIsStockDialogOpen(false);
-    }
-  };
-
-  const handleDownloadClosingStockPdf = () => {
-    if (!closingStockDate) return;
-    exportClosingStockPdf(closingStockData, closingStockDate, authUser);
-  };
-
-  const handleDownloadClosingStockXlsx = () => {
-    if (!closingStockDate) return;
-    exportClosingStockXlsx(closingStockData, closingStockDate, authUser?.storeType);
-  };
-
+  // Expiry alerts calculation
   const expiringAndExpiredMedicines = React.useMemo(() => {
     const now = new Date();
     const oneMonthFromNow = new Date();
@@ -145,89 +110,9 @@ export function useItemManagement(userId: string) {
     });
   }, [allItems]);
 
-  // Client-side filtering & sorting
-  const filteredAndSortedItems = React.useMemo(() => {
-    let result = [...allItems];
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (item) =>
-          item.title.toLowerCase().includes(q) ||
-          item.categoryName.toLowerCase().includes(q) ||
-          (item.author && item.author.toLowerCase().includes(q)) ||
-          (item.medicineGroup && item.medicineGroup.toLowerCase().includes(q)) ||
-          (item.company && item.company.toLowerCase().includes(q))
-      );
-    }
-
-    if (selectedCategoryFilter !== 'all') {
-      result = result.filter((item) => item.categoryId === selectedCategoryFilter);
-    }
-
-    const now = new Date();
-    const oneMonthFromNow = new Date();
-    oneMonthFromNow.setDate(now.getDate() + 30);
-
-    if (selectedStatusFilter === 'lowStock') {
-      result = result.filter((item) => item.stock <= 5);
-    } else if (selectedStatusFilter === 'expiringSoon') {
-      result = result.filter((item) => {
-        if (!item.expiryDate) return false;
-        const exp = new Date(item.expiryDate);
-        return exp > now && exp <= oneMonthFromNow;
-      });
-    } else if (selectedStatusFilter === 'expired') {
-      result = result.filter((item) => {
-        if (!item.expiryDate) return false;
-        const exp = new Date(item.expiryDate);
-        return exp <= now;
-      });
-    }
-
-    result.sort((a, b) => {
-      if (sortBy === 'title-asc') {
-        return a.title.localeCompare(b.title);
-      }
-      if (sortBy === 'title-desc') {
-        return b.title.localeCompare(a.title);
-      }
-      if (sortBy === 'stock-asc') {
-        return a.stock - b.stock;
-      }
-      if (sortBy === 'stock-desc') {
-        return b.stock - a.stock;
-      }
-      if (sortBy === 'group-asc') {
-        const groupA = a.medicineGroup || '';
-        const groupB = b.medicineGroup || '';
-        return groupA.localeCompare(groupB);
-      }
-      if (sortBy === 'company-asc') {
-        const companyA = a.company || '';
-        const companyB = b.company || '';
-        return companyA.localeCompare(companyB);
-      }
-      if (sortBy === 'expiry-asc') {
-        const dateA = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
-        const dateB = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
-        return dateA - dateB;
-      }
-      return 0;
-    });
-
-    return result;
-  }, [allItems, searchQuery, selectedCategoryFilter, selectedStatusFilter, sortBy]);
-
-  const displayedItems = React.useMemo(() => {
-    return filteredAndSortedItems.slice(0, visibleCount);
-  }, [filteredAndSortedItems, visibleCount]);
-
-  const hasMore = visibleCount < filteredAndSortedItems.length;
-
-  const handleLoadMore = () => {
-    setVisibleCount((prev) => prev + 10);
-  };
+  // Compose sub-hooks for specific tasks
+  const closingStock = useClosingStock({ userId, authUser });
+  const itemFilters = useItemFilters({ allItems });
 
   return {
     allItems,
@@ -237,26 +122,9 @@ export function useItemManagement(userId: string) {
     setIsItemDialogOpen,
     isCategoryDialogOpen,
     setIsCategoryDialogOpen,
-    isStockDialogOpen,
-    setIsStockDialogOpen,
     editingItem,
     editingCategory,
-    closingStockDate,
-    setClosingStockDate,
-    closingStockData,
-    setClosingStockData,
-    isCalculating,
     isPending,
-    searchQuery,
-    setSearchQuery,
-    selectedCategoryFilter,
-    setSelectedCategoryFilter,
-    selectedStatusFilter,
-    setSelectedStatusFilter,
-    sortBy,
-    setSortBy,
-    visibleCount,
-    setVisibleCount,
     loadData,
     handleEditItem,
     handleAddNewItem,
@@ -264,13 +132,34 @@ export function useItemManagement(userId: string) {
     handleEditCategory,
     handleDeleteItem,
     handleDeleteCategory,
-    handleCalculateClosingStock,
-    handleDownloadClosingStockPdf,
-    handleDownloadClosingStockXlsx,
     expiringAndExpiredMedicines,
-    filteredAndSortedItems,
-    displayedItems,
-    hasMore,
-    handleLoadMore
+
+    // Delegate closing stock state/actions
+    isStockDialogOpen: closingStock.isStockDialogOpen,
+    setIsStockDialogOpen: closingStock.setIsStockDialogOpen,
+    closingStockDate: closingStock.closingStockDate,
+    setClosingStockDate: closingStock.setClosingStockDate,
+    closingStockData: closingStock.closingStockData,
+    setClosingStockData: closingStock.setClosingStockData,
+    isCalculating: closingStock.isCalculating,
+    handleCalculateClosingStock: closingStock.handleCalculateClosingStock,
+    handleDownloadClosingStockPdf: closingStock.handleDownloadClosingStockPdf,
+    handleDownloadClosingStockXlsx: closingStock.handleDownloadClosingStockXlsx,
+
+    // Delegate sorting, filtering and pagination state/actions
+    searchQuery: itemFilters.searchQuery,
+    setSearchQuery: itemFilters.setSearchQuery,
+    selectedCategoryFilter: itemFilters.selectedCategoryFilter,
+    setSelectedCategoryFilter: itemFilters.setSelectedCategoryFilter,
+    selectedStatusFilter: itemFilters.selectedStatusFilter,
+    setSelectedStatusFilter: itemFilters.setSelectedStatusFilter,
+    sortBy: itemFilters.sortBy,
+    setSortBy: itemFilters.setSortBy,
+    visibleCount: itemFilters.visibleCount,
+    setVisibleCount: itemFilters.setVisibleCount,
+    filteredAndSortedItems: itemFilters.filteredAndSortedItems,
+    displayedItems: itemFilters.displayedItems,
+    hasMore: itemFilters.hasMore,
+    handleLoadMore: itemFilters.handleLoadMore,
   };
 }

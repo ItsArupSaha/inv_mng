@@ -1,13 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { addPurchase, updatePurchase, getItems } from '@/lib/actions';
+import { addPurchase, updatePurchase } from '@/lib/actions';
 import type { Category, Purchase } from '@/lib/types';
 import { purchaseFormSchema, type PurchaseFormValues } from '@/components/purchases/schema';
+import { usePurchaseAutofill } from './use-purchase-autofill';
 
 interface UseRecordPurchaseProps {
   userId: string;
@@ -54,51 +55,19 @@ export function useRecordPurchase({
     name: 'items',
   });
 
-  const [existingItems, setExistingItems] = React.useState<any[]>([]);
-
-  React.useEffect(() => {
-    if (isOpen && userId) {
-      getItems(userId).then(setExistingItems).catch(console.error);
-    }
-  }, [isOpen, userId]);
-
-  const supplierName = useWatch({
-    control: form.control,
-    name: 'supplier'
-  }) || '';
-
-  const lastResolvedCompanyRef = React.useRef<string>('');
-
-  React.useEffect(() => {
-    if (supplierName && existingItems.length > 0) {
-      const typed = supplierName.trim().toLowerCase();
-      if (typed.length >= 2) {
-        const matchingItem = existingItems.find((item) => {
-          if (!item.company || !item.location) return false;
-          const comp = item.company.trim().toLowerCase();
-          return comp.startsWith(typed) || typed.startsWith(comp) || (typed.length >= 4 && comp.includes(typed));
-        });
-
-        if (matchingItem && matchingItem.location) {
-          const matchedCompany = matchingItem.company.trim();
-          if (lastResolvedCompanyRef.current.toLowerCase() !== matchedCompany.toLowerCase()) {
-            form.setValue('location', matchingItem.location, { 
-              shouldDirty: true, 
-              shouldTouch: true, 
-              shouldValidate: true 
-            });
-            lastResolvedCompanyRef.current = matchedCompany;
-          }
-        }
-      }
-    } else if (!supplierName) {
-      lastResolvedCompanyRef.current = '';
-    }
-  }, [supplierName, existingItems, form]);
+  // Call the dedicated autofill and category sync hook
+  const { existingItems } = usePurchaseAutofill({
+    form,
+    isOpen,
+    userId,
+    categories,
+    storeType,
+  });
 
   const wasOpenRef = React.useRef(false);
   const prevPurchaseIdRef = React.useRef<string | null>(null);
 
+  // Manage purchase dialog reset and pre-filling logic when editing
   React.useEffect(() => {
     if (isOpen) {
       const purchaseId = editingPurchase?.id || null;
@@ -177,25 +146,7 @@ export function useRecordPurchase({
     wasOpenRef.current = isOpen;
   }, [isOpen, form, categories, storeType, editingPurchase]);
 
-  // Ensure default category is assigned to the first row once categories are loaded asynchronously
-  React.useEffect(() => {
-    if (isOpen && categories.length > 0) {
-      const items = form.getValues('items');
-      if (items && items.length === 1 && !items[0].categoryId) {
-        const defaultCategory = categories.find(c => {
-          const name = c.name.toLowerCase();
-          if (storeType === 'pharmacy') return name.includes('medicine');
-          if (storeType === 'bookstore') return name.includes('book');
-          return false;
-        });
-        if (defaultCategory) {
-          form.setValue('items.0.categoryId', defaultCategory.id);
-          form.setValue('items.0.categoryName', defaultCategory.name);
-        }
-      }
-    }
-  }, [isOpen, categories, storeType, form]);
-
+  // Form submission coordinator
   const onSubmit = (data: PurchaseFormValues) => {
     startTransition(async () => {
       try {

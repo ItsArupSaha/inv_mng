@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { deleteItem, getCategories, getItems } from '@/lib/actions';
 import type { Category, Item } from '@/lib/types';
 import { handleDownloadPdf, handleDownloadXlsx } from '@/components/expiry/expiry-export-utils';
+import { isFuzzyMatch } from '@/lib/search-utils';
 
 interface UseExpiryAlertsProps {
   userId: string;
@@ -105,13 +106,25 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
 
     // Search query filter
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(item => 
-        item.title.toLowerCase().includes(q) ||
-        item.categoryName.toLowerCase().includes(q) ||
-        (item.medicineGroup && item.medicineGroup.toLowerCase().includes(q)) ||
-        (item.company && item.company.toLowerCase().includes(q))
+      const q = searchQuery.trim();
+      const qLower = q.toLowerCase();
+      
+      let matched = result.filter(item => 
+        item.title.toLowerCase().includes(qLower) ||
+        item.categoryName.toLowerCase().includes(qLower) ||
+        (item.medicineGroup && item.medicineGroup.toLowerCase().includes(qLower)) ||
+        (item.company && item.company.toLowerCase().includes(qLower))
       );
+
+      if (matched.length === 0) {
+        matched = result.filter(item => 
+          isFuzzyMatch(item.title, q) ||
+          isFuzzyMatch(item.categoryName, q) ||
+          (item.medicineGroup && isFuzzyMatch(item.medicineGroup, q)) ||
+          (item.company && isFuzzyMatch(item.company, q))
+        );
+      }
+      result = matched;
     }
 
     // Sort
