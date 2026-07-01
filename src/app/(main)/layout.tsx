@@ -115,7 +115,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     { href: '/purchases', icon: ShoppingBag, label: 'Purchase' },
     ...(storeType === 'pharmacy' ? [{ href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true }] : []),
     { href: '/reports', icon: FileText, label: 'Monthly Report' },
-    { href: '/balance-sheet', icon: Scale, label: 'Balance Sheet' },
+    { href: '/balance-sheet', icon: Store, label: 'Business Overview' },
   ], [storeType]);
 
   // Dynamic Other items

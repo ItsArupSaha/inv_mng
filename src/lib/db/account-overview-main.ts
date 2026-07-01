@@ -178,6 +178,17 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
     const totalCapital = filteredCapital.reduce((sum, cap) => sum + toNum(cap.amount), 0);
     const retainedEarnings = equity - totalCapital;
 
+    const initialCashCapital = filteredCapital
+        .filter((cap: any) => cap.source === 'Initial Capital' && cap.paymentMethod === 'Cash')
+        .reduce((sum: number, cap: any) => sum + toNum(cap.amount), 0);
+
+    const initialBankCapital = filteredCapital
+        .filter((cap: any) => cap.source === 'Initial Capital' && cap.paymentMethod === 'Bank')
+        .reduce((sum: number, cap: any) => sum + toNum(cap.amount), 0);
+
+    const totalExpenses = filteredExpenses.reduce((sum: number, expense: any) => sum + toNum(expense.amount), 0);
+    const totalStockCount = allItems.reduce((sum: number, item: any) => sum + toNum(item.stock), 0);
+
     return {
         cash,
         bank,
@@ -190,6 +201,10 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         otherAssets,
         totalCapital,
         retainedEarnings,
+        initialCashCapital,
+        initialBankCapital,
+        totalExpenses,
+        totalStockCount,
     };
 }
 
