@@ -177,6 +177,25 @@ export function useRecordPurchase({
     wasOpenRef.current = isOpen;
   }, [isOpen, form, categories, storeType, editingPurchase]);
 
+  // Ensure default category is assigned to the first row once categories are loaded asynchronously
+  React.useEffect(() => {
+    if (isOpen && categories.length > 0) {
+      const items = form.getValues('items');
+      if (items && items.length === 1 && !items[0].categoryId) {
+        const defaultCategory = categories.find(c => {
+          const name = c.name.toLowerCase();
+          if (storeType === 'pharmacy') return name.includes('medicine');
+          if (storeType === 'bookstore') return name.includes('book');
+          return false;
+        });
+        if (defaultCategory) {
+          form.setValue('items.0.categoryId', defaultCategory.id);
+          form.setValue('items.0.categoryName', defaultCategory.name);
+        }
+      }
+    }
+  }, [isOpen, categories, storeType, form]);
+
   const onSubmit = (data: PurchaseFormValues) => {
     startTransition(async () => {
       try {
