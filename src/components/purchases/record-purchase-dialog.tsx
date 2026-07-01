@@ -153,6 +153,7 @@ export function RecordPurchaseDialog({
                             <Input 
                               placeholder="e.g., 2, Shelf-A, Row-3" 
                               {...field} 
+                              autoComplete="off"
                             />
                           </FormControl>
                           <FormMessage />

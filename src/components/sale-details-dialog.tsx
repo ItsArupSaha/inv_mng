@@ -90,12 +90,18 @@ export function SaleDetailsDialog({ sale, items, children }: SaleDetailsDialogPr
               <span>Subtotal</span>
               <span>৳{sale.subtotal.toFixed(2)}</span>
             </div>
+            {sale.extraSales && sale.extraSales > 0 ? (
+              <div className="flex justify-between">
+                <span>Extra / Service Sales</span>
+                <span>৳{sale.extraSales.toFixed(2)}</span>
+              </div>
+            ) : null}
             {(() => {
-              const diff = sale.subtotal - sale.total;
+              const diff = (sale.subtotal + (sale.extraSales || 0)) - sale.total;
               return (
                 <div className="flex justify-between text-muted-foreground">
                   <span>{diff >= 0 ? 'Discount' : 'Extra Profit'}</span>
-                  <span>{diff >= 0 ? `-৳${diff.toFixed(2)}` : `+৳${(sale.total - sale.subtotal).toFixed(2)}`}</span>
+                  <span>{diff >= 0 ? `-৳${diff.toFixed(2)}` : `+৳${(sale.total - (sale.subtotal + (sale.extraSales || 0))).toFixed(2)}`}</span>
                 </div>
               );
             })()}

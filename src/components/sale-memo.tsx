@@ -117,19 +117,28 @@ export function SaleMemo({ sale, customer, items, user, onNewSale }: SaleMemoPro
             `TK ${(item.quantity * item.price).toFixed(2)}`
         ]);
 
-        const discountDiff = sale.subtotal - sale.total;
+        const discountDiff = (sale.subtotal + (sale.extraSales || 0)) - sale.total;
         const discountLabel = discountDiff >= 0 
             ? `Discount${sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}`
             : 'Extra Profit';
         const discountValueStr = discountDiff >= 0
             ? `-TK ${discountDiff.toFixed(2)}`
-            : `+TK ${(sale.total - sale.subtotal).toFixed(2)}`;
+            : `+TK ${(sale.total - (sale.subtotal + (sale.extraSales || 0))).toFixed(2)}`;
 
         const footContent = [
             [{ content: 'Subtotal', colSpan: 3, styles: { halign: 'right', textColor: [100, 100, 100] } }, { content: `TK ${sale.subtotal.toFixed(2)}`, styles: { textColor: [100, 100, 100] } }],
-            [{ content: discountLabel, colSpan: 3, styles: { halign: 'right', textColor: [34, 197, 94] } }, { content: discountValueStr, styles: { textColor: [34, 197, 94] } }],
-            [{ content: 'Grand Total', colSpan: 3, styles: { halign: 'right', fontSize: 12, textColor: [0, 0, 0] } }, { content: `TK ${sale.total.toFixed(2)}`, styles: { textColor: [0, 0, 0], fontSize: 12 } }],
         ];
+
+        if (sale.extraSales && sale.extraSales > 0) {
+            footContent.push(
+                [{ content: 'Extra / Service Sales', colSpan: 3, styles: { halign: 'right', textColor: [100, 100, 100] } }, { content: `TK ${sale.extraSales.toFixed(2)}`, styles: { textColor: [100, 100, 100] } }]
+            );
+        }
+
+        footContent.push(
+            [{ content: discountLabel, colSpan: 3, styles: { halign: 'right', textColor: [34, 197, 94] } }, { content: discountValueStr, styles: { textColor: [34, 197, 94] } }],
+            [{ content: 'Grand Total', colSpan: 3, styles: { halign: 'right', fontSize: 12, textColor: [0, 0, 0] } as any }, { content: `TK ${sale.total.toFixed(2)}`, styles: { textColor: [0, 0, 0], fontSize: 12 } as any }]
+        );
 
         if (displayDue > 0) {
             footContent.push(
@@ -211,12 +220,18 @@ export function SaleMemo({ sale, customer, items, user, onNewSale }: SaleMemoPro
                             <span className="text-muted-foreground">Subtotal</span>
                             <span>TK {sale.subtotal.toFixed(2)}</span>
                         </div>
+                        {sale.extraSales && sale.extraSales > 0 ? (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Extra / Service Sales</span>
+                                <span>TK {sale.extraSales.toFixed(2)}</span>
+                            </div>
+                        ) : null}
                         {(() => {
-                            const diff = sale.subtotal - sale.total;
+                            const diff = (sale.subtotal + (sale.extraSales || 0)) - sale.total;
                             return (
                                 <div className="flex justify-between text-green-600">
                                     <span>{diff >= 0 ? `Discount${sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}` : 'Extra Profit'}</span>
-                                    <span>{diff >= 0 ? `-TK ${diff.toFixed(2)}` : `+TK ${(sale.total - sale.subtotal).toFixed(2)}`}</span>
+                                    <span>{diff >= 0 ? `-TK ${diff.toFixed(2)}` : `+TK ${(sale.total - (sale.subtotal + (sale.extraSales || 0))).toFixed(2)}`}</span>
                                 </div>
                             );
                         })()}

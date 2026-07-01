@@ -47,6 +47,7 @@ export function RecordSaleForm({
       amountPaid: 0,
       splitPaymentMethod: 'Cash',
       creditApplied: 0,
+      extraSales: 0,
       total: 0,
     },
   });
@@ -88,6 +89,7 @@ export function RecordSaleForm({
       amountPaid: 0,
       splitPaymentMethod: 'Cash',
       creditApplied: 0,
+      extraSales: 0,
       total: 0,
     });
     setCompletedSale(null);

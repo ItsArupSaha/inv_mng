@@ -67,6 +67,7 @@ export function PurchaseItemRow({
         const currentCost = watch(`items.${index}.cost`);
         const currentAuthor = watch(`items.${index}.author`);
         const currentExpiry = watch(`items.${index}.expiryDate`);
+        const currentLocation = watch(`items.${index}.location`);
 
         // Set values if currently blank or default/0
         if (!currentCategoryId) {
@@ -87,6 +88,9 @@ export function PurchaseItemRow({
         }
         if (!currentExpiry && matchingItem.expiryDate) {
           setValue(`items.${index}.expiryDate`, matchingItem.expiryDate);
+        }
+        if (!currentLocation && matchingItem.location) {
+          setValue(`items.${index}.location`, matchingItem.location);
         }
       }
     }
@@ -131,6 +135,9 @@ export function PurchaseItemRow({
                             }
                             if (item.expiryDate) {
                               setValue(`items.${index}.expiryDate`, item.expiryDate);
+                            }
+                            if (item.location) {
+                              setValue(`items.${index}.location`, item.location);
                             }
                             setShowSuggestions(false);
                           }}
@@ -216,7 +223,7 @@ export function PurchaseItemRow({
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel className="text-xs">Shelf / Row</FormLabel>
-                    <FormControl><Input placeholder="e.g., Row A3" {...field} /></FormControl>
+                    <FormControl><Input placeholder="e.g., Row A3" {...field} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

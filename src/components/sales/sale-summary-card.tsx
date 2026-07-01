@@ -13,20 +13,21 @@ export function SaleSummaryCard({ subtotal }: SaleSummaryCardProps) {
   const { control, setValue, watch } = useFormContext();
   const [isTotalEdited, setIsTotalEdited] = React.useState(false);
   const totalValue = watch('total');
+  const extraSalesValue = watch('extraSales') || 0;
 
-  // Auto-update final total in form when subtotal changes, unless manually overridden
+  // Auto-update final total in form when subtotal or extraSales changes, unless manually overridden
   React.useEffect(() => {
     if (!isTotalEdited) {
-      setValue('total', subtotal);
+      setValue('total', subtotal + Number(extraSalesValue));
     }
-  }, [subtotal, setValue, isTotalEdited]);
+  }, [subtotal, extraSalesValue, setValue, isTotalEdited]);
 
-  // Reset override state when subtotal and total value both become zero (e.g. on form reset)
+  // Reset override state when subtotal, extraSales, and total value all become zero (e.g. on form reset)
   React.useEffect(() => {
-    if (subtotal === 0 && (Number(totalValue) === 0 || !totalValue)) {
+    if (subtotal === 0 && Number(extraSalesValue) === 0 && (Number(totalValue) === 0 || !totalValue)) {
       setIsTotalEdited(false);
     }
-  }, [subtotal, totalValue]);
+  }, [subtotal, extraSalesValue, totalValue]);
 
   return (
     <div className="flex flex-col sm:flex-row justify-end">
@@ -35,6 +36,34 @@ export function SaleSummaryCard({ subtotal }: SaleSummaryCardProps) {
           <span>Computed Subtotal:</span>
           <span className="font-semibold font-mono">৳{subtotal.toFixed(2)}</span>
         </div>
+        
+        {/* Extra / Service Sales Field */}
+        <div className="flex justify-between items-center text-sm border-t pt-2">
+          <span className="text-muted-foreground">Extra / Service Sales:</span>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">৳</span>
+            <FormField
+              control={control}
+              name="extraSales"
+              render={({ field }) => (
+                <FormItem className="space-y-0">
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      className="w-24 text-right h-8 font-mono bg-background border rounded-md px-2"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
         <div className="flex justify-between items-center pt-2 border-t font-bold text-base">
           <span>Final Total:</span>
           <div className="flex items-center gap-1">

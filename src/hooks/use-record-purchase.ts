@@ -67,6 +67,8 @@ export function useRecordPurchase({
     name: 'supplier'
   }) || '';
 
+  const lastResolvedCompanyRef = React.useRef<string>('');
+
   React.useEffect(() => {
     if (supplierName && existingItems.length > 0) {
       const typed = supplierName.trim().toLowerCase();
@@ -78,16 +80,19 @@ export function useRecordPurchase({
         });
 
         if (matchingItem && matchingItem.location) {
-          const currentLocation = form.getValues('location');
-          if (!currentLocation) {
+          const matchedCompany = matchingItem.company.trim();
+          if (lastResolvedCompanyRef.current.toLowerCase() !== matchedCompany.toLowerCase()) {
             form.setValue('location', matchingItem.location, { 
               shouldDirty: true, 
               shouldTouch: true, 
               shouldValidate: true 
             });
+            lastResolvedCompanyRef.current = matchedCompany;
           }
         }
       }
+    } else if (!supplierName) {
+      lastResolvedCompanyRef.current = '';
     }
   }, [supplierName, existingItems, form]);
 

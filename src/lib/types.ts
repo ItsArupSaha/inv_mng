@@ -83,6 +83,7 @@ export type Sale = {
   amountPaid?: number;
   splitPaymentMethod?: 'Cash' | 'Bank';
   creditApplied?: number;
+  extraSales?: number;
 };
 
 export type SalesReturnItem = {
