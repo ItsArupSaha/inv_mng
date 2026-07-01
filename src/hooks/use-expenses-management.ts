@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { deleteExpense, getExpensesPaginated } from '@/lib/actions';
 import type { Expense } from '@/lib/types';
-import { downloadExpensesPdf, downloadExpensesXlsx } from '@/components/expenses/expenses-export-utils';
+import { useExpensesExport } from './use-expenses-export';
 
 interface UseExpensesManagementProps {
   userId: string;
@@ -90,29 +90,13 @@ export function useExpensesManagement({ userId }: UseExpensesManagementProps) {
     loadInitialData();
   };
 
-  const handleDownloadPdf = async () => {
-    try {
-      const success = await downloadExpensesPdf(userId, dateRange, authUser);
-      if (!success) {
-        toast({ title: 'No Expenses Found', description: 'There are no expenses in the selected date range.' });
-      }
-      setIsDownloadDialogOpen(false);
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.message || 'Failed to download PDF.' });
-    }
-  };
-
-  const handleDownloadXlsx = async () => {
-    try {
-      const success = await downloadExpensesXlsx(userId, dateRange);
-      if (!success) {
-        toast({ title: 'No Expenses Found', description: 'There are no expenses in the selected date range.' });
-      }
-      setIsDownloadDialogOpen(false);
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.message || 'Failed to download Excel.' });
-    }
-  };
+  // Call the expenses export sub-hook
+  const expensesExport = useExpensesExport({
+    userId,
+    dateRange,
+    authUser,
+    setIsDownloadDialogOpen,
+  });
 
   return {
     expenses,
@@ -132,7 +116,7 @@ export function useExpensesManagement({ userId }: UseExpensesManagementProps) {
     handleEdit,
     handleDelete,
     handleSuccess,
-    handleDownloadPdf,
-    handleDownloadXlsx,
+    handleDownloadPdf: expensesExport.handleDownloadPdf,
+    handleDownloadXlsx: expensesExport.handleDownloadXlsx,
   };
 }

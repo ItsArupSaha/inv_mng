@@ -2,17 +2,15 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
-import { Download, Edit, Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { Edit, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useExpensesManagement } from '@/hooks/use-expenses-management';
-import { ScrollArea } from './ui/scroll-area';
 import { Skeleton } from './ui/skeleton';
 import { AddExpenseDialog } from './expenses/add-expense-dialog';
+import { ExpensesReportDialog } from './expenses/expenses-report-dialog';
 
 interface ExpensesManagementProps {
   userId: string;
@@ -54,35 +52,14 @@ export default function ExpensesManagement({ userId }: ExpensesManagementProps) 
               <Button onClick={handleAddNew} className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add New Expense
               </Button>
-              <Dialog open={isDownloadDialogOpen} onOpenChange={setIsDownloadDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-4 w-4" /> Download Report
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Download Expense Report</DialogTitle>
-                    <DialogDescription>Select a date range to download your expense data.</DialogDescription>
-                  </DialogHeader>
-                  <ScrollArea className="max-h-[calc(100vh-20rem)] overflow-y-auto">
-                    <div className="py-4 flex flex-col items-center gap-4">
-                      <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={dateRange?.from}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        numberOfMonths={1}
-                      />
-                    </div>
-                  </ScrollArea>
-                  <DialogFooter className="gap-2 sm:justify-center pt-4 border-t">
-                    <Button variant="outline" onClick={handleDownloadPdf} disabled={!dateRange?.from}>Download PDF</Button>
-                    <Button variant="outline" onClick={handleDownloadXlsx} disabled={!dateRange?.from}>Download Excel</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <ExpensesReportDialog
+                isOpen={isDownloadDialogOpen}
+                onOpenChange={setIsDownloadDialogOpen}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                handleDownloadPdf={handleDownloadPdf}
+                handleDownloadXlsx={handleDownloadXlsx}
+              />
             </div>
           </div>
         </CardHeader>

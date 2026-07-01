@@ -4,12 +4,12 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { DateRange } from 'react-day-picker';
-import { addDonation, getDonations, getDonationsPaginated } from '@/lib/actions';
+import { addDonation, getDonationsPaginated } from '@/lib/actions';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { Donation } from '@/lib/types';
 import { donationSchema, type DonationFormValues } from '@/components/donations/schema';
-import { exportDonationsToPdf, exportDonationsToXlsx } from '@/components/donations/donations-export-utils';
+import { useDonationsExport } from './use-donations-export';
 
 interface UseDonationsManagementProps {
   userId: string;
@@ -96,61 +96,12 @@ export function useDonationsManagement({ userId }: UseDonationsManagementProps) 
     });
   };
 
-  const getFilteredDonations = async () => {
-    if (!dateRange?.from) {
-      toast({
-        variant: 'destructive',
-        title: 'Please select a start date.',
-      });
-      return null;
-    }
-
-    try {
-      const allDonations = await getDonations(userId);
-      const from = dateRange.from;
-      const to = dateRange.to || dateRange.from;
-      const tempTo = new Date(to);
-      tempTo.setHours(23, 59, 59, 999);
-
-      return allDonations.filter((donation) => {
-        const donationDate = new Date(donation.date);
-        return donationDate >= from && donationDate <= tempTo;
-      });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not filter donations.' });
-      return null;
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    const filtered = await getFilteredDonations();
-    if (!filtered || !authUser) return;
-
-    if (filtered.length === 0) {
-      toast({
-        title: 'No Donations Found',
-        description: 'There are no donations in the selected date range.',
-      });
-      return;
-    }
-
-    exportDonationsToPdf(filtered, authUser, { from: dateRange!.from!, to: dateRange!.to });
-  };
-
-  const handleDownloadXlsx = async () => {
-    const filtered = await getFilteredDonations();
-    if (!filtered) return;
-
-    if (filtered.length === 0) {
-      toast({
-        title: 'No Donations Found',
-        description: 'There are no donations in the selected date range.',
-      });
-      return;
-    }
-
-    exportDonationsToXlsx(filtered, { from: dateRange!.from!, to: dateRange!.to });
-  };
+  // Call the donations export sub-hook
+  const donationsExport = useDonationsExport({
+    userId,
+    authUser,
+    dateRange,
+  });
 
   return {
     donations,
@@ -168,7 +119,7 @@ export function useDonationsManagement({ userId }: UseDonationsManagementProps) 
     handleLoadMore,
     handleAddNew,
     onSubmit,
-    handleDownloadPdf,
-    handleDownloadXlsx,
+    handleDownloadPdf: donationsExport.handleDownloadPdf,
+    handleDownloadXlsx: donationsExport.handleDownloadXlsx,
   };
 }

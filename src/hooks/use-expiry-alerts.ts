@@ -5,8 +5,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { deleteItem, getCategories, getItems } from '@/lib/actions';
 import type { Category, Item } from '@/lib/types';
-import { handleDownloadPdf, handleDownloadXlsx } from '@/components/expiry/expiry-export-utils';
 import { isFuzzyMatch } from '@/lib/search-utils';
+import { useExpiryExport } from './use-expiry-export';
 
 interface UseExpiryAlertsProps {
   userId: string;
@@ -25,7 +25,7 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedStatusFilter, setSelectedStatusFilter] = React.useState('all'); // 'all', 'expiringSoon', 'expired'
+  const [selectedStatusFilter, setSelectedStatusFilter] = React.useState('expiringSoon');
   const [sortBy, setSortBy] = React.useState('expiry-asc');
   const [visibleCount, setVisibleCount] = React.useState(10);
 
@@ -34,15 +34,15 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     try {
       const allItemsData = await getItems(userId);
       setAllItems(allItemsData);
-      
+
       const categoriesData = await getCategories(userId);
       setCategories(categoriesData);
     } catch (error) {
-      console.error("Failed to load expiry alerts data:", error);
+      console.error('Failed to load data:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not load medicine details.",
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not load data. Please try again later.',
       });
     } finally {
       setIsInitialLoading(false);
@@ -60,47 +60,49 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     setIsItemDialogOpen(true);
   };
 
-  const handleDeleteItem = (id: string) => {
-    startTransition(async () => {
-      try {
-        await deleteItem(userId, id);
-        await loadData();
-        toast({ title: "Item Deleted", description: "The item has been removed from the inventory." });
-      } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "Could not delete the item." });
-      }
-    });
+  const handleAddNewItem = () => {
+    setEditingItem(null);
+    setIsItemDialogOpen(true);
   };
 
   const handleAddNewCategory = () => {
     setIsCategoryDialogOpen(true);
   };
 
-  // Filter items specifically for medicines that are expired or expiring within 30 days
+  const handleDeleteItem = (id: string) => {
+    startTransition(async () => {
+      try {
+        await deleteItem(userId, id);
+        await loadData();
+        toast({ title: 'Item Deleted', description: 'The item has been removed from the inventory.' });
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the item.' });
+      }
+    });
+  };
+
   const filteredAndSortedItems = React.useMemo(() => {
     const now = new Date();
     const oneMonthFromNow = new Date();
     oneMonthFromNow.setDate(now.getDate() + 30);
+    const threeMonthsFromNow = new Date();
+    threeMonthsFromNow.setDate(now.getDate() + 90);
 
-    // Only look at items with an expiry date
-    let result = allItems.filter(item => !!item.expiryDate);
+    // Initial filter for items with expiry dates
+    let result = allItems.filter(item => item.expiryDate);
 
     // Status filter
-    if (selectedStatusFilter === 'expiringSoon') {
+    if (selectedStatusFilter === 'expired') {
+      result = result.filter(item => new Date(item.expiryDate!) <= now);
+    } else if (selectedStatusFilter === 'expiringSoon') {
       result = result.filter(item => {
         const exp = new Date(item.expiryDate!);
         return exp > now && exp <= oneMonthFromNow;
       });
-    } else if (selectedStatusFilter === 'expired') {
+    } else if (selectedStatusFilter === 'expiring3Months') {
       result = result.filter(item => {
         const exp = new Date(item.expiryDate!);
-        return exp <= now;
-      });
-    } else {
-      // Default: show both expired and expiring within 30 days
-      result = result.filter(item => {
-        const exp = new Date(item.expiryDate!);
-        return exp <= oneMonthFromNow;
+        return exp > now && exp <= threeMonthsFromNow;
       });
     }
 
@@ -170,13 +172,8 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     setVisibleCount(prev => prev + 10);
   };
 
-  const handlePdf = () => {
-    handleDownloadPdf(filteredAndSortedItems, authUser);
-  };
-
-  const handleXlsx = () => {
-    handleDownloadXlsx(filteredAndSortedItems);
-  };
+  // Call the expiry reports sub-hook
+  const expiryExport = useExpiryExport({ authUser });
 
   return {
     categories,
@@ -194,15 +191,16 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     setSortBy,
     setVisibleCount,
     isPending,
-    displayedItems,
-    hasMore,
     loadData,
     handleEditItem,
-    handleDeleteItem,
+    handleAddNewItem,
     handleAddNewCategory,
-    handleLoadMore,
-    handlePdf,
-    handleXlsx,
+    handleDeleteItem,
     filteredAndSortedItems,
+    displayedItems,
+    hasMore,
+    handleLoadMore,
+    handlePdf: () => expiryExport.handlePdf(filteredAndSortedItems),
+    handleXlsx: () => expiryExport.handleXlsx(filteredAndSortedItems),
   };
 }

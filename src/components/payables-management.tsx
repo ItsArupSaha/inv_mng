@@ -1,27 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { PayablesReportDialog } from './payables/payables-report-dialog';
 
 import {
   PendingPayablesTable,
@@ -36,7 +20,6 @@ interface PayablesManagementProps {
 
 export default function PayablesManagement({ userId }: PayablesManagementProps) {
   const {
-    authUser,
     payables,
     hasMorePayables,
     isInitialLoadingPayables,
@@ -55,7 +38,7 @@ export default function PayablesManagement({ userId }: PayablesManagementProps) 
     setReportType,
     loadAllData,
     handleLoadMorePayables,
-    handleDownload
+    handleDownload,
   } = usePayablesManagement(userId);
 
   return (
@@ -68,84 +51,17 @@ export default function PayablesManagement({ userId }: PayablesManagementProps) 
               <CardDescription>Manage bills, supplier payments, and customer refunds.</CardDescription>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <Dialog open={isDownloadDialogOpen} onOpenChange={setIsDownloadDialogOpen}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Download className="mr-2 h-4 w-4" /> Download Report
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DialogTrigger asChild>
-                      <DropdownMenuItem onClick={() => setReportType('pending')}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        <span>Pending Payables Report</span>
-                      </DropdownMenuItem>
-                    </DialogTrigger>
-                    <DialogTrigger asChild>
-                      <DropdownMenuItem onClick={() => setReportType('paid')}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        <span>Paid Payables Report</span>
-                      </DropdownMenuItem>
-                    </DialogTrigger>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Download Report</DialogTitle>
-                    <DialogDescription>
-                      {reportType === 'pending'
-                        ? 'Download pending payables as of a specific date.'
-                        : 'Select a date range for exact paid payables.'}
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  {reportType === 'pending' && (
-                    <ScrollArea className="max-h-[calc(100vh-20rem)] overflow-y-auto">
-                      <div className="py-4 flex flex-col items-center">
-                        <div className="mb-2 text-sm text-center text-muted-foreground w-full px-4">
-                          <p>Select an &quot;As of&quot; date.</p>
-                          <p className="text-xs">Leave empty for today (current balance).</p>
-                        </div>
-                        <Calendar initialFocus mode="single" selected={asOfDate} onSelect={setAsOfDate} />
-                        {asOfDate && (
-                          <Button variant="outline" className="mt-2" onClick={() => setAsOfDate(undefined)}>
-                            Clear Date (Use Today)
-                          </Button>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  )}
-
-                  {reportType === 'paid' && (
-                    <ScrollArea className="max-h-[calc(100vh-20rem)] overflow-y-auto">
-                      <div className="py-4 flex flex-col items-center">
-                        <div className="mb-2 text-sm text-center text-muted-foreground w-full px-4">
-                          <p>Select a date range for the report.</p>
-                        </div>
-                        <Calendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={dateRange?.from}
-                          selected={dateRange}
-                          onSelect={setDateRange}
-                          numberOfMonths={1}
-                        />
-                      </div>
-                    </ScrollArea>
-                  )}
-
-                  <DialogFooter className="gap-2 sm:justify-center pt-4 border-t">
-                    <Button variant="outline" onClick={() => handleDownload('pdf')}>
-                      <FileText className="mr-2 h-4 w-4" /> Download PDF
-                    </Button>
-                    <Button variant="outline" onClick={() => handleDownload('xlsx')}>
-                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Download Excel
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <PayablesReportDialog
+                isOpen={isDownloadDialogOpen}
+                onOpenChange={setIsDownloadDialogOpen}
+                asOfDate={asOfDate}
+                setAsOfDate={setAsOfDate}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                reportType={reportType}
+                setReportType={setReportType}
+                handleDownload={handleDownload}
+              />
             </div>
           </div>
         </CardHeader>
