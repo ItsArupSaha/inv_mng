@@ -16,9 +16,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/use-auth';
-import { getAccountOverview, getCapitalHistory } from '@/lib/actions';
+import { useToast } from '@/hooks/use-toast';
+import { getAccountOverview, getCapitalHistory, deleteCapitalAdjustment } from '@/lib/actions';
 import type { Capital } from '@/lib/types';
-import { CalendarIcon, Download, Landmark, PlusCircle, Scale, Store, Wallet, Receipt, Coins, History } from 'lucide-react';
+import { CalendarIcon, Download, Landmark, PlusCircle, Scale, Store, Wallet, Receipt, Coins, History, Edit, Trash2 } from 'lucide-react';
 import { exportBalanceSheetPdf } from './balance-sheet/balance-sheet-pdf';
 import { BalanceSheetTables } from './balance-sheet/balance-sheet-tables';
 import { AddCapitalDialog } from './balance-sheet/add-capital-dialog';
@@ -37,11 +38,13 @@ const formatCurrency = (amount: number) =>
 
 export default function BalanceSheet({ userId }: BalanceSheetProps) {
     const { authUser } = useAuth();
+    const { toast } = useToast();
     const [asOfDate, setAsOfDate] = React.useState<Date | undefined>(undefined);
     const [current, setCurrent] = React.useState<Overview | null>(null);
     const [capitalHistory, setCapitalHistory] = React.useState<Capital[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [isAddCapitalOpen, setIsAddCapitalOpen] = React.useState(false);
+    const [editingCapital, setEditingCapital] = React.useState<Capital | null>(null);
     const [updateTrigger, setUpdateTrigger] = React.useState(0);
 
     const loadData = React.useCallback(async () => {
@@ -76,6 +79,37 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
 
     const handleSuccess = () => {
         setUpdateTrigger(prev => prev + 1);
+    };
+
+    const handleCloseAddCapital = (open: boolean) => {
+        setIsAddCapitalOpen(open);
+        if (!open) {
+            setEditingCapital(null);
+        }
+    };
+
+    const handleEditCapital = (cap: Capital) => {
+        setEditingCapital(cap);
+        setIsAddCapitalOpen(true);
+    };
+
+    const handleDeleteCapital = async (capId: string) => {
+        if (!confirm("Are you sure you want to delete this capital entry? This will immediately affect your Cash/Bank balances.")) return;
+        try {
+            await deleteCapitalAdjustment(userId, capId);
+            toast({
+                title: "Capital Record Deleted",
+                description: "The capital transaction has been deleted successfully."
+            });
+            handleSuccess();
+        } catch (error) {
+            console.error(error);
+            toast({
+                variant: "destructive",
+                title: "Error deleting capital",
+                description: "Failed to delete capital transaction. Please try again."
+            });
+        }
     };
 
     const renderSkeleton = () => (
@@ -310,6 +344,7 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
                                             <TableHead className="py-2.5">Method</TableHead>
                                             <TableHead className="py-2.5">Notes</TableHead>
                                             <TableHead className="text-right py-2.5">Amount</TableHead>
+                                            <TableHead className="text-right py-2.5 w-[90px]">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -335,11 +370,37 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
                                                     <TableCell className="py-2 text-right text-xs font-semibold font-headline">
                                                         ৳{cap.amount.toLocaleString()}
                                                     </TableCell>
+                                                    <TableCell className="py-2 text-right text-xs">
+                                                        {cap.paymentMethod !== 'Asset' ? (
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    className="h-6 w-6" 
+                                                                    title="Edit capital entry"
+                                                                    onClick={() => handleEditCapital(cap)}
+                                                                >
+                                                                    <Edit className="h-3 w-3" />
+                                                                </Button>
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    className="h-6 w-6 text-destructive" 
+                                                                    title="Delete capital entry"
+                                                                    onClick={() => handleDeleteCapital(cap.id)}
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] text-muted-foreground italic">Fixed Asset</span>
+                                                        )}
+                                                    </TableCell>
                                                 </TableRow>
                                             ))
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="text-center h-24 text-muted-foreground text-xs">
+                                                <TableCell colSpan={6} className="text-center h-24 text-muted-foreground text-xs">
                                                     No capital history records found.
                                                 </TableCell>
                                             </TableRow>
@@ -356,8 +417,9 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
             <AddCapitalDialog
                 userId={userId}
                 isOpen={isAddCapitalOpen}
-                onOpenChange={setIsAddCapitalOpen}
+                onOpenChange={handleCloseAddCapital}
                 onSuccess={handleSuccess}
+                editingCapital={editingCapital}
             />
         </div>
     );

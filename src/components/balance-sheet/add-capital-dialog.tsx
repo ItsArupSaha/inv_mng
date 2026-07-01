@@ -31,7 +31,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { addCapitalAdjustment } from '@/lib/actions';
+import { addCapitalAdjustment, updateCapitalAdjustment } from '@/lib/actions';
+import type { Capital } from '@/lib/types';
 
 const addCapitalSchema = z.object({
   amount: z.coerce.number().min(1, 'Amount must be at least BDT 1.'),
@@ -47,6 +48,7 @@ interface AddCapitalDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  editingCapital?: Capital | null;
 }
 
 export function AddCapitalDialog({
@@ -54,6 +56,7 @@ export function AddCapitalDialog({
   isOpen,
   onOpenChange,
   onSuccess,
+  editingCapital = null,
 }: AddCapitalDialogProps) {
   const { toast } = useToast();
   const [isPending, setIsPending] = React.useState(false);
@@ -68,39 +71,64 @@ export function AddCapitalDialog({
     },
   });
 
-  // Reset form when dialog opens
+  // Reset form when dialog opens or editing capital changes
   React.useEffect(() => {
     if (isOpen) {
-      form.reset({
-        amount: 0,
-        paymentMethod: 'Cash',
-        notes: '',
-        date: new Date(),
-      });
+      if (editingCapital) {
+        form.reset({
+          amount: editingCapital.amount,
+          paymentMethod: editingCapital.paymentMethod === 'Asset' ? 'Cash' : (editingCapital.paymentMethod as 'Cash' | 'Bank'),
+          notes: editingCapital.notes || '',
+          date: new Date(editingCapital.date),
+        });
+      } else {
+        form.reset({
+          amount: 0,
+          paymentMethod: 'Cash',
+          notes: '',
+          date: new Date(),
+        });
+      }
     }
-  }, [isOpen, form]);
+  }, [isOpen, editingCapital, form]);
 
   const onSubmit = async (values: AddCapitalFormValues) => {
     setIsPending(true);
     try {
-      await addCapitalAdjustment(userId, {
-        amount: values.amount,
-        paymentMethod: values.paymentMethod,
-        notes: values.notes,
-        date: values.date,
-      });
+      if (editingCapital) {
+        // Edit mode
+        await updateCapitalAdjustment(userId, editingCapital.id, {
+          amount: values.amount,
+          paymentMethod: values.paymentMethod,
+          notes: values.notes,
+          date: values.date,
+        });
 
-      toast({
-        title: 'Capital Added Successfully!',
-        description: `Successfully added BDT ${values.amount.toLocaleString()} to your ${values.paymentMethod} account.`,
-      });
+        toast({
+          title: 'Capital Updated Successfully!',
+          description: `Updated capital record to BDT ${values.amount.toLocaleString()} in your ${values.paymentMethod} account.`,
+        });
+      } else {
+        // Add mode
+        await addCapitalAdjustment(userId, {
+          amount: values.amount,
+          paymentMethod: values.paymentMethod,
+          notes: values.notes,
+          date: values.date,
+        });
+
+        toast({
+          title: 'Capital Added Successfully!',
+          description: `Successfully added BDT ${values.amount.toLocaleString()} to your ${values.paymentMethod} account.`,
+        });
+      }
       onSuccess();
       onOpenChange(false);
     } catch (error) {
       console.error(error);
       toast({
         variant: 'destructive',
-        title: 'Failed to add capital',
+        title: editingCapital ? 'Failed to update capital' : 'Failed to add capital',
         description: 'An error occurred while saving the transaction. Please try again.',
       });
     } finally {
@@ -112,9 +140,13 @@ export function AddCapitalDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline text-xl">Add Business Capital</DialogTitle>
+          <DialogTitle className="font-headline text-xl">
+            {editingCapital ? 'Edit Capital Entry' : 'Add Business Capital'}
+          </DialogTitle>
           <DialogDescription>
-            Inject more funds into your business capital. This will be added to your current Cash or Bank balance.
+            {editingCapital
+              ? 'Update the details for this capital contribution record.'
+              : 'Inject more funds into your business capital. This will be added to your current Cash or Bank balance.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -142,7 +174,7 @@ export function AddCapitalDialog({
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex gap-4"
                     >
                       <FormItem className="flex items-center space-x-2 space-y-0">
@@ -232,10 +264,10 @@ export function AddCapitalDialog({
                 {isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Recording...
+                    Saving...
                   </>
                 ) : (
-                  'Confirm Add Capital'
+                  editingCapital ? 'Save Changes' : 'Confirm Add Capital'
                 )}
               </Button>
             </DialogFooter>

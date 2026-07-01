@@ -1,6 +1,6 @@
 'use server';
 
-import { addDoc, collection, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Capital } from '../types';
@@ -67,6 +67,52 @@ export async function addCapitalAdjustment(
     revalidatePath('/balance-sheet');
   } catch (error) {
     console.error('Error recording capital adjustment:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing capital transaction
+ */
+export async function updateCapitalAdjustment(
+  userId: string,
+  id: string,
+  data: { amount: number; paymentMethod: 'Cash' | 'Bank'; notes?: string; date?: Date }
+): Promise<void> {
+  if (!db || !userId) throw new Error('Database not connected.');
+  try {
+    const capitalDocRef = doc(db, 'users', userId, 'capital', id);
+    const updateData: any = {
+      amount: data.amount,
+      paymentMethod: data.paymentMethod,
+      notes: data.notes || '',
+    };
+    if (data.date) {
+      updateData.date = Timestamp.fromDate(data.date);
+    }
+    await updateDoc(capitalDocRef, updateData);
+
+    revalidatePath('/dashboard');
+    revalidatePath('/balance-sheet');
+  } catch (error) {
+    console.error('Error updating capital adjustment:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an existing capital transaction
+ */
+export async function deleteCapitalAdjustment(userId: string, id: string): Promise<void> {
+  if (!db || !userId) throw new Error('Database not connected.');
+  try {
+    const capitalDocRef = doc(db, 'users', userId, 'capital', id);
+    await deleteDoc(capitalDocRef);
+
+    revalidatePath('/dashboard');
+    revalidatePath('/balance-sheet');
+  } catch (error) {
+    console.error('Error deleting capital adjustment:', error);
     throw error;
   }
 }
