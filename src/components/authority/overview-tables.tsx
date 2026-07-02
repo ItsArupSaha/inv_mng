@@ -13,6 +13,7 @@ interface OverviewProps {
   receivables: number;
   stockValue: number;
   officeAssetsValue: number;
+  securityDepositsValue: number;
   totalAssets: number;
   payables: number;
   equity: number;
@@ -50,6 +51,10 @@ export function OverviewTables({
             <TableRow>
               <TableCell>Office assets</TableCell>
               <TableCell className="text-right">{formatCurrency(overview.officeAssetsValue)}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>Security deposit (refundable)</TableCell>
+              <TableCell className="text-right">{formatCurrency(overview.securityDepositsValue)}</TableCell>
             </TableRow>
             <TableRow className="bg-muted/50 font-semibold">
               <TableCell>Total assets</TableCell>

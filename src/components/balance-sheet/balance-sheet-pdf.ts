@@ -8,6 +8,7 @@ interface BalanceSheetPdfData {
     receivables: number;
     stockValue: number;
     officeAssetsValue: number;
+    securityDepositsValue: number;
     totalAssets: number;
     payables: number;
     equity: number;
@@ -74,6 +75,7 @@ export function exportBalanceSheetPdf(
         ['Customer Dues (Receivables)', formatCurrencyForPdf(current.receivables)],
         ['Stock Value', formatCurrencyForPdf(current.stockValue)],
         ['Office Assets', formatCurrencyForPdf(current.officeAssetsValue)],
+        ['Security Deposit (Refundable)', formatCurrencyForPdf(current.securityDepositsValue)],
     ];
 
     autoTable(doc, {

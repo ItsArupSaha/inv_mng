@@ -17,12 +17,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { getAccountOverview, getCapitalHistory, deleteCapitalAdjustment } from '@/lib/actions';
-import type { Capital } from '@/lib/types';
-import { CalendarIcon, Download, Landmark, PlusCircle, Scale, Store, Wallet, Receipt, Coins, History, Edit, Trash2 } from 'lucide-react';
+import { getAccountOverview, getCapitalHistory, deleteCapitalAdjustment, getSecurityDeposits, deleteSecurityDeposit } from '@/lib/actions';
+import type { Capital, SecurityDeposit } from '@/lib/types';
+import { CalendarIcon, Download, Landmark, PlusCircle, Scale, Store, Wallet, Receipt, Coins, History, Edit, Trash2, Building } from 'lucide-react';
 import { exportBalanceSheetPdf } from './balance-sheet/balance-sheet-pdf';
 import { BalanceSheetTables } from './balance-sheet/balance-sheet-tables';
 import { AddCapitalDialog } from './balance-sheet/add-capital-dialog';
+import { AddSecurityDialog } from './balance-sheet/add-security-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface BalanceSheetProps {
     userId: string;
@@ -42,9 +44,12 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
     const [asOfDate, setAsOfDate] = React.useState<Date | undefined>(undefined);
     const [current, setCurrent] = React.useState<Overview | null>(null);
     const [capitalHistory, setCapitalHistory] = React.useState<Capital[]>([]);
+    const [securityHistory, setSecurityHistory] = React.useState<SecurityDeposit[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [isAddCapitalOpen, setIsAddCapitalOpen] = React.useState(false);
+    const [isAddSecurityOpen, setIsAddSecurityOpen] = React.useState(false);
     const [editingCapital, setEditingCapital] = React.useState<Capital | null>(null);
+    const [editingSecurity, setEditingSecurity] = React.useState<SecurityDeposit | null>(null);
     const [updateTrigger, setUpdateTrigger] = React.useState(0);
 
     const loadData = React.useCallback(async () => {
@@ -59,13 +64,15 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
                 targetDate.setHours(23, 59, 59, 999);
             }
 
-            const [currentSnapshot, history] = await Promise.all([
+            const [currentSnapshot, history, security] = await Promise.all([
                 getAccountOverview(userId, targetDate),
-                getCapitalHistory(userId)
+                getCapitalHistory(userId),
+                getSecurityDeposits(userId)
             ]);
 
             setCurrent(currentSnapshot);
             setCapitalHistory(history);
+            setSecurityHistory(security);
         } catch (error) {
             console.error('Error loading overview data:', error);
         } finally {
@@ -108,6 +115,37 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
                 variant: "destructive",
                 title: "Error deleting capital",
                 description: "Failed to delete capital transaction. Please try again."
+            });
+        }
+    };
+
+    const handleCloseAddSecurity = (open: boolean) => {
+        setIsAddSecurityOpen(open);
+        if (!open) {
+            setEditingSecurity(null);
+        }
+    };
+
+    const handleEditSecurity = (sec: SecurityDeposit) => {
+        setEditingSecurity(sec);
+        setIsAddSecurityOpen(true);
+    };
+
+    const handleDeleteSecurity = async (secId: string) => {
+        if (!confirm("Are you sure you want to delete this security deposit record? This will immediately affect your Cash/Bank balances.")) return;
+        try {
+            await deleteSecurityDeposit(userId, secId);
+            toast({
+                title: "Security Deposit Deleted",
+                description: "The security deposit transaction has been deleted successfully."
+            });
+            handleSuccess();
+        } catch (error) {
+            console.error(error);
+            toast({
+                variant: "destructive",
+                title: "Error deleting security deposit",
+                description: "Failed to delete security deposit. Please try again."
             });
         }
     };
@@ -279,138 +317,280 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
                 </CardContent>
             </Card>
 
-            {/* Capital Injection & History Section */}
+            {/* Capital Injection & History Section with Tabs */}
             {!isLoading && current && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Add Capital Form Box */}
-                    <Card className="lg:col-span-1 border border-muted/60 shadow-sm flex flex-col justify-between">
-                        <CardHeader>
-                            <CardTitle className="font-headline text-lg flex items-center gap-2">
-                                <Coins className="h-5 w-5 text-primary" />
-                                Capital Management
-                            </CardTitle>
-                            <CardDescription>
-                                Monitor liquid cash vs bank balances and add more capital to your operations.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="rounded-lg bg-muted/40 p-4 border border-muted/50 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                        <Wallet className="h-3.5 w-3.5 text-primary/70" />
-                                        Cash Account:
-                                    </span>
-                                    <span className="font-semibold text-sm font-headline">{formatCurrency(current.cash)}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                        <Landmark className="h-3.5 w-3.5 text-primary/70" />
-                                        Bank Account:
-                                    </span>
-                                    <span className="font-semibold text-sm font-headline">{formatCurrency(current.bank)}</span>
-                                </div>
-                                <div className="border-t border-muted pt-2 flex items-center justify-between text-primary">
-                                    <span className="text-xs font-semibold">Total Liquidity:</span>
-                                    <span className="font-bold text-sm font-headline">{formatCurrency(current.cash + current.bank)}</span>
-                                </div>
-                            </div>
-                        </CardContent>
-                        <div className="p-6 pt-0">
-                            <Button onClick={() => setIsAddCapitalOpen(true)} className="w-full flex items-center gap-2">
-                                <PlusCircle className="h-4 w-4" />
-                                Add More Capital
-                            </Button>
-                        </div>
-                    </Card>
+                <Tabs defaultValue="capital" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-4">
+                        <TabsTrigger value="capital">Capital Management</TabsTrigger>
+                        <TabsTrigger value="security">Security Deposits</TabsTrigger>
+                    </TabsList>
 
-                    {/* Capital History List */}
-                    <Card className="lg:col-span-2 border border-muted/60 shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="font-headline text-lg flex items-center gap-2">
-                                <History className="h-5 w-5 text-primary" />
-                                Capital History & Log
-                            </CardTitle>
-                            <CardDescription>
-                                Record of initial starting capital and all subsequent additions.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="border rounded-md overflow-x-auto max-h-[220px]">
-                                <Table>
-                                    <TableHeader className="bg-muted/30 sticky top-0">
-                                        <TableRow>
-                                            <TableHead className="py-2.5">Date</TableHead>
-                                            <TableHead className="py-2.5">Source</TableHead>
-                                            <TableHead className="py-2.5">Method</TableHead>
-                                            <TableHead className="py-2.5">Notes</TableHead>
-                                            <TableHead className="text-right py-2.5">Amount</TableHead>
-                                            <TableHead className="text-right py-2.5 w-[90px]">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {capitalHistory.length > 0 ? (
-                                            capitalHistory.map((cap) => (
-                                                <TableRow key={cap.id} className="hover:bg-muted/10">
-                                                    <TableCell className="py-2 text-xs">
-                                                        {format(new Date(cap.date), 'dd MMM yyyy')}
-                                                    </TableCell>
-                                                    <TableCell className="py-2 text-xs">
-                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                                                            cap.source === 'Initial Capital' 
-                                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400' 
-                                                                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400'
-                                                        }`}>
-                                                            {cap.source}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell className="py-2 text-xs font-medium">{cap.paymentMethod}</TableCell>
-                                                    <TableCell className="py-2 text-xs max-w-[150px] truncate" title={cap.notes || ''}>
-                                                        {cap.notes || '-'}
-                                                    </TableCell>
-                                                    <TableCell className="py-2 text-right text-xs font-semibold font-headline">
-                                                        ৳{cap.amount.toLocaleString()}
-                                                    </TableCell>
-                                                    <TableCell className="py-2 text-right text-xs">
-                                                        {cap.paymentMethod !== 'Asset' ? (
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button 
-                                                                    variant="ghost" 
-                                                                    size="icon" 
-                                                                    className="h-6 w-6" 
-                                                                    title="Edit capital entry"
-                                                                    onClick={() => handleEditCapital(cap)}
-                                                                >
-                                                                    <Edit className="h-3 w-3" />
-                                                                </Button>
-                                                                <Button 
-                                                                    variant="ghost" 
-                                                                    size="icon" 
-                                                                    className="h-6 w-6 text-destructive" 
-                                                                    title="Delete capital entry"
-                                                                    onClick={() => handleDeleteCapital(cap.id)}
-                                                                >
-                                                                    <Trash2 className="h-3 w-3" />
-                                                                </Button>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-[10px] text-muted-foreground italic">Fixed Asset</span>
-                                                        )}
-                                                    </TableCell>
+                    <TabsContent value="capital" className="space-y-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Add Capital Form Box */}
+                            <Card className="lg:col-span-1 border border-muted/60 shadow-sm flex flex-col justify-between">
+                                <CardHeader>
+                                    <CardTitle className="font-headline text-lg flex items-center gap-2">
+                                        <Coins className="h-5 w-5 text-primary" />
+                                        Capital Management
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Monitor liquid cash vs bank balances and add more capital to your operations.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="rounded-lg bg-muted/40 p-4 border border-muted/50 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                                <Wallet className="h-3.5 w-3.5 text-primary/70" />
+                                                Cash Account:
+                                            </span>
+                                            <span className="font-semibold text-sm font-headline">{formatCurrency(current.cash)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                                <Landmark className="h-3.5 w-3.5 text-primary/70" />
+                                                Bank Account:
+                                            </span>
+                                            <span className="font-semibold text-sm font-headline">{formatCurrency(current.bank)}</span>
+                                        </div>
+                                        <div className="border-t border-muted pt-2 flex items-center justify-between text-primary">
+                                            <span className="text-xs font-semibold">Total Liquidity:</span>
+                                            <span className="font-bold text-sm font-headline">{formatCurrency(current.cash + current.bank)}</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                <div className="p-6 pt-0">
+                                    <Button onClick={() => setIsAddCapitalOpen(true)} className="w-full flex items-center gap-2">
+                                        <PlusCircle className="h-4 w-4" />
+                                        Add More Capital
+                                    </Button>
+                                </div>
+                            </Card>
+
+                            {/* Capital History List */}
+                            <Card className="lg:col-span-2 border border-muted/60 shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="font-headline text-lg flex items-center gap-2">
+                                        <History className="h-5 w-5 text-primary" />
+                                        Capital History & Log
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Record of initial starting capital and all subsequent additions.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="border rounded-md overflow-x-auto max-h-[220px]">
+                                        <Table>
+                                            <TableHeader className="bg-muted/30 sticky top-0">
+                                                <TableRow>
+                                                    <TableHead className="py-2.5">Date</TableHead>
+                                                    <TableHead className="py-2.5">Source</TableHead>
+                                                    <TableHead className="py-2.5">Method</TableHead>
+                                                    <TableHead className="py-2.5">Notes</TableHead>
+                                                    <TableHead className="text-right py-2.5">Amount</TableHead>
+                                                    <TableHead className="text-right py-2.5 w-[90px]">Actions</TableHead>
                                                 </TableRow>
-                                            ))
-                                        ) : (
-                                            <TableRow>
-                                                <TableCell colSpan={6} className="text-center h-24 text-muted-foreground text-xs">
-                                                    No capital history records found.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {capitalHistory.length > 0 ? (
+                                                    capitalHistory.map((cap) => (
+                                                        <TableRow key={cap.id} className="hover:bg-muted/10">
+                                                            <TableCell className="py-2 text-xs">
+                                                                {format(new Date(cap.date), 'dd MMM yyyy')}
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-xs">
+                                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                                                    cap.source === 'Initial Capital' 
+                                                                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400' 
+                                                                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400'
+                                                                }`}>
+                                                                    {cap.source}
+                                                                </span>
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-xs font-medium">{cap.paymentMethod}</TableCell>
+                                                            <TableCell className="py-2 text-xs max-w-[150px] truncate" title={cap.notes || ''}>
+                                                                {cap.notes || '-'}
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-right text-xs font-semibold font-headline">
+                                                                ৳{cap.amount.toLocaleString()}
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-right text-xs">
+                                                                {cap.paymentMethod !== 'Asset' ? (
+                                                                    <div className="flex justify-end gap-1">
+                                                                        <Button 
+                                                                            variant="ghost" 
+                                                                            size="icon" 
+                                                                            className="h-6 w-6" 
+                                                                            title="Edit capital entry"
+                                                                            onClick={() => handleEditCapital(cap)}
+                                                                        >
+                                                                            <Edit className="h-3 w-3" />
+                                                                        </Button>
+                                                                        <Button 
+                                                                            variant="ghost" 
+                                                                            size="icon" 
+                                                                            className="h-6 w-6 text-destructive" 
+                                                                            title="Delete capital entry"
+                                                                            onClick={() => handleDeleteCapital(cap.id)}
+                                                                        >
+                                                                            <Trash2 className="h-3 w-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-muted-foreground italic">Fixed Asset</span>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} className="text-center h-24 text-muted-foreground text-xs">
+                                                            No capital history records found.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="security" className="space-y-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Security Summary Card */}
+                            <Card className="lg:col-span-1 border border-muted/60 shadow-sm flex flex-col justify-between">
+                                <CardHeader>
+                                    <CardTitle className="font-headline text-lg flex items-center gap-2">
+                                        <Building className="h-5 w-5 text-primary" />
+                                        Security Deposits
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Manage refundable deposits paid for renting rooms, spaces, or other business investments.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="rounded-lg bg-muted/40 p-4 border border-muted/50 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">Active (Refundable):</span>
+                                            <span className="font-semibold text-sm font-headline text-primary">
+                                                {formatCurrency(securityHistory.filter(s => s.status === 'Refundable').reduce((sum, s) => sum + s.amount, 0))}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">Settled (Refunded):</span>
+                                            <span className="font-semibold text-sm font-headline text-muted-foreground">
+                                                {formatCurrency(securityHistory.filter(s => s.status === 'Refunded').reduce((sum, s) => sum + s.amount, 0))}
+                                            </span>
+                                        </div>
+                                        <div className="border-t border-muted pt-2 flex items-center justify-between">
+                                            <span className="text-xs font-semibold">Total Recorded:</span>
+                                            <span className="font-bold text-sm font-headline">
+                                                {formatCurrency(securityHistory.reduce((sum, s) => sum + s.amount, 0))}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                <div className="p-6 pt-0">
+                                    <Button onClick={() => setIsAddSecurityOpen(true)} className="w-full flex items-center gap-2">
+                                        <PlusCircle className="h-4 w-4" />
+                                        Add Security Deposit
+                                    </Button>
+                                </div>
+                            </Card>
+
+                            {/* Security Deposits History List */}
+                            <Card className="lg:col-span-2 border border-muted/60 shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="font-headline text-lg flex items-center gap-2">
+                                        <History className="h-5 w-5 text-primary" />
+                                        Security Deposit Log
+                                    </CardTitle>
+                                    <CardDescription>
+                                        History of all refundable security deposits paid and their current status.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="border rounded-md overflow-x-auto max-h-[220px]">
+                                        <Table>
+                                            <TableHeader className="bg-muted/30 sticky top-0">
+                                                <TableRow>
+                                                    <TableHead className="py-2.5">Date</TableHead>
+                                                    <TableHead className="py-2.5">ID</TableHead>
+                                                    <TableHead className="py-2.5">Paid Via</TableHead>
+                                                    <TableHead className="py-2.5">Status</TableHead>
+                                                    <TableHead className="py-2.5">Notes</TableHead>
+                                                    <TableHead className="text-right py-2.5">Amount</TableHead>
+                                                    <TableHead className="text-right py-2.5 w-[90px]">Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {securityHistory.length > 0 ? (
+                                                    securityHistory.map((sec) => (
+                                                        <TableRow key={sec.id} className="hover:bg-muted/10">
+                                                            <TableCell className="py-2 text-xs">
+                                                                {format(new Date(sec.date), 'dd MMM yyyy')}
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-xs font-semibold font-mono">
+                                                                {sec.securityId}
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-xs font-medium">{sec.paymentMethod}</TableCell>
+                                                            <TableCell className="py-2 text-xs">
+                                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                                                    sec.status === 'Refundable' 
+                                                                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400' 
+                                                                        : 'bg-muted text-muted-foreground'
+                                                                }`}>
+                                                                    {sec.status}
+                                                                </span>
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-xs max-w-[150px] truncate" title={sec.notes || ''}>
+                                                                {sec.notes || '-'}
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-right text-xs font-semibold font-headline">
+                                                                ৳{sec.amount.toLocaleString()}
+                                                            </TableCell>
+                                                            <TableCell className="py-2 text-right text-xs">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="icon" 
+                                                                        className="h-6 w-6" 
+                                                                        title="Edit security deposit"
+                                                                        onClick={() => handleEditSecurity(sec)}
+                                                                    >
+                                                                        <Edit className="h-3 w-3" />
+                                                                    </Button>
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="icon" 
+                                                                        className="h-6 w-6 text-destructive" 
+                                                                        title="Delete security deposit"
+                                                                        onClick={() => handleDeleteSecurity(sec.id)}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={7} className="text-center h-24 text-muted-foreground text-xs">
+                                                            No security deposit records found.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+                </Tabs>
             )}
 
             {/* Add Capital Form Modal */}
@@ -420,6 +600,15 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
                 onOpenChange={handleCloseAddCapital}
                 onSuccess={handleSuccess}
                 editingCapital={editingCapital}
+            />
+
+            {/* Add Security Form Modal */}
+            <AddSecurityDialog
+                userId={userId}
+                isOpen={isAddSecurityOpen}
+                onOpenChange={handleCloseAddSecurity}
+                onSuccess={handleSuccess}
+                editingSecurity={editingSecurity}
             />
         </div>
     );

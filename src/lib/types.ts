@@ -167,6 +167,18 @@ export type InitialCapital = {
   bank: number;
 }
 
+export type SecurityDeposit = {
+  id: string;
+  securityId: string;
+  date: string;
+  amount: number;
+  paymentMethod: 'Cash' | 'Bank';
+  status: 'Refundable' | 'Refunded';
+  notes?: string;
+  refundDate?: string;
+  refundPaymentMethod?: 'Cash' | 'Bank';
+};
+
 export type Transaction = {
   id: string;
   description: string;

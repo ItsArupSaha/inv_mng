@@ -67,6 +67,7 @@ function appendBalanceSheetSection(
     ['Customer Dues (Receivables)', formatCurrencyForPdf(overview.receivables)],
     ['Stock Value', formatCurrencyForPdf(overview.stockValue)],
     ['Office Assets', formatCurrencyForPdf(overview.officeAssetsValue)],
+    ['Security Deposit (Refundable)', formatCurrencyForPdf((overview as any).securityDepositsValue || 0)],
   ];
 
   autoTable(doc, {

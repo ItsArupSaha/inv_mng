@@ -10,6 +10,7 @@ interface BalanceSheetTablesProps {
     receivables: number;
     stockValue: number;
     officeAssetsValue: number;
+    securityDepositsValue: number;
     totalAssets: number;
     payables: number;
     equity: number;
@@ -56,6 +57,12 @@ export function BalanceSheetTables({ current, formatCurrency }: BalanceSheetTabl
               <TableCell>Office Assets</TableCell>
               <TableCell className="text-right">
                 {formatCurrency(current.officeAssetsValue)}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>Security Deposit (Refundable)</TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(current.securityDepositsValue)}
               </TableCell>
             </TableRow>
             <TableRow className="font-semibold bg-muted/50">

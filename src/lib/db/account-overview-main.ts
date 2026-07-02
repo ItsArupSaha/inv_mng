@@ -8,6 +8,7 @@ import { getItems } from './items';
 import { getPurchases } from './purchases';
 import { getSales } from './sales';
 import { getSalesReturns } from './sales-returns';
+import { getSecurityDeposits } from './security';
 import {
   toNum,
   calculateCashAndBank,
@@ -23,7 +24,7 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
 
     const cutoffTimestamp = asOfDate ? Timestamp.fromDate(asOfDate) : undefined;
 
-    const [allItems, allSales, allExpenses, allTransactionsData, allPurchases, capitalData, allCustomers, transfersData, donationsData, allReturns] = await Promise.all([
+    const [allItems, allSales, allExpenses, allTransactionsData, allPurchases, capitalData, allCustomers, transfersData, donationsData, allReturns, allSecurityDeposits] = await Promise.all([
         getItems(userId),
         getSales(userId),
         getExpenses(userId),
@@ -34,6 +35,7 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         getDocs(collection(db, 'users', userId, 'transfers')),
         getDocs(collection(db, 'users', userId, 'donations')),
         getSalesReturns(userId),
+        getSecurityDeposits(userId),
     ]);
 
     const allTransactions = allTransactionsData.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as any));
@@ -135,7 +137,7 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         return false;
     };
 
-    const { cash, bank, otherAssets } = calculateCashAndBank(
+    let { cash, bank, otherAssets } = calculateCashAndBank(
         filteredCapital,
         filteredDonations,
         filteredSales,
@@ -143,6 +145,41 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         filteredExpenses,
         filteredTransfers
     );
+
+    // Apply security deposits impact on Cash/Bank
+    const filteredSecurityDeposits = allSecurityDeposits.filter((sec: any) => isBeforeOrOnCutoff(sec.date));
+    
+    filteredSecurityDeposits.forEach((sec: any) => {
+        const amt = toNum(sec.amount);
+        // Decrease cash/bank when security deposit is paid
+        if (sec.paymentMethod === 'Cash') {
+            cash -= amt;
+        } else if (sec.paymentMethod === 'Bank') {
+            bank -= amt;
+        }
+
+        // Increase cash/bank if security deposit is refunded on/before cutoff date
+        if (sec.status === 'Refunded' && sec.refundDate && isBeforeOrOnCutoff(sec.refundDate)) {
+            const refundMethod = sec.refundPaymentMethod || sec.paymentMethod;
+            if (refundMethod === 'Cash') {
+                cash += amt;
+            } else if (refundMethod === 'Bank') {
+                bank += amt;
+            }
+        }
+    });
+
+    // Security deposits that are outstanding (Refundable OR Refunded AFTER cutoff)
+    const activeSecurityDeposits = filteredSecurityDeposits.filter((sec: any) => {
+        if (sec.status === 'Refundable') return true;
+        if (sec.status === 'Refunded') {
+            if (!sec.refundDate) return false;
+            return !isBeforeOrOnCutoff(sec.refundDate);
+        }
+        return false;
+    });
+
+    const securityDepositsValue = activeSecurityDeposits.reduce((sum: number, sec: any) => sum + toNum(sec.amount), 0);
 
     const { stockValue, officeAssetsValue } = calculateStockAndAssets(
         allItems,
@@ -172,7 +209,7 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
     });
     const payables = pendingPayables.reduce((sum: number, t: any) => sum + toNum(t.amount), 0);
 
-    const totalAssets = cash + bank + receivables + stockValue + officeAssetsValue;
+    const totalAssets = cash + bank + receivables + stockValue + officeAssetsValue + securityDepositsValue;
     const equity = totalAssets - payables;
 
     const totalCapital = filteredCapital.reduce((sum, cap) => sum + toNum(cap.amount), 0);
@@ -194,6 +231,7 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         bank,
         stockValue,
         officeAssetsValue,
+        securityDepositsValue,
         receivables,
         totalAssets,
         payables,
