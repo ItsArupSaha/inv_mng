@@ -48,6 +48,10 @@ export async function downloadSalesPdf(userId: string, dateRange: DateRange | un
   doc.text(`For the period: ${dateString}`, 105, 51, { align: 'center' });
   doc.setTextColor(0);
 
+  const totalPaid = filteredSales.reduce((acc, sale) => acc + (exportBreakdown[sale.id]?.paidAmount ?? sale.total), 0);
+  const totalDue = filteredSales.reduce((acc, sale) => acc + (exportBreakdown[sale.id]?.dueAmount ?? 0), 0);
+  const totalSalesAmount = filteredSales.reduce((acc, sale) => acc + sale.total, 0);
+
   autoTable(doc, {
     startY: 60,
     head: [['Date', 'Sale ID', 'Customer', 'Items', 'Discount', 'Status', 'Paid Amount', 'Due Amount', 'Total']],
@@ -62,6 +66,18 @@ export async function downloadSalesPdf(userId: string, dateRange: DateRange | un
       `TK ${(exportBreakdown[sale.id]?.dueAmount ?? 0).toFixed(2)}`,
       `TK ${sale.total.toFixed(2)}`
     ]),
+    foot: [[
+      '',
+      '',
+      '',
+      'TOTAL',
+      '',
+      '',
+      `TK ${totalPaid.toFixed(2)}`,
+      `TK ${totalDue.toFixed(2)}`,
+      `TK ${totalSalesAmount.toFixed(2)}`
+    ]],
+    footStyles: { fontStyle: 'bold' },
   });
 
   doc.save(`sales-report-${format(dateRange!.from!, 'yyyy-MM-dd')}-to-${format(dateRange!.to! || dateRange!.from!, 'yyyy-MM-dd')}.pdf`);

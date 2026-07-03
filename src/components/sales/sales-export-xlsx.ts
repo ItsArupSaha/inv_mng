@@ -14,6 +14,10 @@ export async function downloadSalesXlsx(userId: string, dateRange: DateRange | u
   const getCustomerName = (customerId: string) => customers.find(c => c.id === customerId)?.name || 'Unknown Customer';
   const getItemTitle = (itemId: string) => items.find(i => i.id === itemId)?.title || 'Unknown Item';
 
+  const totalPaid = filteredSales.reduce((acc, sale) => acc + (exportBreakdown[sale.id]?.paidAmount ?? sale.total), 0);
+  const totalDue = filteredSales.reduce((acc, sale) => acc + (exportBreakdown[sale.id]?.dueAmount ?? 0), 0);
+  const totalSalesAmount = filteredSales.reduce((acc, sale) => acc + sale.total, 0);
+
   const dataToExport = filteredSales.map(sale => ({
     'Date': format(new Date(sale.date), 'yyyy-MM-dd'),
     'Sale ID': sale.saleId,
@@ -25,6 +29,18 @@ export async function downloadSalesXlsx(userId: string, dateRange: DateRange | u
     'Due Amount': exportBreakdown[sale.id]?.dueAmount ?? 0,
     'Total': sale.total,
   }));
+
+  dataToExport.push({
+    'Date': '',
+    'Sale ID': '',
+    'Customer': '',
+    'Items': 'TOTAL',
+    'Discount': '' as any,
+    'Status': '',
+    'Paid Amount': totalPaid,
+    'Due Amount': totalDue,
+    'Total': totalSalesAmount,
+  });
 
   const worksheet = XLSX.utils.json_to_sheet(dataToExport);
 
@@ -68,12 +84,22 @@ export async function downloadSalesItemsXlsx(userId: string, dateRange: DateRang
   }
   const summaryRows = Object.values(summary).sort((a, b) => a.title.localeCompare(b.title));
 
+  const totalQty = summaryRows.reduce((acc, r) => acc + r.qty, 0);
+  const totalRevenue = summaryRows.reduce((acc, r) => acc + r.revenue, 0);
+
   const dataToExport = summaryRows.map((row, i) => ({
     '#': i + 1,
     'Item / Book Title': row.title,
     'Qty Sold': row.qty,
     'Total Revenue (BDT)': row.revenue,
   }));
+
+  dataToExport.push({
+    '#': '' as any,
+    'Item / Book Title': 'TOTAL',
+    'Qty Sold': totalQty,
+    'Total Revenue (BDT)': totalRevenue,
+  });
 
   const worksheet = XLSX.utils.json_to_sheet(dataToExport);
   const columnWidths = [{ wch: 5 }, { wch: 40 }, { wch: 12 }, { wch: 22 }];
