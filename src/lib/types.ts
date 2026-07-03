@@ -57,6 +57,7 @@ export type Item = {
   productionPrice: number;
   sellingPrice: number;
   stock: number;
+  ignoredWarning?: boolean;
 };
 
 export type ClosingStock = Item & {

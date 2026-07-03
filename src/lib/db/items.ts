@@ -124,6 +124,14 @@ export async function deleteItem(userId: string, id: string) {
   revalidatePath('/items');
 }
 
+export async function ignoreItemWarning(userId: string, id: string, ignore: boolean) {
+  if (!db || !userId) return;
+  const itemRef = doc(db, 'users', userId, 'items', id);
+  await updateDoc(itemRef, { ignoredWarning: ignore });
+  revalidatePath('/items');
+  revalidatePath('/stock-warnings');
+}
+
 export async function bulkUpdateItemLocationByCompany(
   userId: string,
   companyName: string,

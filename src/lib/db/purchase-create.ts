@@ -97,7 +97,8 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   const updateData: any = { 
                       stock: newStock,
                       productionPrice: newProductionPrice,
-                      sellingPrice: newSellingPrice
+                      sellingPrice: newSellingPrice,
+                      ignoredWarning: false
                   };
                   if (item.medicineGroup) updateData.medicineGroup = item.medicineGroup;
                   if (item.company) updateData.company = item.company;
@@ -114,13 +115,14 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                                         ? 0
                                         : (item.sellingPrice && item.sellingPrice > 0 ? item.sellingPrice : capitalizedCost * 1.5);
                   
-                  const newItemData: Omit<Item, 'id'> = {
+                  const newItemData: any = {
                       title: trimmedName,
                       categoryId: item.categoryId,
                       categoryName: item.categoryName,
                       stock: item.quantity,
                       productionPrice: capitalizedCost,
                       sellingPrice: sellingPrice,
+                      ignoredWarning: false
                   };
 
                   if (item.author) {

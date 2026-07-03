@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   ShoppingCart,
   AlertTriangle,
+  ShieldAlert,
   Loader2,
   FolderSync,
 } from 'lucide-react';
@@ -88,6 +89,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const { authUser, user } = useAuth();
   const [alertCount, setAlertCount] = React.useState(0);
+  const [stockWarningCount, setStockWarningCount] = React.useState(0);
 
   React.useEffect(() => {
     if (user) {
@@ -95,8 +97,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         const now = new Date();
         const oneMonthFromNow = new Date();
         oneMonthFromNow.setDate(now.getDate() + 30);
-        const count = items.filter(item => item.expiryDate && new Date(item.expiryDate) <= oneMonthFromNow).length;
-        setAlertCount(count);
+        
+        const expCount = items.filter(item => item.expiryDate && new Date(item.expiryDate) <= oneMonthFromNow).length;
+        setAlertCount(expCount);
+
+        const stockCount = items.filter(item => {
+          const cat = (item.categoryName || '').toLowerCase();
+          if (cat === 'assets' || cat === 'surgicals') return false;
+          return item.stock === 0 || (item.stock < 10 && !item.ignoredWarning);
+        }).length;
+        setStockWarningCount(stockCount);
       }).catch(err => console.error("Failed to fetch alert count for sidebar:", err));
     }
   }, [user, pathname]); // Re-fetch on path name change to update badges when editing/deleting
@@ -114,6 +124,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     { href: '/expenses', icon: CreditCard, label: 'Expense' },
     { href: '/purchases', icon: ShoppingBag, label: 'Purchase' },
     ...(storeType === 'pharmacy' ? [{ href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true }] : []),
+    { href: '/stock-warnings', icon: ShieldAlert, label: 'Stock Warnings', stockBadge: true },
     { href: '/reports', icon: FileText, label: 'Reports' },
     { href: '/balance-sheet', icon: Store, label: 'Business Overview' },
   ], [storeType]);
@@ -176,6 +187,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                               {alertCount}
                             </span>
                           )}
+                          {'stockBadge' in item && stockWarningCount > 0 && (
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-semibold text-white animate-pulse">
+                              {stockWarningCount}
+                            </span>
+                          )}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -208,6 +224,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                           {'badge' in item && alertCount > 0 && (
                             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground animate-pulse">
                               {alertCount}
+                            </span>
+                          )}
+                          {'stockBadge' in item && stockWarningCount > 0 && (
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-semibold text-white animate-pulse">
+                              {stockWarningCount}
                             </span>
                           )}
                         </Link>

@@ -162,6 +162,7 @@ export async function updatePurchase(
                   const updateData: any = {
                       stock: finalStock,
                       productionPrice: finalProductionPrice,
+                      ignoredWarning: false
                   };
 
                   const newItem = data.items.find(i => `${i.itemName.trim()}||${i.expiryDate || ''}` === key);
@@ -195,6 +196,7 @@ export async function updatePurchase(
                           stock: finalStock,
                           productionPrice: finalProductionPrice,
                           sellingPrice: sellingPrice,
+                          ignoredWarning: false
                       };
                       if (newItem.author) {
                           newItemData.author = newItem.author;
