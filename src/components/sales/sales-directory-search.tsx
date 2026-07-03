@@ -76,17 +76,17 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
   }, [directoryQuery, items]);
 
   return (
-    <Card className="xl:col-span-1 w-full min-w-0 overflow-hidden h-fit sticky top-20">
-      <CardHeader className="pb-3">
-        <CardTitle className="font-headline text-lg flex items-center gap-2">
+    <Card className="xl:col-span-1 w-full min-w-0 overflow-hidden h-fit sticky top-20 shadow-sm border border-muted/60">
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="font-headline text-base flex items-center gap-2">
           <Search className="h-4 w-4 text-primary" />
           Directory Deep Search
         </CardTitle>
-        <CardDescription className="text-xs">
+        <CardDescription className="text-[10px]">
           Search medicines by name, company, generic group, or shelf.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="p-4 pt-0 space-y-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -105,74 +105,65 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
           )}
         </div>
 
-        <ScrollArea className="h-[520px] pr-2 w-full min-w-0 overflow-hidden">
-          <div className="space-y-2 w-full min-w-0 overflow-hidden">
-            {filteredDirectoryItems.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-8">No matching medicines found.</p>
-            ) : (
-              filteredDirectoryItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-2.5 border rounded-lg bg-card/40 hover:bg-card/85 transition-all duration-200 space-y-1.5 text-xs min-w-0 overflow-hidden"
-                >
-                  <div className="flex justify-between items-start gap-1 min-w-0">
-                    <div className="font-bold text-foreground truncate flex-1" title={item.title}>
-                      {item.title}
-                    </div>
-                    <div className="font-bold text-primary shrink-0">৳{Number(item.sellingPrice).toFixed(2)}</div>
-                  </div>
+        <div className="h-[520px] overflow-y-auto overflow-x-hidden pr-1.5 space-y-2 w-full min-w-0">
+          {filteredDirectoryItems.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">No matching medicines found.</p>
+          ) : (
+            filteredDirectoryItems.map((item) => (
+              <div
+                key={item.id}
+                className="p-2.5 border rounded-lg bg-card/40 hover:bg-card/85 transition-all duration-200 space-y-1.5 text-xs min-w-0 overflow-hidden"
+              >
+                <div className="font-bold text-foreground truncate min-w-0" title={item.title}>
+                  {item.title}
+                </div>
 
-                  <div className="text-[10px] text-muted-foreground leading-tight truncate">
-                    {item.company} {item.medicineGroup ? ` • ${item.medicineGroup}` : ''}
-                  </div>
+                <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                  {item.company} {item.medicineGroup ? ` • ${item.medicineGroup}` : ''}
+                </div>
 
-                  <div className="flex flex-wrap gap-1 pt-0.5">
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
-                        item.stock <= 5
-                          ? 'bg-destructive/15 text-destructive animate-pulse'
-                          : item.stock <= 20
-                          ? 'bg-amber-500/15 text-amber-600'
-                          : 'bg-emerald-500/15 text-emerald-600'
-                      }`}
-                    >
-                      Stock: {item.stock}
+                <div className="text-[10px] text-muted-foreground pt-0.5 leading-normal flex flex-wrap gap-x-1.5 gap-y-0.5 min-w-0">
+                  <span className={cn(
+                    "font-semibold",
+                    item.stock <= 5 
+                      ? "text-destructive" 
+                      : item.stock <= 20 
+                      ? "text-amber-600" 
+                      : "text-emerald-600"
+                  )}>
+                    Stock: {item.stock}
+                  </span>
+                  {item.location && <span className="shrink-0">• Shelf: {item.location}</span>}
+                  {item.expiryDate && (
+                    <span className={cn(
+                      "shrink-0",
+                      new Date(item.expiryDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
+                        ? "text-destructive font-semibold animate-pulse" 
+                        : ""
+                    )}>
+                      • Exp: {item.expiryDate}
                     </span>
-
-                    {item.location && (
-                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold truncate max-w-[120px]">
-                        Shelf: {item.location}
-                      </span>
-                    )}
-
-                    {item.expiryDate && (
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
-                          new Date(item.expiryDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                            ? 'bg-destructive/20 text-destructive animate-pulse'
-                            : 'bg-secondary text-secondary-foreground'
-                        }`}
-                      >
-                        Exp: {item.expiryDate}
-                      </span>
-                    )}
-                  </div>
-
-                  {item.medicineGroup && (
-                    <div className="pt-1 flex">
-                      <button
-                        onClick={() => setSelectedAlternativeItem(item)}
-                        className="w-full text-center py-0.5 rounded border border-primary/25 text-primary text-[9px] font-bold hover:bg-primary/10 transition-colors bg-primary/5"
-                      >
-                        Alternatives
-                      </button>
-                    </div>
                   )}
                 </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
+
+                <div className="text-[10px] font-bold text-primary pt-0.5">
+                  Price: ৳{Number(item.sellingPrice).toFixed(2)}
+                </div>
+
+                {item.medicineGroup && (
+                  <div className="pt-1 flex">
+                    <button
+                      onClick={() => setSelectedAlternativeItem(item)}
+                      className="w-full text-center py-0.5 rounded border border-primary/25 text-primary text-[9px] font-bold hover:bg-primary/10 transition-colors bg-primary/5"
+                    >
+                      Alternatives
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </CardContent>
       
       {/* Alternatives Dialog */}
