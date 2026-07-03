@@ -104,7 +104,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         const stockCount = items.filter(item => {
           const cat = (item.categoryName || '').toLowerCase();
           if (cat === 'assets' || cat === 'surgicals') return false;
-          return item.stock === 0 || (item.stock < 10 && !item.ignoredWarning);
+          return item.stock === 0 || (item.stock < 5 && !item.ignoredWarning);
         }).length;
         setStockWarningCount(stockCount);
       }).catch(err => console.error("Failed to fetch alert count for sidebar:", err));
