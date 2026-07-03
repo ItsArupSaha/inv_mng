@@ -252,7 +252,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </h2>
             </div>
           </header>
-          <main className="p-4 sm:p-6 w-full flex-1">{children}</main>
+          <main className="p-4 sm:p-6 w-full flex-1 min-w-0 overflow-hidden">{children}</main>
         </SidebarInset>
       </div>
     </SidebarProvider>

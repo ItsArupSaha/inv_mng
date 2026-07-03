@@ -87,7 +87,7 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
 
   return (
     <>
-      <Card className="w-full">
+      <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>

@@ -58,8 +58,8 @@ export function PurchasesTable({
             <TableRow key={purchase.id}>
               <TableCell>{format(new Date(purchase.date), 'PPP')}</TableCell>
               <TableCell className="font-mono hidden sm:table-cell">{purchase.purchaseId}</TableCell>
-              <TableCell className="font-medium">{purchase.supplier}</TableCell>
-              <TableCell className="max-w-[300px] truncate">
+              <TableCell className="font-medium max-w-[150px] truncate" title={purchase.supplier}>{purchase.supplier}</TableCell>
+              <TableCell className="max-w-[200px] truncate" title={purchase.items.map(i => `${i.quantity}x ${i.itemName}`).join(', ')}>
                 {purchase.items.map(i => `${i.quantity}x ${i.itemName}`).join(', ')}
               </TableCell>
               <TableCell className="hidden sm:table-cell">{purchase.paymentMethod}</TableCell>
