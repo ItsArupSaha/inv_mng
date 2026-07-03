@@ -63,11 +63,9 @@ export async function getExpensesPaginated({ userId, pageLimit = 5, lastVisibleI
   return { expenses, hasMore };
 }
 
-export async function getExpensesForMonth(userId: string, year: number, month: number): Promise<Expense[]> {
+export async function getExpensesForDateRange(userId: string, startDate: Date, endDate: Date): Promise<Expense[]> {
     if (!db || !userId) return [];
     const expensesCollection = collection(db, 'users', userId, 'expenses');
-    const startDate = new Date(year, month, 1);
-    const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
     const q = query(
         expensesCollection,
         where('date', '>=', Timestamp.fromDate(startDate)),
@@ -79,6 +77,19 @@ export async function getExpensesForMonth(userId: string, year: number, month: n
     
     // Filter out transfer-related expenses (they shouldn't affect profit calculation)
     return expenses.filter(expense => !expense.description.startsWith('Transfer to'));
+}
+
+export async function getExpensesForMonth(userId: string, year: number, month: number): Promise<Expense[]> {
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    return getExpensesForDateRange(userId, startDate, endDate);
+}
+
+export async function getExpensesForDay(userId: string, dateString: string): Promise<Expense[]> {
+    const date = new Date(dateString);
+    const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    return getExpensesForDateRange(userId, startDate, endDate);
 }
 
 export async function addExpense(userId: string, data: Omit<Expense, 'id' | 'expenseId' | 'date'> & { date: Date }): Promise<Expense> {

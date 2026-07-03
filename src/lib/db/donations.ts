@@ -55,11 +55,9 @@ export async function getDonationsPaginated({ userId, pageLimit = 5, lastVisible
 }
 
 
-export async function getDonationsForMonth(userId: string, year: number, month: number): Promise<Donation[]> {
+export async function getDonationsForDateRange(userId: string, startDate: Date, endDate: Date): Promise<Donation[]> {
     if (!db || !userId) return [];
     const donationsCollection = collection(db, 'users', userId, 'donations');
-    const startDate = new Date(year, month, 1);
-    const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
     const q = query(
         donationsCollection,
         where('date', '>=', Timestamp.fromDate(startDate)),
@@ -74,6 +72,19 @@ export async function getDonationsForMonth(userId: string, year: number, month: 
       !(donation.donorName === 'Internal Transfer' && donation.notes?.startsWith('Transfer from')) &&
       !(donation.donorName === 'Initial Capital')
     );
+}
+
+export async function getDonationsForMonth(userId: string, year: number, month: number): Promise<Donation[]> {
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    return getDonationsForDateRange(userId, startDate, endDate);
+}
+
+export async function getDonationsForDay(userId: string, dateString: string): Promise<Donation[]> {
+    const date = new Date(dateString);
+    const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    return getDonationsForDateRange(userId, startDate, endDate);
 }
 
 export async function addDonation(userId: string, data: Omit<Donation, 'id' | 'donationId' | 'date'> & { date: Date }): Promise<Donation> {

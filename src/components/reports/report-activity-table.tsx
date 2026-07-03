@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 
 interface ReportActivityTableProps {
-  monthlyActivity: {
+  activity: {
     totalSales: number;
     totalProfit: number;
     receivedPaymentsFromDues: number;
@@ -12,34 +12,35 @@ interface ReportActivityTableProps {
     totalExpenses: number;
   };
   formatCurrency: (amount: number) => string;
+  title?: string;
 }
 
-export function ReportActivityTable({ monthlyActivity, formatCurrency }: ReportActivityTableProps) {
+export function ReportActivityTable({ activity, formatCurrency, title = 'Monthly Activity' }: ReportActivityTableProps) {
   return (
     <div>
-      <h3 className="text-lg font-semibold mb-2 font-headline">Monthly Activity</h3>
+      <h3 className="text-lg font-semibold mb-2 font-headline">{title}</h3>
       <Table>
         <TableBody>
           <TableRow>
             <TableCell>Total Sales</TableCell>
-            <TableCell className="text-right">{formatCurrency(monthlyActivity.totalSales)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(activity.totalSales)}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Total Profit</TableCell>
-            <TableCell className="text-right">{formatCurrency(monthlyActivity.totalProfit)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(activity.totalProfit)}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Received Payments from Dues</TableCell>
-            <TableCell className="text-right">{formatCurrency(monthlyActivity.receivedPaymentsFromDues)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(activity.receivedPaymentsFromDues)}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Total Donations</TableCell>
-            <TableCell className="text-right text-primary">{formatCurrency(monthlyActivity.totalDonations)}</TableCell>
+            <TableCell className="text-right text-primary">{formatCurrency(activity.totalDonations)}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Total Expenses</TableCell>
             <TableCell className="text-right text-destructive">
-              ({formatCurrency(monthlyActivity.totalExpenses)})
+              ({formatCurrency(activity.totalExpenses)})
             </TableCell>
           </TableRow>
         </TableBody>

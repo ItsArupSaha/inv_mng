@@ -179,11 +179,9 @@ export async function getTransfersPaginated({ userId, pageLimit = 5, lastVisible
   return { transfers, hasMore };
 }
 
-export async function getTransactionsForMonth(userId: string, year: number, month: number): Promise<Transaction[]> {
+export async function getTransactionsForDateRange(userId: string, startDate: Date, endDate: Date): Promise<Transaction[]> {
   if (!db || !userId) return [];
   const transactionsCollection = collection(db, 'users', userId, 'transactions');
-  const startDate = new Date(year, month, 1);
-  const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
   const q = query(
     transactionsCollection,
     where('dueDate', '>=', Timestamp.fromDate(startDate)),
@@ -194,6 +192,19 @@ export async function getTransactionsForMonth(userId: string, year: number, mont
   return snapshot.docs
     .map(docToTransaction)
     .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+}
+
+export async function getTransactionsForMonth(userId: string, year: number, month: number): Promise<Transaction[]> {
+  const startDate = new Date(year, month, 1);
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  return getTransactionsForDateRange(userId, startDate, endDate);
+}
+
+export async function getTransactionsForDay(userId: string, dateString: string): Promise<Transaction[]> {
+  const date = new Date(dateString);
+  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  return getTransactionsForDateRange(userId, startDate, endDate);
 }
 
 /**

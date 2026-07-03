@@ -1,15 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import type { UseFormReturn } from 'react-hook-form';
-import type { ReportFormValues } from './use-report-generator';
-
 interface UseReportCalculationsProps {
   authUser: any;
-  form: UseFormReturn<ReportFormValues>;
+  selectedYear: string;
 }
 
-export function useReportCalculations({ authUser, form }: UseReportCalculationsProps) {
+export function useReportCalculations({ authUser, selectedYear }: UseReportCalculationsProps) {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
 
@@ -26,8 +23,7 @@ export function useReportCalculations({ authUser, form }: UseReportCalculationsP
   const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => (currentYear - i).toString());
 
   // Watch the selected year to dynamically generate months
-  const watchedYear = form.watch('year');
-  const watchedYearNum = watchedYear ? parseInt(watchedYear, 10) : null;
+  const watchedYearNum = selectedYear ? parseInt(selectedYear, 10) : null;
 
   // Generate months based on selected year, company creation date and current month
   const months = React.useMemo(() => {

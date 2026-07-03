@@ -1,22 +1,27 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { getDonationsForMonth, getExpensesForMonth, getItems, getSalesForMonth, getTransactionsForMonth } from '@/lib/actions';
-import { generateMonthlyReport, type ReportAnalysis } from '@/lib/report-generator';
+import {
+  getDonationsForMonth,
+  getExpensesForMonth,
+  getItems,
+  getSalesForMonth,
+  getTransactionsForMonth,
+  getSalesForDay,
+  getExpensesForDay,
+  getDonationsForDay,
+  getTransactionsForDay,
+} from '@/lib/actions';
+import {
+  generateMonthlyReport,
+  generateDailyReport,
+  type ReportAnalysis,
+  type DailyReportAnalysis,
+} from '@/lib/report-generator';
 import type { Item } from '@/lib/types';
 import { useReportCalculations } from './use-report-calculations';
-
-export const reportSchema = z.object({
-  month: z.string({ required_error: 'Please select a month.' }),
-  year: z.string({ required_error: 'Please select a year.' }),
-});
-
-export type ReportFormValues = z.infer<typeof reportSchema>;
 
 interface ReportDataSource {
   items: Item[];
@@ -30,8 +35,12 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
   const [dataSource, setDataSource] = React.useState<ReportDataSource | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [reportData, setReportData] = React.useState<ReportAnalysis | null>(null);
-  const [formValues, setFormValues] = React.useState<ReportFormValues | null>(null);
+  const [reportData, setReportData] = React.useState<ReportAnalysis | DailyReportAnalysis | null>(null);
+
+  const [reportType, setReportType] = React.useState<'monthly' | 'daily'>('daily');
+  const [date, setDate] = React.useState<Date>(new Date());
+  const [month, setMonth] = React.useState<string>(new Date().getMonth().toString());
+  const [year, setYear] = React.useState<string>(new Date().getFullYear().toString());
 
   const { toast } = useToast();
   const { authUser } = useAuth();
@@ -57,64 +66,77 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
     loadData();
   }, [userId, toast]);
 
-  const form = useForm<ReportFormValues>({
-    resolver: zodResolver(reportSchema),
-  });
+  React.useEffect(() => {
+    async function runReport() {
+      if (!userId || !dataSource) return;
+      setIsGenerating(true);
+      setReportData(null);
+      try {
+        if (reportType === 'daily') {
+          // Format as YYYY-MM-DD local date
+          const offset = date.getTimezoneOffset();
+          const localDate = new Date(date.getTime() - offset * 60 * 1000);
+          const dateString = localDate.toISOString().split('T')[0];
 
-  const onSubmit = async (formData: ReportFormValues) => {
-    if (!dataSource) return;
+          const [salesForDay, expensesForDay, donationsForDay, transactionsForDay] = await Promise.all([
+            getSalesForDay(userId, dateString),
+            getExpensesForDay(userId, dateString),
+            getDonationsForDay(userId, dateString),
+            getTransactionsForDay(userId, dateString)
+          ]);
 
-    setIsGenerating(true);
-    setReportData(null);
-    setFormValues(formData);
+          const input = {
+            salesData: salesForDay,
+            expensesData: expensesForDay,
+            donationsData: donationsForDay,
+            itemsData: dataSource.items,
+            date: dateString,
+            transactionsData: transactionsForDay,
+          };
 
-    try {
-      const selectedMonth = parseInt(formData.month, 10);
-      const selectedYear = parseInt(formData.year, 10);
+          const result = generateDailyReport(input);
+          setReportData(result);
+        } else {
+          const selectedMonth = parseInt(month, 10);
+          const selectedYear = parseInt(year, 10);
 
-      const [salesForMonth, expensesForMonth, donationsForMonth, transactionsForMonth] = await Promise.all([
-        getSalesForMonth(userId, selectedYear, selectedMonth),
-        getExpensesForMonth(userId, selectedYear, selectedMonth),
-        getDonationsForMonth(userId, selectedYear, selectedMonth),
-        getTransactionsForMonth(userId, selectedYear, selectedMonth)
-      ]);
+          const [salesForMonth, expensesForMonth, donationsForMonth, transactionsForMonth] = await Promise.all([
+            getSalesForMonth(userId, selectedYear, selectedMonth),
+            getExpensesForMonth(userId, selectedYear, selectedMonth),
+            getDonationsForMonth(userId, selectedYear, selectedMonth),
+            getTransactionsForMonth(userId, selectedYear, selectedMonth)
+          ]);
 
-      const input = {
-        salesData: salesForMonth,
-        expensesData: expensesForMonth,
-        donationsData: donationsForMonth,
-        itemsData: dataSource.items,
-        month: new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long' }),
-        year: formData.year,
-        transactionsData: transactionsForMonth,
-      };
+          const input = {
+            salesData: salesForMonth,
+            expensesData: expensesForMonth,
+            donationsData: donationsForMonth,
+            itemsData: dataSource.items,
+            month: new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long' }),
+            year: year,
+            transactionsData: transactionsForMonth,
+          };
 
-      const result = generateMonthlyReport(input);
-
-      if (result) {
-        setReportData(result);
+          const result = generateMonthlyReport(input);
+          setReportData(result);
+        }
+      } catch (error) {
+        console.error('Error generating report:', error);
         toast({
-          title: 'Report Generated',
-          description: 'Your monthly report preview is ready below.',
+          variant: 'destructive',
+          title: 'Error generating report',
+          description: 'There was a problem loading database values for this period.'
         });
-      } else {
-        throw new Error('The AI model failed to return valid report data.');
+      } finally {
+        setIsGenerating(false);
       }
-    } catch (error) {
-      console.error(error);
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
-      toast({
-        variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: `There was a problem generating your report. Error: ${errorMessage}`,
-      });
-    } finally {
-      setIsGenerating(false);
     }
-  };
+
+    runReport();
+  }, [userId, dataSource, reportType, date, month, year, toast]);
 
   // Call the report date options calculator hook
-  const calcs = useReportCalculations({ authUser, form });
+  const calcs = useReportCalculations({ authUser, selectedYear: year });
 
   return {
     dataSource,
@@ -122,11 +144,16 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
     isGenerating,
     reportData,
     setReportData,
-    formValues,
-    form,
-    onSubmit,
     years: calcs.years,
     months: calcs.months,
     authUser,
+    reportType,
+    setReportType,
+    date,
+    setDate,
+    month,
+    setMonth,
+    year,
+    setYear,
   };
 }

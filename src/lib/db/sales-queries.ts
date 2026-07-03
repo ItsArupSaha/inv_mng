@@ -64,11 +64,9 @@ export async function getSalesForCustomer(userId: string, customerId: string): P
   return snapshot.docs.map(docToSale);
 }
 
-export async function getSalesForMonth(userId: string, year: number, month: number): Promise<Sale[]> {
+export async function getSalesForDateRange(userId: string, startDate: Date, endDate: Date): Promise<Sale[]> {
   if (!db || !userId) return [];
   const salesCollection = collection(db, 'users', userId, 'sales');
-  const startDate = new Date(year, month, 1);
-  const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
   const q = query(
     salesCollection,
     where('date', '>=', Timestamp.fromDate(startDate)),
@@ -77,6 +75,19 @@ export async function getSalesForMonth(userId: string, year: number, month: numb
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(docToSale);
+}
+
+export async function getSalesForMonth(userId: string, year: number, month: number): Promise<Sale[]> {
+  const startDate = new Date(year, month, 1);
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  return getSalesForDateRange(userId, startDate, endDate);
+}
+
+export async function getSalesForDay(userId: string, dateString: string): Promise<Sale[]> {
+  const date = new Date(dateString);
+  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  return getSalesForDateRange(userId, startDate, endDate);
 }
 
 export async function searchSales(userId: string, searchTerm: string): Promise<Sale[]> {

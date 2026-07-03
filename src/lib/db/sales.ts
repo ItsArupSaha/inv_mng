@@ -6,6 +6,7 @@ import {
   getSalesPaginated as getSalesPaginatedImpl,
   getSalesForCustomer as getSalesForCustomerImpl,
   getSalesForMonth as getSalesForMonthImpl,
+  getSalesForDay as getSalesForDayImpl,
   searchSales as searchSalesImpl,
 } from './sales-queries';
 import {
@@ -31,6 +32,10 @@ export async function getSalesForCustomer(userId: string, customerId: string): P
 
 export async function getSalesForMonth(userId: string, year: number, month: number): Promise<Sale[]> {
   return getSalesForMonthImpl(userId, year, month);
+}
+
+export async function getSalesForDay(userId: string, dateString: string): Promise<Sale[]> {
+  return getSalesForDayImpl(userId, dateString);
 }
 
 export async function searchSales(userId: string, searchTerm: string): Promise<Sale[]> {

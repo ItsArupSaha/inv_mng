@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth';
-import type { ReportAnalysis } from '@/lib/report-generator';
+import type { ReportAnalysis, DailyReportAnalysis } from '@/lib/report-generator';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Download } from 'lucide-react';
@@ -11,9 +11,9 @@ import { ReportActivityTable } from './reports/report-activity-table';
 import { ReportCashflowOverview } from './reports/report-cashflow-overview';
 
 interface ReportPreviewProps {
-  reportData: ReportAnalysis;
-  month: string;
-  year: string;
+  reportData: ReportAnalysis | DailyReportAnalysis;
+  reportType: 'monthly' | 'daily';
+  dateLabel: string;
 }
 
 const formatCurrency = (amount: number) => {
@@ -30,9 +30,14 @@ const formatCurrencyForPdf = (amount: number) => {
   }).format(amount)}`;
 };
 
-export default function ReportPreview({ reportData, month, year }: ReportPreviewProps) {
+export default function ReportPreview({ reportData, reportType, dateLabel }: ReportPreviewProps) {
   const { authUser } = useAuth();
-  const { monthlyActivity, salesBreakdown, cashFlow, netResult } = reportData;
+  
+  const activity = reportType === 'daily'
+    ? (reportData as DailyReportAnalysis).dailyActivity
+    : (reportData as ReportAnalysis).monthlyActivity;
+    
+  const { salesBreakdown, cashFlow, netResult } = reportData;
 
   const handleDownloadPdf = () => {
     if (!authUser) return;
@@ -60,25 +65,25 @@ export default function ReportPreview({ reportData, month, year }: ReportPreview
     // Report Title
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Monthly Financial Report`, 105, 45, { align: 'center' });
+    doc.text(reportType === 'daily' ? 'Daily Financial Report' : 'Monthly Financial Report', 105, 45, { align: 'center' });
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text(`${month} ${year}`, 105, 51, { align: 'center' });
+    doc.text(dateLabel, 105, 51, { align: 'center' });
     doc.setTextColor(0);
 
-    // Monthly Activity Table
+    // Activity Table
     const activityBody = [
-      ['Total Sales', formatCurrencyForPdf(monthlyActivity.totalSales)],
-      ['Total Profit', formatCurrencyForPdf(monthlyActivity.totalProfit)],
-      ['Received Payments from Dues', formatCurrencyForPdf(monthlyActivity.receivedPaymentsFromDues)],
-      ['Total Donations', formatCurrencyForPdf(monthlyActivity.totalDonations)],
-      ['Total Expenses', `(${formatCurrencyForPdf(monthlyActivity.totalExpenses)})`],
+      ['Total Sales', formatCurrencyForPdf(activity.totalSales)],
+      ['Total Profit', formatCurrencyForPdf(activity.totalProfit)],
+      ['Received Payments from Dues', formatCurrencyForPdf(activity.receivedPaymentsFromDues)],
+      ['Total Donations', formatCurrencyForPdf(activity.totalDonations)],
+      ['Total Expenses', `(${formatCurrencyForPdf(activity.totalExpenses)})`],
     ];
 
     autoTable(doc, {
       startY: 60,
-      head: [['Monthly Activity', 'Amount']],
+      head: [[reportType === 'daily' ? 'Daily Activity' : 'Monthly Activity', 'Amount']],
       body: activityBody,
       theme: 'striped',
       headStyles: { fillColor: '#306754' },
@@ -127,13 +132,14 @@ export default function ReportPreview({ reportData, month, year }: ReportPreview
     // Net Result
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('Net Profit / Loss for the Month:', 14, finalY + 15);
+    doc.text(reportType === 'daily' ? 'Net Profit / Loss for the Day:' : 'Net Profit / Loss for the Month:', 14, finalY + 15);
     const netColor = netResult.netProfitOrLoss >= 0 ? '#306754' : '#E53E3E';
     doc.setTextColor(netColor);
     doc.text(formatCurrencyForPdf(netResult.netProfitOrLoss), 200, finalY + 15, { align: 'right' });
     doc.setTextColor(0);
 
-    doc.save(`report-${month}-${year}.pdf`);
+    const safeDateLabel = dateLabel.replace(/[\s,]+/g, '-').toLowerCase();
+    doc.save(`report-${reportType}-${safeDateLabel}.pdf`);
   };
 
   const netColor = netResult.netProfitOrLoss >= 0 ? 'text-primary' : 'text-destructive';
@@ -144,7 +150,7 @@ export default function ReportPreview({ reportData, month, year }: ReportPreview
         <div>
           <CardTitle className="font-headline text-2xl">Financial Report</CardTitle>
           <CardDescription>
-            Showing results for {month} {year}
+            Showing results for {dateLabel}
           </CardDescription>
         </div>
         <Button onClick={handleDownloadPdf} variant="outline" className="w-full sm:w-auto">
@@ -156,12 +162,18 @@ export default function ReportPreview({ reportData, month, year }: ReportPreview
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Activity Table */}
           <div className="space-y-6">
-            <ReportActivityTable monthlyActivity={monthlyActivity} formatCurrency={formatCurrency} />
+            <ReportActivityTable
+              activity={activity}
+              formatCurrency={formatCurrency}
+              title={reportType === 'daily' ? 'Daily Activity' : 'Monthly Activity'}
+            />
           </div>
           {/* Net Result & Cash Flow */}
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold mb-2 font-headline">Net Result for {month}</h3>
+              <h3 className="text-lg font-semibold mb-2 font-headline">
+                {reportType === 'daily' ? `Net Result for ${dateLabel}` : `Net Result for ${dateLabel}`}
+              </h3>
               <div className="p-4 rounded-lg bg-muted/50 text-center">
                 <p className="text-sm text-muted-foreground">Net Profit / Loss</p>
                 <p className={`text-3xl font-bold ${netColor}`}>{formatCurrency(netResult.netProfitOrLoss)}</p>

@@ -9,6 +9,7 @@ import {
   getSaleTransaction as getSaleTransactionImpl,
   getTransfersPaginated as getTransfersPaginatedImpl,
   getTransactionsForMonth as getTransactionsForMonthImpl,
+  getTransactionsForDay as getTransactionsForDayImpl,
   getPaidPayables as getPaidPayablesImpl,
   getPaidPayablesForDateRange as getPaidPayablesForDateRangeImpl,
 } from './transaction-queries';
@@ -63,6 +64,10 @@ export async function getTransfersPaginated(params: {
 
 export async function getTransactionsForMonth(userId: string, year: number, month: number): Promise<Transaction[]> {
   return getTransactionsForMonthImpl(userId, year, month);
+}
+
+export async function getTransactionsForDay(userId: string, dateString: string): Promise<Transaction[]> {
+  return getTransactionsForDayImpl(userId, dateString);
 }
 
 export async function getPaidPayables(userId: string): Promise<Transaction[]> {
