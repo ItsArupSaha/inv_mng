@@ -5,6 +5,15 @@ import { Search, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '../ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { Item } from '@/lib/types';
 
 interface SalesDirectorySearchProps {
@@ -13,6 +22,18 @@ interface SalesDirectorySearchProps {
 
 export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
   const [directoryQuery, setDirectoryQuery] = React.useState('');
+  const [selectedAlternativeItem, setSelectedAlternativeItem] = React.useState<Item | null>(null);
+
+  const alternativeMedicines = React.useMemo(() => {
+    if (!selectedAlternativeItem || !selectedAlternativeItem.medicineGroup) return [];
+    const groupLower = selectedAlternativeItem.medicineGroup.trim().toLowerCase();
+    return items.filter(
+      (item) =>
+        item.id !== selectedAlternativeItem.id &&
+        item.medicineGroup &&
+        item.medicineGroup.trim().toLowerCase() === groupLower
+    );
+  }, [selectedAlternativeItem, items]);
 
   const filteredDirectoryItems = React.useMemo(() => {
     const q = directoryQuery.trim().toLowerCase();
@@ -55,7 +76,7 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
   }, [directoryQuery, items]);
 
   return (
-    <Card className="xl:col-span-1 w-full h-fit sticky top-20">
+    <Card className="xl:col-span-1 w-full min-w-0 overflow-hidden h-fit sticky top-20">
       <CardHeader className="pb-3">
         <CardTitle className="font-headline text-lg flex items-center gap-2">
           <Search className="h-4 w-4 text-primary" />
@@ -84,17 +105,17 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
           )}
         </div>
 
-        <ScrollArea className="h-[520px] pr-2">
-          <div className="space-y-2">
+        <ScrollArea className="h-[520px] pr-2 w-full min-w-0 overflow-hidden">
+          <div className="space-y-2 w-full min-w-0 overflow-hidden">
             {filteredDirectoryItems.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-8">No matching medicines found.</p>
             ) : (
               filteredDirectoryItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-2.5 border rounded-lg bg-card/40 hover:bg-card/85 transition-all duration-200 space-y-1.5 text-xs"
+                  className="p-2.5 border rounded-lg bg-card/40 hover:bg-card/85 transition-all duration-200 space-y-1.5 text-xs min-w-0 overflow-hidden"
                 >
-                  <div className="flex justify-between items-start gap-1">
+                  <div className="flex justify-between items-start gap-1 min-w-0">
                     <div className="font-bold text-foreground truncate flex-1" title={item.title}>
                       {item.title}
                     </div>
@@ -136,12 +157,86 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
                       </span>
                     )}
                   </div>
+
+                  {item.medicineGroup && (
+                    <div className="pt-1 flex">
+                      <button
+                        onClick={() => setSelectedAlternativeItem(item)}
+                        className="w-full text-center py-0.5 rounded border border-primary/25 text-primary text-[9px] font-bold hover:bg-primary/10 transition-colors bg-primary/5"
+                      >
+                        Alternatives
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
         </ScrollArea>
       </CardContent>
+      
+      {/* Alternatives Dialog */}
+      <Dialog 
+        open={!!selectedAlternativeItem} 
+        onOpenChange={(open) => {
+          if (!open) setSelectedAlternativeItem(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-headline text-lg flex items-center gap-2">
+              Alternative Medicines
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Available brands for generic group: <span className="font-semibold text-foreground">{selectedAlternativeItem?.medicineGroup}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-2">
+            {alternativeMedicines.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No alternative medicines found in this generic group.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {alternativeMedicines.map((alt) => (
+                  <div 
+                    key={alt.id}
+                    className="p-3 border rounded-lg flex items-center justify-between gap-3 text-xs bg-muted/20"
+                  >
+                    <div>
+                      <span className="block font-semibold text-foreground">{alt.title}</span>
+                      <span className="block text-[10px] text-muted-foreground">{alt.company || 'Unknown Company'}</span>
+                      {alt.location && (
+                        <span className="inline-block mt-1 text-[9px] bg-primary/10 text-primary px-1 rounded font-medium">
+                          Shelf: {alt.location}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0 space-y-1">
+                      <span className="block font-bold text-foreground">৳{Number(alt.sellingPrice).toFixed(2)}</span>
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "text-[9px] px-1 font-semibold",
+                          alt.stock === 0 
+                            ? "bg-red-100 text-red-800 animate-pulse" 
+                            : alt.stock <= 5 
+                            ? "bg-amber-100 text-amber-800" 
+                            : "bg-emerald-100 text-emerald-800"
+                        )}
+                      >
+                        Stock: {alt.stock}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
