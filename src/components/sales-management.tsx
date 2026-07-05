@@ -75,7 +75,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
 
       {activeTab === 'checkout' ? (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start w-full">
-          <Card className="xl:col-span-2 w-full">
+          <Card className="xl:col-span-2 w-full min-w-0">
             <CardHeader>
               <CardTitle className="font-headline text-2xl">POS Receipt Checkout</CardTitle>
               <CardDescription>Select items, adjust prices, and confirm transactions instantly.</CardDescription>

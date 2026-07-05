@@ -96,14 +96,13 @@ export function SaleItemsTable({
         >
           <thead className="bg-slate-100 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 select-none">
             <tr>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 w-8 text-center bg-slate-100/80 dark:bg-slate-900/80">#</th>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 min-w-[220px]">Medicine / Item</th>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 w-44">Company & Shelf</th>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 w-20 text-center">In Stock</th>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 w-20 text-center">Quantity</th>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 w-24 text-right">Price (৳)</th>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 w-28 text-right">Total (৳)</th>
-              <th className="border border-slate-300 dark:border-slate-700 p-2 w-12 text-center bg-slate-100/80 dark:bg-slate-900/80">Action</th>
+              <th className="border border-slate-300 dark:border-slate-700 p-2 w-6 text-center bg-slate-100/80 dark:bg-slate-900/80">#</th>
+              <th className="border border-slate-300 dark:border-slate-700 p-2 min-w-[160px]">Medicine / Item</th>
+              <th className="border border-slate-300 dark:border-slate-700 p-2 w-14 text-center">In Stock</th>
+              <th className="border border-slate-300 dark:border-slate-700 p-2 w-14 text-center">Quantity</th>
+              <th className="border border-slate-300 dark:border-slate-700 p-2 w-20 text-right">Price (৳)</th>
+              <th className="border border-slate-300 dark:border-slate-700 p-2 w-24 text-right">Total (৳)</th>
+              <th className="border border-slate-300 dark:border-slate-700 p-2 w-10 text-center bg-slate-100/80 dark:bg-slate-900/80">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -122,55 +121,54 @@ export function SaleItemsTable({
                   </td>
                   
                   {/* Medicine Selector Cell */}
-                  <td className="border border-slate-200 dark:border-slate-800 p-0 bg-transparent">
+                  <td className="border border-slate-200 dark:border-slate-800 p-0 bg-transparent min-w-[160px] align-top">
                     <FormField
                       control={control}
                       name={`items.${index}.itemId`}
                       render={({ field: selectField }) => (
                         <FormItem className="space-y-0">
                           <FormControl>
-                            <SearchableItemSelect
-                              items={items}
-                              value={selectField.value || ''}
-                              className="w-full h-9 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 px-3 py-1 font-medium"
-                              data-row={index}
-                              data-col={0}
-                              onChange={(value) => {
-                                if (value === selectField.value) return;
-                                const item = items.find(i => i.id === value);
-                                selectField.onChange(value);
-                                setValue(`items.${index}.price`, item?.sellingPrice || 0, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
-                                setValue(`items.${index}.quantity`, 1, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
-                                
-                                // Auto-append another row if we selected an item in the last row
-                                if (index === fields.length - 1) {
-                                  appendRow();
-                                }
-                              }}
-                              disabledItemIds={watchItems
-                                .map((i: any) => i.itemId)
-                                .filter((id: string) => id && id !== selectField.value)}
-                            />
+                            <div className="flex flex-col w-full min-w-0 h-full justify-between">
+                              <div className="p-1">
+                                <SearchableItemSelect
+                                  items={items}
+                                  value={selectField.value || ''}
+                                  className="w-full h-8 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 px-3 py-0.5 font-medium text-xs"
+                                  data-row={index}
+                                  data-col={0}
+                                  onChange={(value) => {
+                                    if (value === selectField.value) return;
+                                    const item = items.find(i => i.id === value);
+                                    selectField.onChange(value);
+                                    setValue(`items.${index}.price`, item?.sellingPrice || 0, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+                                    setValue(`items.${index}.quantity`, 1, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+                                    
+                                    // Auto-append another row if we selected an item in the last row
+                                    if (index === fields.length - 1) {
+                                      appendRow();
+                                    }
+                                  }}
+                                  disabledItemIds={watchItems
+                                    .map((i: any) => i.itemId)
+                                    .filter((id: string) => id && id !== selectField.value)}
+                                />
+                              </div>
+                              {selectedItem && (
+                                <div className="flex items-center gap-2 text-[10px] px-3 py-1.5 bg-slate-50 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800 select-none">
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[130px]" title={selectedItem.company || '—'}>
+                                    {selectedItem.company || '—'}
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-700 select-none">|</span>
+                                  <span className="text-slate-500 dark:text-slate-400 truncate max-w-[130px]" title={selectedItem.location ? `Shelf: ${selectedItem.location}` : 'No Shelf'}>
+                                    {selectedItem.location ? `Shelf: ${selectedItem.location}` : 'No Shelf'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </FormControl>
                         </FormItem>
                       )}
                     />
-                  </td>
-
-                  {/* Reference Info (Company & Shelf) */}
-                  <td className="border border-slate-200 dark:border-slate-800 p-2 bg-slate-50/30 dark:bg-slate-900/5 select-none truncate max-w-[176px]">
-                    {selectedItem ? (
-                      <div className="flex flex-col text-[10px] leading-tight">
-                        <span className="font-semibold text-foreground truncate max-w-[160px]" title={selectedItem.company || '—'}>
-                          {selectedItem.company || '—'}
-                        </span>
-                        <span className="text-muted-foreground truncate max-w-[160px]" title={selectedItem.location ? `Shelf: ${selectedItem.location}` : 'No Shelf'}>
-                          {selectedItem.location ? `Shelf: ${selectedItem.location}` : 'No Shelf'}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground/60">—</span>
-                    )}
                   </td>
 
                   {/* In Stock Count */}
@@ -191,7 +189,7 @@ export function SaleItemsTable({
                               min="1"
                               max={selectedItem?.stock}
                               placeholder="0"
-                              className="w-full h-9 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 text-center font-mono py-1"
+                              className="w-full h-8 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 text-center font-mono py-0.5"
                               data-row={index}
                               data-col={1}
                               {...qtyField}
@@ -217,7 +215,7 @@ export function SaleItemsTable({
                               step="0.01"
                               min="0"
                               placeholder="0.00"
-                              className="w-full h-9 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 text-right font-mono pr-3 py-1"
+                              className="w-full h-8 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 text-right font-mono pr-3 py-0.5"
                               data-row={index}
                               data-col={2}
                               {...priceField}
@@ -241,7 +239,7 @@ export function SaleItemsTable({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-full text-destructive hover:bg-destructive/10 rounded-none border-0 transition-colors"
+                      className="h-8 w-full text-destructive hover:bg-destructive/10 rounded-none border-0 transition-colors"
                       onClick={() => remove(index)}
                       disabled={fields.length === 1}
                     >
