@@ -60,22 +60,19 @@ export function SearchableItemSelect({
       return !disabledItemIds.includes(item.id);
     });
 
-    // Try exact matching first
-    let matches = list.filter(item => {
+    // Combine exact and fuzzy matching so both are available and sorted by relevance score
+    const matches = list.filter(item => {
       const title = (item.title || '').toLowerCase();
       const company = (item.company || '').toLowerCase();
       const group = (item.medicineGroup || '').toLowerCase();
-      return title.includes(query) || company.includes(query) || group.includes(query);
+      
+      return title.includes(query) || 
+             company.includes(query) || 
+             group.includes(query) ||
+             isFuzzyMatch(title, query) ||
+             isFuzzyMatch(group, query) ||
+             isFuzzyMatch(company, query);
     });
-
-    // Fallback to fuzzy matching if no exact matches found
-    if (matches.length === 0) {
-      matches = list.filter(item => {
-        return isFuzzyMatch(item.title, query) ||
-               isFuzzyMatch(item.medicineGroup, query) ||
-               isFuzzyMatch(item.company, query);
-      });
-    }
 
     const getRelevanceScore = (item: Item) => {
       const title = (item.title || '').toLowerCase();

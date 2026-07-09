@@ -10,16 +10,19 @@ export function normalizePhonetic(str: string): string {
   return str
     .toLowerCase()
     .trim()
-    .replace(/^x/, 'z')
+    .replace(/ph/g, 'f')
+    .replace(/th/g, 't')
+    .replace(/sh/g, 'z') // soft sibilants mapped to common z sound
+    .replace(/ch/g, 'k')
+    .replace(/c/g, 'k')
+    .replace(/q/g, 'k')
     .replace(/x/g, 'z')
     .replace(/j/g, 'z')
-    .replace(/ph/g, 'f')
-    .replace(/y/g, 'i')
-    .replace(/c/g, 'k')
-    .replace(/sh/g, 's')
-    .replace(/oo/g, 'u')
-    .replace(/ee/g, 'i')
-    .replace(/(.)\1+/g, '$1');
+    .replace(/g/g, 'z')
+    .replace(/s/g, 'z')
+    .replace(/w/g, 'v') // w and v are frequently swapped
+    .replace(/[aeiouy]/g, 'a') // collapse all vowel spaces to 'a'
+    .replace(/(.)\1+/g, '$1'); // collapse duplicate letters
 }
 
 /**
@@ -69,18 +72,20 @@ export function isFuzzyMatch(target: string | null | undefined, query: string): 
   const normQuery = normalizePhonetic(queryLower);
   if (normTarget.includes(normQuery)) return true;
 
-  // 3. Edit distance check on individual words (to catch keyboard typos)
+  // 3. Edit distance check on individual normalized words
   const targetWords = targetLower.split(/[\s\-]+/);
   const queryWords = queryLower.split(/[\s\-]+/);
   
   for (const qWord of queryWords) {
-    if (qWord.length < 3) continue; // skip very short query words for edit distance
+    if (qWord.length < 3) continue; // skip very short query words
     const maxDist = qWord.length >= 5 ? 2 : 1;
+    const normQ = normalizePhonetic(qWord);
     
     for (const tWord of targetWords) {
       if (tWord.length < 3) continue;
-      const prefix = tWord.substring(0, qWord.length);
-      const dist = getLevenshteinDistance(prefix, qWord);
+      const normT = normalizePhonetic(tWord);
+      const prefix = normT.substring(0, normQ.length);
+      const dist = getLevenshteinDistance(prefix, normQ);
       if (dist <= maxDist) return true;
     }
   }
