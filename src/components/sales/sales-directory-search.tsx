@@ -4,147 +4,24 @@ import * as React from 'react';
 import { Search, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '../ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { useSalesDirectorySearch } from '@/hooks/use-sales-directory-search';
+import { AlternativeMedicinesDialog } from './alternative-medicines-dialog';
 import type { Item } from '@/lib/types';
 
 interface SalesDirectorySearchProps {
   items: Item[];
 }
 
-function getFormCategory(title: string): string {
-  const t = title.toLowerCase();
-  if (/\b(supp|suppository|suppositories)\b/i.test(t)) {
-    return 'suppository';
-  }
-  if (/\b(syp|syrup|syrups|susp|suspension|suspensions|pfs|sol|solution|oral|sus)\b/i.test(t)) {
-    return 'liquid';
-  }
-  if (/\b(inj|injection|injections|vial|vials|amp|ampoule)\b/i.test(t)) {
-    return 'injection';
-  }
-  if (/\b(crm|cream|creams|oint|ointment|ointments|gel)\b/i.test(t)) {
-    return 'topical';
-  }
-  if (/\b(drop|drops)\b/i.test(t)) {
-    return 'drops';
-  }
-  return 'tablet_capsule';
-}
-
-function getStrengths(title: string): string[] {
-  const t = title.toLowerCase();
-  const regex = /\b\d+(\.\d+)?\s*(mg|mcg|%|iu|gm|g|ml)?\b/gi;
-  const matches = t.match(regex) || [];
-  
-  const strengths: string[] = [];
-  for (const m of matches) {
-    const clean = m.replace(/\s+/g, '');
-    if (clean.endsWith('ml')) {
-      continue;
-    }
-    const numMatch = clean.match(/^\d+(\.\d+)?/);
-    if (numMatch) {
-      strengths.push(numMatch[0]);
-    }
-  }
-  return strengths;
-}
-
-function matchStrength(strengthsA: string[], strengthsB: string[]): boolean {
-  if (strengthsA.length === 0 || strengthsB.length === 0) return false;
-  return strengthsA.some(s => strengthsB.includes(s));
-}
-
 export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
-  const [directoryQuery, setDirectoryQuery] = React.useState('');
-  const [selectedAlternativeItem, setSelectedAlternativeItem] = React.useState<Item | null>(null);
-
-  const alternativeMedicines = React.useMemo(() => {
-    if (!selectedAlternativeItem || !selectedAlternativeItem.medicineGroup) return [];
-    const groupLower = selectedAlternativeItem.medicineGroup.trim().toLowerCase();
-    
-    const matching = items.filter(
-      (item) =>
-        item.id !== selectedAlternativeItem.id &&
-        item.medicineGroup &&
-        item.medicineGroup.trim().toLowerCase() === groupLower
-    );
-
-    const targetForm = getFormCategory(selectedAlternativeItem.title || '');
-    const targetStrengths = getStrengths(selectedAlternativeItem.title || '');
-
-    return [...matching].sort((a, b) => {
-      const formA = getFormCategory(a.title || '');
-      const formB = getFormCategory(b.title || '');
-      
-      const strengthsA = getStrengths(a.title || '');
-      const strengthsB = getStrengths(b.title || '');
-      
-      const formMatchA = formA === targetForm;
-      const formMatchB = formB === targetForm;
-      
-      const strengthMatchA = matchStrength(strengthsA, targetStrengths);
-      const strengthMatchB = matchStrength(strengthsB, targetStrengths);
-      
-      const scoreA = formMatchA && strengthMatchA ? 3 : formMatchA ? 2 : strengthMatchA ? 1 : 0;
-      const scoreB = formMatchB && strengthMatchB ? 3 : formMatchB ? 2 : strengthMatchB ? 1 : 0;
-      
-      if (scoreA !== scoreB) {
-        return scoreB - scoreA;
-      }
-      
-      return (a.title || '').localeCompare(b.title || '');
-    });
-  }, [selectedAlternativeItem, items]);
-
-  const filteredDirectoryItems = React.useMemo(() => {
-    const q = directoryQuery.trim().toLowerCase();
-    if (!q) return items.slice(0, 8);
-
-    const matches = items.filter(
-      (item) =>
-        (item.title || '').toLowerCase().includes(q) ||
-        (item.medicineGroup || '').toLowerCase().includes(q) ||
-        (item.company || '').toLowerCase().includes(q) ||
-        (item.location || '').toLowerCase().includes(q)
-    );
-
-    const getRelevanceScore = (item: Item) => {
-      const title = (item.title || '').toLowerCase();
-      const group = (item.medicineGroup || '').toLowerCase();
-      const company = (item.company || '').toLowerCase();
-      const location = (item.location || '').toLowerCase();
-
-      if (title.startsWith(q)) return 1;
-      if (title.includes(q)) return 2;
-      if (group.startsWith(q)) return 3;
-      if (group.includes(q)) return 4;
-      if (company.startsWith(q)) return 5;
-      if (company.includes(q)) return 6;
-      if (location.includes(q)) return 7;
-      return 8;
-    };
-
-    return matches
-      .sort((a, b) => {
-        const scoreA = getRelevanceScore(a);
-        const scoreB = getRelevanceScore(b);
-        if (scoreA !== scoreB) {
-          return scoreA - scoreB;
-        }
-        return (a.title || '').localeCompare(b.title || '');
-      })
-      .slice(0, 50);
-  }, [directoryQuery, items]);
+  const {
+    directoryQuery,
+    setDirectoryQuery,
+    selectedAlternativeItem,
+    setSelectedAlternativeItem,
+    alternativeMedicines,
+    filteredDirectoryItems,
+  } = useSalesDirectorySearch(items);
 
   return (
     <Card className="xl:col-span-1 w-full min-w-0 overflow-hidden h-fit sticky top-20 shadow-sm border border-muted/60">
@@ -178,7 +55,9 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
 
         <div className="h-[520px] overflow-y-auto overflow-x-hidden pr-1.5 space-y-2 w-full min-w-0">
           {filteredDirectoryItems.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-8">No matching medicines found.</p>
+            <p className="text-xs text-muted-foreground text-center py-8">
+              No matching medicines found.
+            </p>
           ) : (
             filteredDirectoryItems.map((item) => (
               <div
@@ -194,24 +73,28 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
                 </div>
 
                 <div className="text-[10px] text-muted-foreground pt-0.5 leading-normal flex flex-wrap gap-x-1.5 gap-y-0.5 min-w-0">
-                  <span className={cn(
-                    "font-semibold",
-                    item.stock <= 5 
-                      ? "text-destructive" 
-                      : item.stock <= 20 
-                      ? "text-amber-600" 
-                      : "text-emerald-600"
-                  )}>
+                  <span
+                    className={cn(
+                      'font-semibold',
+                      item.stock <= 5
+                        ? 'text-destructive'
+                        : item.stock <= 20
+                        ? 'text-amber-600'
+                        : 'text-emerald-600'
+                    )}
+                  >
                     Stock: {item.stock}
                   </span>
                   {item.location && <span className="shrink-0">• Shelf: {item.location}</span>}
                   {item.expiryDate && (
-                    <span className={cn(
-                      "shrink-0",
-                      new Date(item.expiryDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
-                        ? "text-destructive font-semibold animate-pulse" 
-                        : ""
-                    )}>
+                    <span
+                      className={cn(
+                        'shrink-0',
+                        new Date(item.expiryDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                          ? 'text-destructive font-semibold animate-pulse'
+                          : ''
+                      )}
+                    >
                       • Exp: {item.expiryDate}
                     </span>
                   )}
@@ -236,69 +119,15 @@ export function SalesDirectorySearch({ items }: SalesDirectorySearchProps) {
           )}
         </div>
       </CardContent>
-      
-      {/* Alternatives Dialog */}
-      <Dialog 
-        open={!!selectedAlternativeItem} 
+
+      <AlternativeMedicinesDialog
+        isOpen={!!selectedAlternativeItem}
         onOpenChange={(open) => {
           if (!open) setSelectedAlternativeItem(null);
         }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-headline text-lg flex items-center gap-2">
-              Alternative Medicines
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Available brands for generic group: <span className="font-semibold text-foreground">{selectedAlternativeItem?.medicineGroup}</span>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-2">
-            {alternativeMedicines.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                No alternative medicines found in this generic group.
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                {alternativeMedicines.map((alt) => (
-                  <div 
-                    key={alt.id}
-                    className="p-3 border rounded-lg flex items-center justify-between gap-3 text-xs bg-muted/20"
-                  >
-                    <div>
-                      <span className="block font-semibold text-foreground">{alt.title}</span>
-                      <span className="block text-[10px] text-muted-foreground">{alt.company || 'Unknown Company'}</span>
-                      {alt.location && (
-                        <span className="inline-block mt-1 text-[9px] bg-primary/10 text-primary px-1 rounded font-medium">
-                          Shelf: {alt.location}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-right shrink-0 space-y-1">
-                      <span className="block font-bold text-foreground">৳{Number(alt.sellingPrice).toFixed(2)}</span>
-                      <Badge 
-                        variant="secondary" 
-                        className={cn(
-                          "text-[9px] px-1 font-semibold",
-                          alt.stock === 0 
-                            ? "bg-red-100 text-red-800 animate-pulse" 
-                            : alt.stock <= 5 
-                            ? "bg-amber-100 text-amber-800" 
-                            : "bg-emerald-100 text-emerald-800"
-                        )}
-                      >
-                        Stock: {alt.stock}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        selectedAlternativeItem={selectedAlternativeItem}
+        alternativeMedicines={alternativeMedicines}
+      />
     </Card>
   );
 }

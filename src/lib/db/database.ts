@@ -145,7 +145,7 @@ export async function resetDatabase(userId: string) {
   console.log(`Database reset and re-initialized for user: ${userId}`);
 
   // Revalidate all paths
-  const paths = ['/dashboard', '/books', '/customers', '/sales', '/sales-returns', '/expenses', '/donations', '/receivables', '/payables', '/purchases'];
+  const paths = ['/dashboard', '/books', '/customers', '/sales', '/sales-returns', '/expenses', '/payables', '/purchases'];
   paths.forEach(path => revalidatePath(path));
 }
 

@@ -4,14 +4,12 @@ import * as React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import {
-  getDonationsForMonth,
   getExpensesForMonth,
   getItems,
   getSalesForMonth,
   getTransactionsForMonth,
   getSalesForDay,
   getExpensesForDay,
-  getDonationsForDay,
   getTransactionsForDay,
 } from '@/lib/actions';
 import {
@@ -78,17 +76,16 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
           const localDate = new Date(date.getTime() - offset * 60 * 1000);
           const dateString = localDate.toISOString().split('T')[0];
 
-          const [salesForDay, expensesForDay, donationsForDay, transactionsForDay] = await Promise.all([
+          const [salesForDay, expensesForDay, transactionsForDay] = await Promise.all([
             getSalesForDay(userId, dateString),
             getExpensesForDay(userId, dateString),
-            getDonationsForDay(userId, dateString),
-            getTransactionsForDay(userId, dateString)
+            getTransactionsForDay(userId, dateString),
           ]);
 
           const input = {
             salesData: salesForDay,
             expensesData: expensesForDay,
-            donationsData: donationsForDay,
+            donationsData: [],
             itemsData: dataSource.items,
             date: dateString,
             transactionsData: transactionsForDay,
@@ -100,17 +97,16 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
           const selectedMonth = parseInt(month, 10);
           const selectedYear = parseInt(year, 10);
 
-          const [salesForMonth, expensesForMonth, donationsForMonth, transactionsForMonth] = await Promise.all([
+          const [salesForMonth, expensesForMonth, transactionsForMonth] = await Promise.all([
             getSalesForMonth(userId, selectedYear, selectedMonth),
             getExpensesForMonth(userId, selectedYear, selectedMonth),
-            getDonationsForMonth(userId, selectedYear, selectedMonth),
-            getTransactionsForMonth(userId, selectedYear, selectedMonth)
+            getTransactionsForMonth(userId, selectedYear, selectedMonth),
           ]);
 
           const input = {
             salesData: salesForMonth,
             expensesData: expensesForMonth,
-            donationsData: donationsForMonth,
+            donationsData: [],
             itemsData: dataSource.items,
             month: new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long' }),
             year: year,

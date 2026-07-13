@@ -4,35 +4,14 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format } from 'date-fns';
-import { CalendarIcon, Loader2 } from 'lucide-react';
-
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Form } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { addCapitalAdjustment, updateCapitalAdjustment } from '@/lib/actions';
 import type { Capital } from '@/lib/types';
+import { CapitalFormFields } from './capital-form-fields';
 
 const addCapitalSchema = z.object({
   amount: z.coerce.number().min(1, 'Amount must be at least BDT 1.'),
@@ -63,15 +42,9 @@ export function AddCapitalDialog({
 
   const form = useForm<AddCapitalFormValues>({
     resolver: zodResolver(addCapitalSchema),
-    defaultValues: {
-      amount: 0,
-      paymentMethod: 'Cash',
-      notes: '',
-      date: new Date(),
-    },
+    defaultValues: { amount: 0, paymentMethod: 'Cash', notes: '', date: new Date() },
   });
 
-  // Reset form when dialog opens or editing capital changes
   React.useEffect(() => {
     if (isOpen) {
       if (editingCapital) {
@@ -82,12 +55,7 @@ export function AddCapitalDialog({
           date: new Date(editingCapital.date),
         });
       } else {
-        form.reset({
-          amount: 0,
-          paymentMethod: 'Cash',
-          notes: '',
-          date: new Date(),
-        });
+        form.reset({ amount: 0, paymentMethod: 'Cash', notes: '', date: new Date() });
       }
     }
   }, [isOpen, editingCapital, form]);
@@ -96,27 +64,23 @@ export function AddCapitalDialog({
     setIsPending(true);
     try {
       if (editingCapital) {
-        // Edit mode
         await updateCapitalAdjustment(userId, editingCapital.id, {
           amount: values.amount,
           paymentMethod: values.paymentMethod,
           notes: values.notes,
           date: values.date,
         });
-
         toast({
           title: 'Capital Updated Successfully!',
           description: `Updated capital record to BDT ${values.amount.toLocaleString()} in your ${values.paymentMethod} account.`,
         });
       } else {
-        // Add mode
         await addCapitalAdjustment(userId, {
           amount: values.amount,
           paymentMethod: values.paymentMethod,
           notes: values.notes,
           date: values.date,
         });
-
         toast({
           title: 'Capital Added Successfully!',
           description: `Successfully added BDT ${values.amount.toLocaleString()} to your ${values.paymentMethod} account.`,
@@ -150,112 +114,8 @@ export function AddCapitalDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount (BDT)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="any" placeholder="Enter capital amount" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="paymentMethod"
-              render={({ field }) => (
-                <FormItem className="space-y-2">
-                  <FormLabel>Destination Account</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      className="flex gap-4"
-                    >
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="Cash" />
-                        </FormControl>
-                        <FormLabel className="font-normal cursor-pointer">Cash Balance</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="Bank" />
-                        </FormControl>
-                        <FormLabel className="font-normal cursor-pointer">Bank Balance</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Transaction Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, 'PPP')
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date('1900-01-01')
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes / Details</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="e.g., Personal cash investment, Business loan injection, etc."
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <CapitalFormFields form={form} />
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
@@ -263,11 +123,12 @@ export function AddCapitalDialog({
               <Button type="submit" disabled={isPending}>
                 {isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
                   </>
+                ) : editingCapital ? (
+                  'Save Changes'
                 ) : (
-                  editingCapital ? 'Save Changes' : 'Confirm Add Capital'
+                  'Confirm Add Capital'
                 )}
               </Button>
             </DialogFooter>
