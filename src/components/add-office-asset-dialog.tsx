@@ -1,18 +1,20 @@
 'use client';
 
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import * as React from 'react';
-
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Form } from '@/components/ui/form';
 import { useAddOfficeAsset } from '@/hooks/use-add-office-asset';
+import { OfficeAssetFormFields } from './office-assets/office-asset-form-fields';
 
 interface AddOfficeAssetDialogProps {
   userId: string;
@@ -20,7 +22,11 @@ interface AddOfficeAssetDialogProps {
   children: React.ReactNode;
 }
 
-export function AddOfficeAssetDialog({ userId, onAssetAdded, children }: AddOfficeAssetDialogProps) {
+export function AddOfficeAssetDialog({
+  userId,
+  onAssetAdded,
+  children,
+}: AddOfficeAssetDialogProps) {
   const { isOpen, setIsOpen, isPending, form, onSubmit } = useAddOfficeAsset({
     userId,
     onAssetAdded,
@@ -28,9 +34,7 @@ export function AddOfficeAssetDialog({ userId, onAssetAdded, children }: AddOffi
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-headline">Add Office Asset</DialogTitle>
@@ -39,112 +43,12 @@ export function AddOfficeAssetDialog({ userId, onAssetAdded, children }: AddOffi
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
             <div className="flex-1 overflow-y-auto pr-4 pl-1 -mr-4 -ml-1">
-                <div className="space-y-4 py-4 px-4">
-                    <FormField
-                    control={form.control}
-                    name="itemName"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Asset Name</FormLabel>
-                        <FormControl>
-                            <Input placeholder="e.g., Office Desk" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="quantity"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Quantity</FormLabel>
-                            <FormControl>
-                            <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="cost"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Unit Cost</FormLabel>
-                            <FormControl>
-                            <Input type="number" step="0.01" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    </div>
-                    <FormField
-                    control={form.control}
-                    name="paymentMethod"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                        <FormLabel>Payment Method</FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            className="flex gap-4"
-                            >
-                            <FormItem className="flex items-center space-x-2">
-                                <FormControl><RadioGroupItem value="Cash" /></FormControl>
-                                <FormLabel className="font-normal">Cash</FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-2">
-                                <FormControl><RadioGroupItem value="Bank" /></FormControl>
-                                <FormLabel className="font-normal">Bank</FormLabel>
-                            </FormItem>
-                            </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="date"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>Purchase Date</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <FormControl>
-                                <Button
-                                variant={'outline'}
-                                className={cn(
-                                    'w-full pl-3 text-left font-normal',
-                                    !field.value && 'text-muted-foreground'
-                                )}
-                                >
-                                {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) => date > new Date()}
-                                initialFocus
-                            />
-                            </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                </div>
+              <OfficeAssetFormFields form={form} />
             </div>
             <DialogFooter className="pt-4 border-t">
               <Button type="submit" disabled={isPending}>

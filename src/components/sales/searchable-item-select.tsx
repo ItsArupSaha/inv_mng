@@ -3,8 +3,8 @@
 import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { isFuzzyMatch, normalizePhonetic } from '@/lib/search-utils';
 import type { Item } from '@/lib/types';
+import { filterAndSortItems } from './searchable-item-utils';
 
 interface SearchableItemSelectProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
   items: Item[];
@@ -18,20 +18,20 @@ export function SearchableItemSelect({
   value,
   onChange,
   disabledItemIds,
-  placeholder = "Select item",
+  placeholder = 'Select item',
   className,
   ...props
 }: SearchableItemSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [highlightedIndex, setHighlightedIndex] = React.useState(0);
-  
+
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  
+
   // Find current selected item
   const selectedItem = React.useMemo(() => {
-    return items.find(item => item.id === value);
+    return items.find((item) => item.id === value);
   }, [items, value]);
 
   const selectedItemRef = React.useRef(selectedItem);
@@ -48,67 +48,9 @@ export function SearchableItemSelect({
     }
   }, [selectedItem]);
 
-  // Filter items based on searchQuery
+  // Filter items based on searchQuery using utility
   const filteredItems = React.useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    
-    if (!query) return []; // Disable suggestions when input query is empty
-
-    // Include current value, exclude other disabled values
-    const list = items.filter(item => {
-      if (item.id === value) return true;
-      return !disabledItemIds.includes(item.id);
-    });
-
-    // Combine exact and fuzzy matching so both are available and sorted by relevance score
-    const matches = list.filter(item => {
-      const title = (item.title || '').toLowerCase();
-      const company = (item.company || '').toLowerCase();
-      const group = (item.medicineGroup || '').toLowerCase();
-      
-      return title.includes(query) || 
-             company.includes(query) || 
-             group.includes(query) ||
-             isFuzzyMatch(title, query) ||
-             isFuzzyMatch(group, query) ||
-             isFuzzyMatch(company, query);
-    });
-
-    const getRelevanceScore = (item: Item) => {
-      const title = (item.title || '').toLowerCase();
-      const group = (item.medicineGroup || '').toLowerCase();
-      const company = (item.company || '').toLowerCase();
-
-      if (title.startsWith(query)) return 1;
-      if (title.includes(query)) return 2;
-      if (group.startsWith(query)) return 3;
-      if (group.includes(query)) return 4;
-      if (company.startsWith(query)) return 5;
-      if (company.includes(query)) return 6;
-
-      const normTitle = normalizePhonetic(title);
-      const normGroup = normalizePhonetic(group);
-      const normCompany = normalizePhonetic(company);
-      const normQuery = normalizePhonetic(query);
-
-      if (normTitle.startsWith(normQuery)) return 7;
-      if (normTitle.includes(normQuery)) return 8;
-      if (normGroup.startsWith(normQuery)) return 9;
-      if (normGroup.includes(normQuery)) return 10;
-      if (normCompany.startsWith(normQuery)) return 11;
-      if (normCompany.includes(normQuery)) return 12;
-
-      return 13;
-    };
-
-    return matches.sort((a, b) => {
-      const scoreA = getRelevanceScore(a);
-      const scoreB = getRelevanceScore(b);
-      if (scoreA !== scoreB) {
-        return scoreA - scoreB;
-      }
-      return (a.title || '').localeCompare(b.title || '');
-    }).slice(0, 50);
+    return filterAndSortItems({ items, searchQuery, value, disabledItemIds });
   }, [items, searchQuery, value, disabledItemIds]);
 
   // Reset highlight index when filter list changes
@@ -121,7 +63,6 @@ export function SearchableItemSelect({
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        // Reset query to match selected item name
         setSearchQuery(selectedItem ? selectedItem.title : '');
       }
     }
@@ -132,17 +73,17 @@ export function SearchableItemSelect({
   // Key navigation handler
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
-      return; // Allow arrow key events to bubble up for grid row navigation when closed
+      return;
     }
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       e.stopPropagation();
-      setHighlightedIndex(prev => (prev + 1) % filteredItems.length);
+      setHighlightedIndex((prev) => (prev + 1) % filteredItems.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopPropagation();
-      setHighlightedIndex(prev => (prev - 1 + filteredItems.length) % filteredItems.length);
+      setHighlightedIndex((prev) => (prev - 1 + filteredItems.length) % filteredItems.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
@@ -179,7 +120,7 @@ export function SearchableItemSelect({
           }, 200);
         }}
         onKeyDown={handleKeyDown}
-        className={cn("w-full h-8 px-3 text-sm font-medium", className)}
+        className={cn('w-full h-8 px-3 text-sm font-medium', className)}
         {...props}
         ref={inputRef}
       />
@@ -203,7 +144,8 @@ export function SearchableItemSelect({
             >
               <div className="font-semibold">{item.title}</div>
               <div className="text-xs text-muted-foreground">
-                {item.company} {item.medicineGroup ? ` - ${item.medicineGroup}` : ''} {item.expiryDate ? ` | Exp: ${item.expiryDate}` : ''} | Stock: {item.stock}
+                {item.company} {item.medicineGroup ? ` - ${item.medicineGroup}` : ''}{' '}
+                {item.expiryDate ? ` | Exp: ${item.expiryDate}` : ''} | Stock: {item.stock}
               </div>
             </button>
           ))}

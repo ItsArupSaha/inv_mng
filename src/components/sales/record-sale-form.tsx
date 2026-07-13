@@ -23,6 +23,21 @@ interface RecordSaleFormProps {
   authUser: any;
 }
 
+const DEFAULT_ROWS = Array.from({ length: 10 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
+
+const DEFAULT_VALUES = {
+  items: DEFAULT_ROWS,
+  date: new Date(),
+  discountType: 'none' as const,
+  discountValue: 0,
+  paymentMethod: 'Cash' as const,
+  amountPaid: 0,
+  splitPaymentMethod: 'Cash' as const,
+  creditApplied: 0,
+  extraSales: 0,
+  total: 0,
+};
+
 export function RecordSaleForm({
   userId,
   items,
@@ -34,22 +49,9 @@ export function RecordSaleForm({
   const [isPending, startTransition] = React.useTransition();
   const [completedSale, setCompletedSale] = React.useState<Sale | null>(null);
 
-  const initialRows = Array.from({ length: 10 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
-
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(saleFormSchema),
-    defaultValues: {
-      items: initialRows,
-      date: new Date(),
-      discountType: 'none',
-      discountValue: 0,
-      paymentMethod: 'Cash',
-      amountPaid: 0,
-      splitPaymentMethod: 'Cash',
-      creditApplied: 0,
-      extraSales: 0,
-      total: 0,
-    },
+    defaultValues: DEFAULT_VALUES as any,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -57,47 +59,28 @@ export function RecordSaleForm({
     name: 'items',
   });
 
-  // Find Walk-in Customer
   const walkInCustomer = React.useMemo(() => {
-    return customers.find(c => c.name === 'Walk-in Customer') || customers[0];
+    return customers.find((c) => c.name === 'Walk-in Customer') || customers[0];
   }, [customers]);
 
-  const watchItems = useWatch({
-    control: form.control,
-    name: 'items',
-  }) || [];
+  const watchItems = useWatch({ control: form.control, name: 'items' }) || [];
+
   const subtotal = React.useMemo(() => {
     return watchItems.reduce((acc: number, item: any) => {
       if (!item?.itemId) return acc;
-      const price = Number(item?.price) || 0;
-      const quantity = Number(item?.quantity) || 0;
-      return acc + (price * quantity);
+      return acc + (Number(item?.price) || 0) * (Number(item?.quantity) || 0);
     }, 0);
   }, [watchItems]);
 
-  const handleAddNewRow = () => {
-    append({ itemId: '', quantity: 1, price: 0 });
-  };
+  const handleAddNewRow = () => append({ itemId: '', quantity: 1, price: 0 });
 
   const handleResetForm = () => {
-    form.reset({
-      items: Array.from({ length: 10 }).map(() => ({ itemId: '', quantity: 1, price: 0 })),
-      date: new Date(),
-      discountType: 'none',
-      discountValue: 0,
-      paymentMethod: 'Cash',
-      amountPaid: 0,
-      splitPaymentMethod: 'Cash',
-      creditApplied: 0,
-      extraSales: 0,
-      total: 0,
-    });
+    form.reset(DEFAULT_VALUES as any);
     setCompletedSale(null);
   };
 
   const onSubmit = (data: SaleFormValues) => {
-    // Filter out rows without selected items
-    const activeItems = data.items.filter(item => item.itemId !== '');
+    const activeItems = data.items.filter((item) => item.itemId !== '');
 
     if (activeItems.length === 0) {
       toast({
@@ -136,7 +119,7 @@ export function RecordSaleForm({
   };
 
   const sellableItems = React.useMemo(() => {
-    return items.filter(item => {
+    return items.filter((item) => {
       const catName = (item.categoryName || '').toLowerCase();
       return catName !== 'assets' && catName !== 'surgicals';
     });
@@ -147,17 +130,13 @@ export function RecordSaleForm({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <SalePaymentToggle />
-          
-          <SaleItemsTable 
-            items={sellableItems} 
-            fields={fields} 
-            remove={remove} 
-            appendRow={handleAddNewRow} 
+          <SaleItemsTable
+            items={sellableItems}
+            fields={fields}
+            remove={remove}
+            appendRow={handleAddNewRow}
           />
-
           <SaleSummaryCard subtotal={subtotal} />
-
-          {/* Form Actions */}
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button type="button" variant="outline" onClick={handleResetForm} disabled={isPending}>
               Reset Form
@@ -169,7 +148,6 @@ export function RecordSaleForm({
         </form>
       </Form>
 
-      {/* Sale Memo Dialog popup on completion */}
       <Dialog open={!!completedSale} onOpenChange={(open) => !open && handleResetForm()}>
         <DialogContent className="sm:max-w-2xl">
           {completedSale && authUser && (
