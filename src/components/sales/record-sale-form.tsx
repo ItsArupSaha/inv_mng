@@ -25,7 +25,7 @@ interface RecordSaleFormProps {
 
 const DEFAULT_ROWS = Array.from({ length: 10 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
 
-const DEFAULT_VALUES = {
+const getDefaultValues = () => ({
   items: DEFAULT_ROWS,
   date: new Date(),
   discountType: 'none' as const,
@@ -36,7 +36,7 @@ const DEFAULT_VALUES = {
   creditApplied: 0,
   extraSales: 0,
   total: 0,
-};
+});
 
 export function RecordSaleForm({
   userId,
@@ -51,7 +51,7 @@ export function RecordSaleForm({
 
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(saleFormSchema),
-    defaultValues: DEFAULT_VALUES as any,
+    defaultValues: getDefaultValues() as any,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -75,7 +75,7 @@ export function RecordSaleForm({
   const handleAddNewRow = () => append({ itemId: '', quantity: 1, price: 0 });
 
   const handleResetForm = () => {
-    form.reset(DEFAULT_VALUES as any);
+    form.reset(getDefaultValues() as any);
     setCompletedSale(null);
   };
 

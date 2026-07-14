@@ -50,8 +50,9 @@ export function SearchableItemSelect({
 
   // Filter items based on searchQuery using utility
   const filteredItems = React.useMemo(() => {
+    if (!isOpen) return [];
     return filterAndSortItems({ items, searchQuery, value, disabledItemIds });
-  }, [items, searchQuery, value, disabledItemIds]);
+  }, [isOpen, items, searchQuery, value, disabledItemIds]);
 
   // Reset highlight index when filter list changes
   React.useEffect(() => {
