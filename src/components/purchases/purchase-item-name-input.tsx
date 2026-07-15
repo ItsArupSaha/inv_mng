@@ -63,7 +63,7 @@ export function PurchaseItemNameInput({
         if (!currentCost || Number(currentCost) === 0) {
           setValue(
             `items.${index}.cost`,
-            matchingItem.productionPrice || matchingItem.sellingPrice
+            matchingItem.productionPrice ?? matchingItem.sellingPrice
           );
         }
         if (!currentAuthor && matchingItem.author) {
@@ -112,7 +112,7 @@ export function PurchaseItemNameInput({
                         setValue(`items.${index}.sellingPrice`, item.sellingPrice);
                         setValue(
                           `items.${index}.cost`,
-                          item.productionPrice || item.sellingPrice
+                          item.productionPrice ?? item.sellingPrice
                         );
                         if (item.author) {
                           setValue(`items.${index}.author`, item.author);
