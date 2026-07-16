@@ -194,16 +194,35 @@ export async function getTransactionsForDateRange(userId: string, startDate: Dat
     .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
 }
 
-export async function getTransactionsForMonth(userId: string, year: number, month: number): Promise<Transaction[]> {
+export async function getTransactionsForMonth(userId: string, year: number, month: number, offsetMinutes?: number): Promise<Transaction[]> {
+  if (offsetMinutes !== undefined) {
+    let startMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+    let endMs = Date.UTC(year, month + 1, 0, 23, 59, 59, 999);
+    startMs += offsetMinutes * 60 * 1000;
+    endMs += offsetMinutes * 60 * 1000;
+    return getTransactionsForDateRange(userId, new Date(startMs), new Date(endMs));
+  }
   const startDate = new Date(year, month, 1);
   const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
   return getTransactionsForDateRange(userId, startDate, endDate);
 }
 
-export async function getTransactionsForDay(userId: string, dateString: string): Promise<Transaction[]> {
+export async function getTransactionsForDay(userId: string, dateString: string, offsetMinutes?: number): Promise<Transaction[]> {
   const date = new Date(dateString);
-  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-  const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+
+  if (offsetMinutes !== undefined) {
+    let startMs = Date.UTC(year, month, day, 0, 0, 0, 0);
+    let endMs = Date.UTC(year, month, day, 23, 59, 59, 999);
+    startMs += offsetMinutes * 60 * 1000;
+    endMs += offsetMinutes * 60 * 1000;
+    return getTransactionsForDateRange(userId, new Date(startMs), new Date(endMs));
+  }
+
+  const startDate = new Date(year, month, day, 0, 0, 0, 0);
+  const endDate = new Date(year, month, day, 23, 59, 59, 999);
   return getTransactionsForDateRange(userId, startDate, endDate);
 }
 

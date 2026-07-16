@@ -77,16 +77,35 @@ export async function getSalesForDateRange(userId: string, startDate: Date, endD
   return snapshot.docs.map(docToSale);
 }
 
-export async function getSalesForMonth(userId: string, year: number, month: number): Promise<Sale[]> {
+export async function getSalesForMonth(userId: string, year: number, month: number, offsetMinutes?: number): Promise<Sale[]> {
+  if (offsetMinutes !== undefined) {
+    let startMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+    let endMs = Date.UTC(year, month + 1, 0, 23, 59, 59, 999);
+    startMs += offsetMinutes * 60 * 1000;
+    endMs += offsetMinutes * 60 * 1000;
+    return getSalesForDateRange(userId, new Date(startMs), new Date(endMs));
+  }
   const startDate = new Date(year, month, 1);
   const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
   return getSalesForDateRange(userId, startDate, endDate);
 }
 
-export async function getSalesForDay(userId: string, dateString: string): Promise<Sale[]> {
+export async function getSalesForDay(userId: string, dateString: string, offsetMinutes?: number): Promise<Sale[]> {
   const date = new Date(dateString);
-  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-  const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+
+  if (offsetMinutes !== undefined) {
+    let startMs = Date.UTC(year, month, day, 0, 0, 0, 0);
+    let endMs = Date.UTC(year, month, day, 23, 59, 59, 999);
+    startMs += offsetMinutes * 60 * 1000;
+    endMs += offsetMinutes * 60 * 1000;
+    return getSalesForDateRange(userId, new Date(startMs), new Date(endMs));
+  }
+
+  const startDate = new Date(year, month, day, 0, 0, 0, 0);
+  const endDate = new Date(year, month, day, 23, 59, 59, 999);
   return getSalesForDateRange(userId, startDate, endDate);
 }
 

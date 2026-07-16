@@ -62,12 +62,12 @@ export async function getTransfersPaginated(params: {
   return getTransfersPaginatedImpl(params);
 }
 
-export async function getTransactionsForMonth(userId: string, year: number, month: number): Promise<Transaction[]> {
-  return getTransactionsForMonthImpl(userId, year, month);
+export async function getTransactionsForMonth(userId: string, year: number, month: number, offsetMinutes?: number): Promise<Transaction[]> {
+  return getTransactionsForMonthImpl(userId, year, month, offsetMinutes);
 }
 
-export async function getTransactionsForDay(userId: string, dateString: string): Promise<Transaction[]> {
-  return getTransactionsForDayImpl(userId, dateString);
+export async function getTransactionsForDay(userId: string, dateString: string, offsetMinutes?: number): Promise<Transaction[]> {
+  return getTransactionsForDayImpl(userId, dateString, offsetMinutes);
 }
 
 export async function getPaidPayables(userId: string): Promise<Transaction[]> {

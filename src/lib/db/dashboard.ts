@@ -7,7 +7,7 @@ import { getCustomersWithDueBalance } from './customers';
 import { getExpensesForMonth } from './expenses';
 import { docToItem, docToSale, docToSalesReturn, isOperatingExpense } from './utils';
 
-export async function getDashboardStats(userId: string) {
+export async function getDashboardStats(userId: string, offsetMinutes?: number) {
     if (!db || !userId) {
         // Return a default structure if no user or DB
         return {
@@ -32,8 +32,21 @@ export async function getDashboardStats(userId: string) {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
-    const startDate = new Date(year, month, 1);
-    const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (offsetMinutes !== undefined) {
+        let startMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+        let endMs = Date.UTC(year, month + 1, 0, 23, 59, 59, 999);
+        startMs += offsetMinutes * 60 * 1000;
+        endMs += offsetMinutes * 60 * 1000;
+        startDate = new Date(startMs);
+        endDate = new Date(endMs);
+    } else {
+        startDate = new Date(year, month, 1);
+        endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    }
 
     const salesQuery = query(
         salesCollection,
@@ -72,7 +85,7 @@ export async function getDashboardStats(userId: string) {
     const items = itemsSnapshot.docs.map(docToItem);
     const salesThisMonth = salesSnapshot.docs.map(docToSale);
     const returnsThisMonth = returnsSnapshot.docs.map(docToSalesReturn);
-    const expensesThisMonth = await getExpensesForMonth(userId, year, month);
+    const expensesThisMonth = await getExpensesForMonth(userId, year, month, offsetMinutes);
 
     const totalItemsInStock = items.reduce((sum, item) => sum + item.stock, 0);
     const totalItemTitles = items.length;

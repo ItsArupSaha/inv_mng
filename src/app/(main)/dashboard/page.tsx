@@ -23,7 +23,8 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     if (user) {
-      getDashboardStats(user.uid).then(data => {
+      const offset = new Date().getTimezoneOffset();
+      getDashboardStats(user.uid, offset).then(data => {
         setStats(data);
         setIsLoading(false);
       });

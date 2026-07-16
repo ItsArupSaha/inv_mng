@@ -79,16 +79,35 @@ export async function getExpensesForDateRange(userId: string, startDate: Date, e
     return expenses.filter(expense => !expense.description.startsWith('Transfer to'));
 }
 
-export async function getExpensesForMonth(userId: string, year: number, month: number): Promise<Expense[]> {
+export async function getExpensesForMonth(userId: string, year: number, month: number, offsetMinutes?: number): Promise<Expense[]> {
+    if (offsetMinutes !== undefined) {
+        let startMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+        let endMs = Date.UTC(year, month + 1, 0, 23, 59, 59, 999);
+        startMs += offsetMinutes * 60 * 1000;
+        endMs += offsetMinutes * 60 * 1000;
+        return getExpensesForDateRange(userId, new Date(startMs), new Date(endMs));
+    }
     const startDate = new Date(year, month, 1);
     const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
     return getExpensesForDateRange(userId, startDate, endDate);
 }
 
-export async function getExpensesForDay(userId: string, dateString: string): Promise<Expense[]> {
+export async function getExpensesForDay(userId: string, dateString: string, offsetMinutes?: number): Promise<Expense[]> {
     const date = new Date(dateString);
-    const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-    const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+
+    if (offsetMinutes !== undefined) {
+        let startMs = Date.UTC(year, month, day, 0, 0, 0, 0);
+        let endMs = Date.UTC(year, month, day, 23, 59, 59, 999);
+        startMs += offsetMinutes * 60 * 1000;
+        endMs += offsetMinutes * 60 * 1000;
+        return getExpensesForDateRange(userId, new Date(startMs), new Date(endMs));
+    }
+
+    const startDate = new Date(year, month, day, 0, 0, 0, 0);
+    const endDate = new Date(year, month, day, 23, 59, 59, 999);
     return getExpensesForDateRange(userId, startDate, endDate);
 }
 

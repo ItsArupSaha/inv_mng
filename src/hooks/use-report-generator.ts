@@ -70,16 +70,16 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
       setIsGenerating(true);
       setReportData(null);
       try {
+        const offset = date.getTimezoneOffset();
         if (reportType === 'daily') {
           // Format as YYYY-MM-DD local date
-          const offset = date.getTimezoneOffset();
           const localDate = new Date(date.getTime() - offset * 60 * 1000);
           const dateString = localDate.toISOString().split('T')[0];
 
           const [salesForDay, expensesForDay, transactionsForDay] = await Promise.all([
-            getSalesForDay(userId, dateString),
-            getExpensesForDay(userId, dateString),
-            getTransactionsForDay(userId, dateString),
+            getSalesForDay(userId, dateString, offset),
+            getExpensesForDay(userId, dateString, offset),
+            getTransactionsForDay(userId, dateString, offset),
           ]);
 
           const input = {
@@ -98,9 +98,9 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
           const selectedYear = parseInt(year, 10);
 
           const [salesForMonth, expensesForMonth, transactionsForMonth] = await Promise.all([
-            getSalesForMonth(userId, selectedYear, selectedMonth),
-            getExpensesForMonth(userId, selectedYear, selectedMonth),
-            getTransactionsForMonth(userId, selectedYear, selectedMonth),
+            getSalesForMonth(userId, selectedYear, selectedMonth, offset),
+            getExpensesForMonth(userId, selectedYear, selectedMonth, offset),
+            getTransactionsForMonth(userId, selectedYear, selectedMonth, offset),
           ]);
 
           const input = {

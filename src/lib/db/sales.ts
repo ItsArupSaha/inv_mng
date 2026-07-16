@@ -30,12 +30,12 @@ export async function getSalesForCustomer(userId: string, customerId: string): P
   return getSalesForCustomerImpl(userId, customerId);
 }
 
-export async function getSalesForMonth(userId: string, year: number, month: number): Promise<Sale[]> {
-  return getSalesForMonthImpl(userId, year, month);
+export async function getSalesForMonth(userId: string, year: number, month: number, offsetMinutes?: number): Promise<Sale[]> {
+  return getSalesForMonthImpl(userId, year, month, offsetMinutes);
 }
 
-export async function getSalesForDay(userId: string, dateString: string): Promise<Sale[]> {
-  return getSalesForDayImpl(userId, dateString);
+export async function getSalesForDay(userId: string, dateString: string, offsetMinutes?: number): Promise<Sale[]> {
+  return getSalesForDayImpl(userId, dateString, offsetMinutes);
 }
 
 export async function searchSales(userId: string, searchTerm: string): Promise<Sale[]> {
