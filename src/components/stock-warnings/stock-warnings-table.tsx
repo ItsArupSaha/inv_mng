@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Loader2, Package, Eye, EyeOff, ShoppingBag } from 'lucide-react';
+import { Search, Loader2, Package, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,23 +29,25 @@ import type { Item } from '@/lib/types';
 interface StockWarningsTableProps {
   isLoading: boolean;
   filteredItems: Item[];
-  activeTab: 'active' | 'ignored';
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   stockThreshold: number;
   setStockThreshold: (t: number) => void;
-  handleToggleIgnore: (itemId: string, shouldIgnore: boolean) => void;
+  companies: string[];
+  selectedCompany: string;
+  setSelectedCompany: (c: string) => void;
 }
 
 export function StockWarningsTable({
   isLoading,
   filteredItems,
-  activeTab,
   searchQuery,
   setSearchQuery,
   stockThreshold,
   setStockThreshold,
-  handleToggleIgnore,
+  companies,
+  selectedCompany,
+  setSelectedCompany,
 }: StockWarningsTableProps) {
   const router = useRouter();
 
@@ -55,15 +57,14 @@ export function StockWarningsTable({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <CardTitle className="font-headline text-2xl">
-              {activeTab === 'active' ? 'Active Stock Warnings' : 'Ignored Warnings'}
+              Stock Warnings
             </CardTitle>
             <CardDescription>
-              {activeTab === 'active'
-                ? `List of items requiring attention (Out of stock or less than ${stockThreshold} units).`
-                : 'Items with low stock that you chose to ignore (Will reappear automatically if stock hits 0).'}
+              List of items requiring attention (Out of stock or less than {stockThreshold} {stockThreshold === 1 ? 'unit' : 'units'}).
             </CardDescription>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* Threshold Selector */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground whitespace-nowrap">Threshold:</span>
               <Select
@@ -75,18 +76,59 @@ export function StockWarningsTable({
                 </SelectTrigger>
                 <SelectPortal>
                   <SelectContent position="popper">
+                    <SelectItem value="1" className="text-xs">
+                      Below 1 unit
+                    </SelectItem>
+                    <SelectItem value="2" className="text-xs">
+                      Below 2 units
+                    </SelectItem>
+                    <SelectItem value="3" className="text-xs">
+                      Below 3 units
+                    </SelectItem>
+                    <SelectItem value="4" className="text-xs">
+                      Below 4 units
+                    </SelectItem>
                     <SelectItem value="5" className="text-xs">
                       Below 5 units
                     </SelectItem>
                     <SelectItem value="10" className="text-xs">
                       Below 10 units
                     </SelectItem>
+                    <SelectItem value="20" className="text-xs">
+                      Below 20 units
+                    </SelectItem>
                   </SelectContent>
                 </SelectPortal>
               </Select>
             </div>
 
-            <div className="relative w-full sm:w-64">
+            {/* Company Filter Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Company:</span>
+              <Select
+                value={selectedCompany}
+                onValueChange={setSelectedCompany}
+              >
+                <SelectTrigger className="w-[160px] h-9 text-xs">
+                  <SelectValue placeholder="All Companies" />
+                </SelectTrigger>
+                <SelectPortal>
+                  <SelectContent position="popper">
+                    <SelectItem value="all" className="text-xs">
+                      All Companies
+                    </SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company} value={company} className="text-xs">
+                        {company}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectPortal>
+              </Select>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-56">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search items..."
@@ -110,7 +152,9 @@ export function StockWarningsTable({
             <div>
               <p className="font-semibold text-foreground">No warnings found</p>
               <p className="text-sm text-muted-foreground">
-                {searchQuery ? 'Try clearing your search query.' : 'Everything looks well stocked!'}
+                {searchQuery || selectedCompany !== 'all'
+                  ? 'Try clearing your filters or search query.'
+                  : 'Everything looks well stocked!'}
               </p>
             </div>
           </div>
@@ -167,47 +211,16 @@ export function StockWarningsTable({
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {activeTab === 'active' ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleToggleIgnore(item.id, true)}
-                                disabled={isOutOfStock}
-                                title={
-                                  isOutOfStock
-                                    ? 'Out of stock items cannot be ignored'
-                                    : 'Ignore this warning'
-                                }
-                                className="h-8 border-muted text-xs flex items-center gap-1"
-                              >
-                                <EyeOff className="h-3.5 w-3.5" />
-                                Ignore
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push('/purchases')}
-                                className="h-8 border-muted text-xs flex items-center gap-1 text-primary hover:text-primary"
-                              >
-                                <ShoppingBag className="h-3.5 w-3.5" />
-                                Restock
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleToggleIgnore(item.id, false)}
-                              className="h-8 border-muted text-xs flex items-center gap-1"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Unignore
-                            </Button>
-                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push('/purchases')}
+                            className="h-8 border-muted text-xs flex items-center gap-1 text-primary hover:text-primary"
+                          >
+                            <ShoppingBag className="h-3.5 w-3.5" />
+                            Restock
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>

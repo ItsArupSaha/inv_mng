@@ -56,7 +56,7 @@ export function AppSidebar() {
           const stockCount = items.filter((item) => {
             const cat = (item.categoryName || '').toLowerCase();
             if (cat === 'assets' || cat === 'surgicals') return false;
-            return item.stock === 0 || (item.stock < 5 && !item.ignoredWarning);
+            return item.stock < 1;
           }).length;
           setStockWarningCount(stockCount);
         })

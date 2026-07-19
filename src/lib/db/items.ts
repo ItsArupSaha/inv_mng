@@ -11,7 +11,9 @@ import {
   orderBy,
   query,
   startAfter,
-  updateDoc
+  updateDoc,
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
@@ -164,5 +166,27 @@ export async function bulkUpdateItemLocationByCompany(
   } catch (error: any) {
     console.error('Failed to bulk update location:', error);
     return { success: false, error: error?.message || 'Failed to update location' };
+  }
+}
+
+export async function resetAllIgnoredWarnings(userId: string) {
+  if (!db || !userId) return { success: false, count: 0 };
+  try {
+    const itemsCollection = collection(db, 'users', userId, 'items');
+    const q = query(itemsCollection, where('ignoredWarning', '==', true));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return { success: true, count: 0 };
+
+    const batchPromises = snapshot.docs.map((docSnap) => {
+      return updateDoc(docSnap.ref, { ignoredWarning: false });
+    });
+    await Promise.all(batchPromises);
+
+    revalidatePath('/items');
+    revalidatePath('/stock-warnings');
+    return { success: true, count: snapshot.size };
+  } catch (error: any) {
+    console.error('Failed to reset ignored warnings:', error);
+    return { success: false, error: error?.message || 'Failed to reset ignored warnings' };
   }
 }

@@ -1,11 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getItems, ignoreItemWarning, getCategories } from '@/lib/actions';
+import { getItems, getCategories, resetAllIgnoredWarnings } from '@/lib/actions';
 import type { Item, Category } from '@/lib/types';
-import { isFuzzyMatch } from '@/lib/search-utils';
+import { isFuzzyMatch, getFormFactorRank } from '@/lib/search-utils';
 import { StockWarningsKpis } from './stock-warnings/stock-warnings-kpis';
 import { StockWarningsTable } from './stock-warnings/stock-warnings-table';
 
@@ -18,16 +17,19 @@ export default function StockWarnings({ userId }: StockWarningsProps) {
   const [items, setItems] = React.useState<Item[]>([]);
   const [, setCategories] = React.useState<Category[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [, startTransition] = React.useTransition();
 
-  // Tab State: 'active' or 'ignored'
-  const [activeTab, setActiveTab] = React.useState<'active' | 'ignored'>('active');
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [stockThreshold, setStockThreshold] = React.useState<number>(5);
+  const [stockThreshold, setStockThreshold] = React.useState<number>(1);
+  const [selectedCompany, setSelectedCompany] = React.useState<string>('all');
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
     try {
+      // Migrate any ignored warnings back to active warnings in DB
+      await resetAllIgnoredWarnings(userId).catch((err) =>
+        console.error('Migration error resetting ignored warnings:', err)
+      );
+
       const [allItems, allCategories] = await Promise.all([
         getItems(userId),
         getCategories(userId),
@@ -52,40 +54,20 @@ export default function StockWarnings({ userId }: StockWarningsProps) {
     }
   }, [userId, loadData]);
 
-  // Handle Ignore/Unignore Actions
-  const handleToggleIgnore = async (itemId: string, shouldIgnore: boolean) => {
-    const originalItems = [...items];
-
-    // Optimistically update the state instantly
-    setItems((prev) =>
-      prev.map((item) => (item.id === itemId ? { ...item, ignoredWarning: shouldIgnore } : item))
-    );
-
-    startTransition(async () => {
-      try {
-        await ignoreItemWarning(userId, itemId, shouldIgnore);
-        toast({
-          title: shouldIgnore ? 'Warning Ignored' : 'Warning Restored',
-          description: shouldIgnore
-            ? 'This item will be hidden from stock warnings until it hits 0 stock.'
-            : `This item will now trigger warnings below ${stockThreshold} stock.`,
-        });
-      } catch (error) {
-        console.error('Failed to toggle ignore state:', error);
-        setItems(originalItems);
-        toast({
-          variant: 'destructive',
-          title: 'Action failed',
-          description: 'Failed to update warning status. Please try again.',
-        });
+  // Extract unique list of companies from inventory
+  const companies = React.useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((item) => {
+      if (item.company && item.company.trim()) {
+        set.add(item.company.trim());
       }
     });
-  };
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [items]);
 
-  // Warning Filters
-  const { activeWarnings, ignoredWarnings } = React.useMemo(() => {
-    const active: Item[] = [];
-    const ignored: Item[] = [];
+  // Active Warnings Filter based on threshold, sorted by form-factor priority
+  const activeWarnings = React.useMemo(() => {
+    const list: Item[] = [];
 
     items.forEach((item) => {
       const catNameLower = (item.categoryName || '').toLowerCase();
@@ -93,27 +75,35 @@ export default function StockWarnings({ userId }: StockWarningsProps) {
         return;
       }
 
-      if (item.stock === 0) {
-        active.push(item);
-      } else if (item.stock < stockThreshold) {
-        if (item.ignoredWarning) {
-          ignored.push(item);
-        } else {
-          active.push(item);
-        }
+      if (item.stock === 0 || item.stock < stockThreshold) {
+        list.push(item);
       }
     });
 
-    const sortFn = (a: Item, b: Item) => a.stock - b.stock;
-    active.sort(sortFn);
-    ignored.sort(sortFn);
-
-    return { activeWarnings: active, ignoredWarnings: ignored };
+    list.sort((a, b) => {
+      const formA = getFormFactorRank(a.title);
+      const formB = getFormFactorRank(b.title);
+      if (formA !== formB) {
+        return formA - formB;
+      }
+      if (a.stock !== b.stock) {
+        return a.stock - b.stock;
+      }
+      return (a.title || '').localeCompare(b.title || '');
+    });
+    return list;
   }, [items, stockThreshold]);
 
-  // Apply search query filter to selected tab items
+  // Apply company filter & search query filter
   const filteredItems = React.useMemo(() => {
-    const list = activeTab === 'active' ? activeWarnings : ignoredWarnings;
+    let list = activeWarnings;
+
+    if (selectedCompany !== 'all') {
+      list = list.filter(
+        (item) => (item.company || '').trim().toLowerCase() === selectedCompany.toLowerCase()
+      );
+    }
+
     if (!searchQuery.trim()) return list;
 
     const query = searchQuery.trim().toLowerCase();
@@ -126,41 +116,22 @@ export default function StockWarnings({ userId }: StockWarningsProps) {
         isFuzzyMatch(item.categoryName, query)
       );
     });
-  }, [activeTab, activeWarnings, ignoredWarnings, searchQuery]);
+  }, [activeWarnings, selectedCompany, searchQuery]);
 
   return (
     <div className="space-y-6">
-      {/* Tab Selector Toggle System */}
-      <div className="flex gap-2 justify-center max-w-2xl mx-auto border-b pb-4">
-        <Button
-          type="button"
-          variant={activeTab === 'active' ? 'default' : 'outline'}
-          onClick={() => setActiveTab('active')}
-          className="flex-1 transition-all"
-        >
-          Active Warnings ({activeWarnings.length})
-        </Button>
-        <Button
-          type="button"
-          variant={activeTab === 'ignored' ? 'default' : 'outline'}
-          onClick={() => setActiveTab('ignored')}
-          className="flex-1 transition-all"
-        >
-          Ignored Warnings ({ignoredWarnings.length})
-        </Button>
-      </div>
-
       <StockWarningsKpis activeWarnings={activeWarnings} />
 
       <StockWarningsTable
         isLoading={isLoading}
         filteredItems={filteredItems}
-        activeTab={activeTab}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         stockThreshold={stockThreshold}
         setStockThreshold={setStockThreshold}
-        handleToggleIgnore={handleToggleIgnore}
+        companies={companies}
+        selectedCompany={selectedCompany}
+        setSelectedCompany={setSelectedCompany}
       />
     </div>
   );

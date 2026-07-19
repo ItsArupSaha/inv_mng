@@ -94,36 +94,39 @@ export function isFuzzyMatch(target: string | null | undefined, query: string): 
 }
 
 /**
- * Categorizes item form factor to prioritize Tablets & Capsules over Syrups, Suspensions, Creams, etc.
+ * Categorizes item form factor for priority listing:
  * 1 = Tablets & Capsules
- * 2 = Syrups, Suspensions, Liquids, Drops, Solutions
- * 3 = Creams, Ointments, Gels, Injections, Others
+ * 2 = Suspensions & Syrups (liquids, drops, solutions)
+ * 3 = Creams & Ointments (gels)
+ * 4 = Injections (infusions, vials, ampoules)
+ * 5 = Others
  */
 export function getFormFactorRank(title: string | null | undefined): number {
-  if (!title) return 3;
+  if (!title) return 5;
   const t = title.toLowerCase();
 
   // Rank 1: Tablets & Capsules
-  if (
-    /\b(tab|tablets?|cap|capsules?)\b/i.test(t) ||
-    t.includes('tab') ||
-    t.includes('cap')
-  ) {
+  if (/\b(tab|tablets?|cap|capsules?)\b/i.test(t)) {
     return 1;
   }
 
-  // Rank 2: Syrups, Suspensions, Liquids, Drops
-  if (
-    /\b(syr|syrups?|susp|suspensions?|drop|drops|sol|solutions?|liq|liquids?)\b/i.test(t) ||
-    t.includes('syr') ||
-    t.includes('susp') ||
-    t.includes('drop')
-  ) {
+  // Rank 2: Suspensions & Syrups, Liquids, Drops
+  if (/\b(syr|syrups?|syp|susp|suspensions?|drop|drops|sol|solutions?|liq|liquids?)\b/i.test(t)) {
     return 2;
   }
 
-  // Rank 3: Others (Creams, Ointments, Injections, etc.)
-  return 3;
+  // Rank 3: Creams & Ointments, Gels
+  if (/\b(cream|creams?|oint|ointments?|gel|gels?)\b/i.test(t)) {
+    return 3;
+  }
+
+  // Rank 4: Injections, Infusions, Vials, Ampoules
+  if (/\b(inj|injections?|infusion|infusions?|vial|ampoule|ampoules?)\b/i.test(t)) {
+    return 4;
+  }
+
+  // Rank 5: Others
+  return 5;
 }
 
 /**
