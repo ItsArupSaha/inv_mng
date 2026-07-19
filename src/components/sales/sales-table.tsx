@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Sale, Item, Customer } from '@/lib/types';
 import { getSaleTransaction } from '@/lib/actions';
-import { DownloadSaleMemo } from '../download-sale-memo';
 import { SaleDetailsDialog } from '../sale-details-dialog';
 import { EditSaleDialog } from './edit-sale-dialog';
 import { getImmediateSaleStatus, getResolvedSaleStatus, type SaleStatus } from './sales-status-utils';
@@ -162,9 +161,6 @@ export function SalesTable({
                   <TableCell className="text-right font-medium">৳{sale.total.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {customer && authUser && (
-                        <DownloadSaleMemo sale={sale} customer={customer} items={items} user={authUser} />
-                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleEditClick(sale)} disabled={isPending}>
                         <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                       </Button>

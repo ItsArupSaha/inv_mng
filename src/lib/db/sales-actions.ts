@@ -377,7 +377,11 @@ export async function updateSale(
     const relatedTransactionsQuery = query(transactionsCollection, where('saleId', '==', oldSale.saleId));
     const relatedTransactionDocs = await getDocs(relatedTransactionsQuery);
 
-    const selectedItemRefs = data.items.map((item) => doc(itemsCollection, item.itemId));
+    const allItemIdsToFetch = new Set<string>();
+    data.items.forEach((item) => allItemIdsToFetch.add(item.itemId));
+    oldSale.items.forEach((item) => allItemIdsToFetch.add(item.itemId));
+
+    const selectedItemRefs = Array.from(allItemIdsToFetch).map((id) => doc(itemsCollection, id));
     const selectedItemSnaps = await Promise.all(selectedItemRefs.map((ref) => getDoc(ref)));
 
     const batchRefsMap: Record<string, { ref: any; isMedicine: boolean; title: string }[]> = {};
@@ -386,7 +390,7 @@ export async function updateSale(
     for (let i = 0; i < selectedItemSnaps.length; i++) {
       const snap = selectedItemSnaps[i];
       if (!snap.exists()) {
-        return { success: false, error: `Item with id ${data.items[i].itemId} does not exist.` };
+        continue;
       }
       const itemData = snap.data() as Item;
       const catNameLower = (itemData.categoryName || '').toLowerCase();
@@ -417,13 +421,6 @@ export async function updateSale(
         }
       }
     }
-
-    const oldItemRefs = oldSale.items.map((item) => doc(itemsCollection, item.itemId));
-    oldItemRefs.forEach((ref) => {
-      if (!allBatchRefs.some((bRef) => bRef.path === ref.path)) {
-        allBatchRefs.push(ref);
-      }
-    });
 
     const result = await runTransaction(db, async (transaction) => {
       const oldCustomerRef = doc(customersCollection, oldSale.customerId);

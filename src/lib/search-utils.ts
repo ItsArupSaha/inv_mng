@@ -139,39 +139,52 @@ export function getSearchMatchRank(
   const q = query.trim().toLowerCase();
   if (!q) return 1;
 
-  const t = (title || '').toLowerCase();
-  const g = (group || '').toLowerCase();
-  const c = (company || '').toLowerCase();
+  const t = (title || '').trim().toLowerCase();
+  const g = (group || '').trim().toLowerCase();
+  const c = (company || '').trim().toLowerCase();
 
-  // 1. Direct title start match
-  if (t.startsWith(q)) return 1;
+  // 1. Exact match on title, group, or company
+  if (t === q || g === q || c === q) return 1;
 
-  // 2. Title word start match
-  const words = t.split(/[\s\-]+/);
-  if (words.some((w) => w.startsWith(q))) return 2;
+  // 2. Title starts with query
+  if (t.startsWith(q)) return 2;
 
-  // 3. Title contains query
-  if (t.includes(q)) return 3;
+  // 3. Title word starts with query
+  const tWords = t.split(/[\s\-]+/);
+  if (tWords.some((w) => w.startsWith(q))) return 3;
 
-  // 4. Fuzzy title match
-  if (isFuzzyMatch(title, q)) return 4;
+  // 4. Group or company starts with query
+  if (g.startsWith(q) || c.startsWith(q)) return 4;
 
-  // 5. Medicine group / company match
-  if (g.startsWith(q) || c.startsWith(q)) return 5;
-  if (g.includes(q) || c.includes(q)) return 6;
-  if (isFuzzyMatch(g, q) || isFuzzyMatch(c, q)) return 7;
+  // 5. Group or company word starts with query
+  const gWords = g.split(/[\s\-]+/);
+  const cWords = c.split(/[\s\-]+/);
+  if (gWords.some((w) => w.startsWith(q)) || cWords.some((w) => w.startsWith(q))) return 5;
 
-  return 8;
+  // 6. Title contains query
+  if (t.includes(q)) return 6;
+
+  // 7. Group or company contains query
+  if (g.includes(q) || c.includes(q)) return 7;
+
+  // 8. Fuzzy title match
+  if (isFuzzyMatch(title, q)) return 8;
+
+  // 9. Fuzzy group or company match
+  if (isFuzzyMatch(group, q) || isFuzzyMatch(company, q)) return 9;
+
+  return 10;
 }
 
 /**
  * Helper to compare two items when searching:
- * First by match relevance, second by form factor (Tablets > Syrups > Others), third by title.
+ * First by match relevance, second by form factor (Tablets > Syrups > Others), third by user's chosen sortBy or title.
  */
-export function compareItemsForSearch<T extends { title: string; medicineGroup?: string; company?: string }>(
+export function compareItemsForSearch<T extends { title: string; medicineGroup?: string; company?: string; stock?: number; expiryDate?: string }>(
   a: T,
   b: T,
-  query: string
+  query: string,
+  sortBy: string = 'title-asc'
 ): number {
   const matchA = getSearchMatchRank(a.title, query, a.medicineGroup, a.company);
   const matchB = getSearchMatchRank(b.title, query, b.medicineGroup, b.company);
@@ -187,6 +200,35 @@ export function compareItemsForSearch<T extends { title: string; medicineGroup?:
     return formA - formB;
   }
 
+  // Tie-breaker based on active sortBy
+  if (sortBy === 'title-desc') {
+    return (b.title || '').localeCompare(a.title || '');
+  }
+  if (sortBy === 'stock-asc') {
+    return (a.stock || 0) - (b.stock || 0);
+  }
+  if (sortBy === 'stock-desc') {
+    return (b.stock || 0) - (a.stock || 0);
+  }
+  if (sortBy === 'group-asc') {
+    const groupA = a.medicineGroup || '';
+    const groupB = b.medicineGroup || '';
+    const groupCmp = groupA.localeCompare(groupB);
+    if (groupCmp !== 0) return groupCmp;
+  }
+  if (sortBy === 'company-asc') {
+    const companyA = a.company || '';
+    const companyB = b.company || '';
+    const companyCmp = companyA.localeCompare(companyB);
+    if (companyCmp !== 0) return companyCmp;
+  }
+  if (sortBy === 'expiry-asc') {
+    const dateA = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+    const dateB = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+    if (dateA !== dateB) return dateA - dateB;
+  }
+
   return (a.title || '').localeCompare(b.title || '');
 }
+
 

@@ -70,10 +70,10 @@ export function useItemFilters({ allItems }: UseItemFiltersProps) {
     }
 
     result.sort((a, b) => {
+      if (searchQuery.trim()) {
+        return compareItemsForSearch(a, b, searchQuery.trim(), sortBy);
+      }
       if (sortBy === 'title-asc') {
-        if (searchQuery.trim()) {
-          return compareItemsForSearch(a, b, searchQuery.trim());
-        }
         return a.title.localeCompare(b.title);
       }
       if (sortBy === 'title-desc') {

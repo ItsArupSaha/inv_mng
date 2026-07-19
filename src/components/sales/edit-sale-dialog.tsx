@@ -142,11 +142,29 @@ export function EditSaleDialog({
   };
 
   const sellableItems = React.useMemo(() => {
-    return items.filter((item) => {
-      const catName = (item.categoryName || '').toLowerCase();
-      return catName !== 'assets' && catName !== 'surgicals';
-    });
-  }, [items]);
+    const oldSaleQtyMap: Record<string, number> = {};
+    if (sale && sale.items) {
+      sale.items.forEach((item) => {
+        oldSaleQtyMap[item.itemId] = (oldSaleQtyMap[item.itemId] || 0) + (Number(item.quantity) || 0);
+      });
+    }
+
+    return items
+      .filter((item) => {
+        const catName = (item.categoryName || '').toLowerCase();
+        return catName !== 'assets' && catName !== 'surgicals';
+      })
+      .map((item) => {
+        const oldQty = oldSaleQtyMap[item.id] || 0;
+        if (oldQty > 0) {
+          return {
+            ...item,
+            stock: (Number(item.stock) || 0) + oldQty,
+          };
+        }
+        return item;
+      });
+  }, [items, sale]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
