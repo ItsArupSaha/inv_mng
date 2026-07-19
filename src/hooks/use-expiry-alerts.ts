@@ -25,7 +25,8 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedStatusFilter, setSelectedStatusFilter] = React.useState('expiringSoon');
+  const [selectedStatusFilter, setSelectedStatusFilter] = React.useState('expiring90d');
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = React.useState('all');
   const [sortBy, setSortBy] = React.useState('expiry-asc');
   const [visibleCount, setVisibleCount] = React.useState(10);
 
@@ -55,6 +56,17 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     }
   }, [userId, loadData]);
 
+  // Extract unique list of companies
+  const companies = React.useMemo(() => {
+    const set = new Set<string>();
+    allItems.forEach((item) => {
+      if (item.company && item.company.trim()) {
+        set.add(item.company.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allItems]);
+
   const handleEditItem = (item: Item) => {
     setEditingItem(item);
     setIsItemDialogOpen(true);
@@ -83,27 +95,39 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
 
   const filteredAndSortedItems = React.useMemo(() => {
     const now = new Date();
-    const oneMonthFromNow = new Date();
-    oneMonthFromNow.setDate(now.getDate() + 30);
-    const threeMonthsFromNow = new Date();
-    threeMonthsFromNow.setDate(now.getDate() + 90);
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+    const sixtyDaysFromNow = new Date();
+    sixtyDaysFromNow.setDate(now.getDate() + 60);
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(now.getDate() + 90);
 
     // Initial filter for items with expiry dates
     let result = allItems.filter(item => item.expiryDate);
 
-    // Status filter
+    // Status / Timeframe filter
     if (selectedStatusFilter === 'expired') {
       result = result.filter(item => new Date(item.expiryDate!) <= now);
-    } else if (selectedStatusFilter === 'expiringSoon') {
+    } else if (selectedStatusFilter === 'expiring30d' || selectedStatusFilter === 'expiringSoon') {
       result = result.filter(item => {
         const exp = new Date(item.expiryDate!);
-        return exp > now && exp <= oneMonthFromNow;
+        return exp > now && exp <= thirtyDaysFromNow;
       });
-    } else if (selectedStatusFilter === 'expiring3Months') {
+    } else if (selectedStatusFilter === 'expiring60d') {
       result = result.filter(item => {
         const exp = new Date(item.expiryDate!);
-        return exp > now && exp <= threeMonthsFromNow;
+        return exp > now && exp <= sixtyDaysFromNow;
       });
+    } else if (selectedStatusFilter === 'expiring90d') {
+      result = result.filter(item => {
+        const exp = new Date(item.expiryDate!);
+        return exp > now && exp <= ninetyDaysFromNow;
+      });
+    }
+
+    // Company filter
+    if (selectedCompanyFilter !== 'all') {
+      result = result.filter(item => (item.company || '').trim().toLowerCase() === selectedCompanyFilter.toLowerCase());
     }
 
     // Search query filter
@@ -160,7 +184,7 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     });
 
     return result;
-  }, [allItems, searchQuery, selectedStatusFilter, sortBy]);
+  }, [allItems, searchQuery, selectedStatusFilter, selectedCompanyFilter, sortBy]);
 
   const displayedItems = React.useMemo(() => {
     return filteredAndSortedItems.slice(0, visibleCount);
@@ -177,6 +201,7 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
 
   return {
     categories,
+    companies,
     isInitialLoading,
     isItemDialogOpen,
     setIsItemDialogOpen,
@@ -187,6 +212,8 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     setSearchQuery,
     selectedStatusFilter,
     setSelectedStatusFilter,
+    selectedCompanyFilter,
+    setSelectedCompanyFilter,
     sortBy,
     setSortBy,
     setVisibleCount,

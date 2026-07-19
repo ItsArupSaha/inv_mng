@@ -17,6 +17,9 @@ interface ExpiryFiltersHeaderProps {
   setSearchQuery: (query: string) => void;
   selectedStatusFilter: string;
   setSelectedStatusFilter: (val: string) => void;
+  companies: string[];
+  selectedCompanyFilter: string;
+  setSelectedCompanyFilter: (val: string) => void;
   sortBy: string;
   setSortBy: (val: string) => void;
   setVisibleCount: (count: number) => void;
@@ -27,6 +30,9 @@ export function ExpiryFiltersHeader({
   setSearchQuery,
   selectedStatusFilter,
   setSelectedStatusFilter,
+  companies,
+  selectedCompanyFilter,
+  setSelectedCompanyFilter,
   sortBy,
   setSortBy,
   setVisibleCount,
@@ -66,13 +72,35 @@ export function ExpiryFiltersHeader({
             setVisibleCount(10);
           }}
         >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Alerts" />
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Timeframe" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Expiry Alerts</SelectItem>
-            <SelectItem value="expiringSoon">Expiring Soon (30d)</SelectItem>
+            <SelectItem value="expiring90d">Expiring in 90 Days</SelectItem>
+            <SelectItem value="expiring60d">Expiring in 60 Days</SelectItem>
+            <SelectItem value="expiring30d">Expiring in 30 Days</SelectItem>
             <SelectItem value="expired">Expired</SelectItem>
+            <SelectItem value="all">All Expiry Alerts</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={selectedCompanyFilter}
+          onValueChange={(val) => {
+            setSelectedCompanyFilter(val);
+            setVisibleCount(10);
+          }}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Companies" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Companies</SelectItem>
+            {companies.map((company) => (
+              <SelectItem key={company} value={company}>
+                {company}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

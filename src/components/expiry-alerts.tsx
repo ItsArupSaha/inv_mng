@@ -18,6 +18,7 @@ interface ExpiryAlertsProps {
 export default function ExpiryAlerts({ userId }: ExpiryAlertsProps) {
   const {
     categories,
+    companies,
     isInitialLoading,
     isItemDialogOpen,
     setIsItemDialogOpen,
@@ -28,6 +29,8 @@ export default function ExpiryAlerts({ userId }: ExpiryAlertsProps) {
     setSearchQuery,
     selectedStatusFilter,
     setSelectedStatusFilter,
+    selectedCompanyFilter,
+    setSelectedCompanyFilter,
     sortBy,
     setSortBy,
     setVisibleCount,
@@ -51,7 +54,7 @@ export default function ExpiryAlerts({ userId }: ExpiryAlertsProps) {
           <div>
             <CardTitle className="font-headline text-2xl">Expiry Alerts</CardTitle>
             <CardDescription>
-              View, manage, and download lists of expired medicines or items expiring within 30 days.
+              View, manage, and download lists of expired medicines or items expiring within 90 days.
             </CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
@@ -83,6 +86,9 @@ export default function ExpiryAlerts({ userId }: ExpiryAlertsProps) {
           setSearchQuery={setSearchQuery}
           selectedStatusFilter={selectedStatusFilter}
           setSelectedStatusFilter={setSelectedStatusFilter}
+          companies={companies}
+          selectedCompanyFilter={selectedCompanyFilter}
+          setSelectedCompanyFilter={setSelectedCompanyFilter}
           sortBy={sortBy}
           setSortBy={setSortBy}
           setVisibleCount={setVisibleCount}

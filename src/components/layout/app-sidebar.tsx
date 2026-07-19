@@ -45,11 +45,11 @@ export function AppSidebar() {
       getItems(user.uid)
         .then((items) => {
           const now = new Date();
-          const oneMonthFromNow = new Date();
-          oneMonthFromNow.setDate(now.getDate() + 30);
+          const ninetyDaysFromNow = new Date();
+          ninetyDaysFromNow.setDate(now.getDate() + 90);
 
           const expCount = items.filter(
-            (item) => item.expiryDate && new Date(item.expiryDate) <= oneMonthFromNow
+            (item) => item.expiryDate && new Date(item.expiryDate) <= ninetyDaysFromNow
           ).length;
           setAlertCount(expCount);
 
