@@ -28,6 +28,8 @@ export function SearchableItemSelect({
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const itemRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
 
   // Find current selected item
   const selectedItem = React.useMemo(() => {
@@ -59,6 +61,13 @@ export function SearchableItemSelect({
     setHighlightedIndex(0);
   }, [filteredItems]);
 
+  // Scroll highlighted item into view during keyboard navigation
+  React.useEffect(() => {
+    if (isOpen && itemRefs.current[highlightedIndex]) {
+      itemRefs.current[highlightedIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightedIndex, isOpen]);
+
   // Handle clicking outside
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -71,28 +80,37 @@ export function SearchableItemSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedItem]);
 
+  const handleSelectItem = (item: Item) => {
+    onChange(item.id);
+    setSearchQuery(item.title);
+    setIsOpen(false);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  };
+
   // Key navigation handler
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
+      if (e.key === 'ArrowDown' && searchQuery.trim()) {
+        setIsOpen(true);
+      }
       return;
     }
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       e.stopPropagation();
-      setHighlightedIndex((prev) => (prev + 1) % filteredItems.length);
+      setHighlightedIndex((prev) => (prev + 1) % Math.max(1, filteredItems.length));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopPropagation();
-      setHighlightedIndex((prev) => (prev - 1 + filteredItems.length) % filteredItems.length);
+      setHighlightedIndex((prev) => (prev - 1 + filteredItems.length) % Math.max(1, filteredItems.length));
     } else if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
       if (filteredItems[highlightedIndex]) {
-        const item = filteredItems[highlightedIndex];
-        onChange(item.id);
-        setSearchQuery(item.title);
-        setIsOpen(false);
+        handleSelectItem(filteredItems[highlightedIndex]);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -126,21 +144,24 @@ export function SearchableItemSelect({
         ref={inputRef}
       />
       {isOpen && filteredItems.length > 0 && (
-        <div className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto bg-popover text-popover-foreground border rounded-md shadow-lg p-1">
+        <div ref={listRef} className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto bg-popover text-popover-foreground border rounded-md shadow-lg p-1">
           {filteredItems.map((item, idx) => (
             <button
               key={item.id}
+              ref={(el) => {
+                itemRefs.current[idx] = el;
+              }}
               type="button"
               className={`w-full text-left px-2 py-1.5 text-sm rounded-sm transition-colors ${
-                idx === highlightedIndex ? 'bg-muted text-foreground' : 'hover:bg-muted/50'
+                idx === highlightedIndex ? 'bg-muted text-foreground font-semibold' : 'hover:bg-muted/50'
               }`}
-              onClick={() => {
-                onChange(item.id);
-                setSearchQuery(item.title);
-                setIsOpen(false);
-                setTimeout(() => {
-                  inputRef.current?.focus();
-                }, 50);
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelectItem(item);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                handleSelectItem(item);
               }}
             >
               <div className="font-semibold">{item.title}</div>

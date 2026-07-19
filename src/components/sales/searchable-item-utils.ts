@@ -1,4 +1,4 @@
-import { isFuzzyMatch, normalizePhonetic } from '@/lib/search-utils';
+import { compareItemsForSearch, isFuzzyMatch } from '@/lib/search-utils';
 import type { Item } from '@/lib/types';
 
 export function filterAndSortItems({
@@ -36,41 +36,8 @@ export function filterAndSortItems({
     );
   });
 
-  const getRelevanceScore = (item: Item) => {
-    const title = (item.title || '').toLowerCase();
-    const group = (item.medicineGroup || '').toLowerCase();
-    const company = (item.company || '').toLowerCase();
-
-    if (title.startsWith(query)) return 1;
-    if (title.includes(query)) return 2;
-    if (group.startsWith(query)) return 3;
-    if (group.includes(query)) return 4;
-    if (company.startsWith(query)) return 5;
-    if (company.includes(query)) return 6;
-
-    const normTitle = normalizePhonetic(title);
-    const normGroup = normalizePhonetic(group);
-    const normCompany = normalizePhonetic(company);
-    const normQuery = normalizePhonetic(query);
-
-    if (normTitle.startsWith(normQuery)) return 7;
-    if (normTitle.includes(normQuery)) return 8;
-    if (normGroup.startsWith(normQuery)) return 9;
-    if (normGroup.includes(normQuery)) return 10;
-    if (normCompany.startsWith(normQuery)) return 11;
-    if (normCompany.includes(normQuery)) return 12;
-
-    return 13;
-  };
-
   return matches
-    .sort((a, b) => {
-      const scoreA = getRelevanceScore(a);
-      const scoreB = getRelevanceScore(b);
-      if (scoreA !== scoreB) {
-        return scoreA - scoreB;
-      }
-      return (a.title || '').localeCompare(b.title || '');
-    })
+    .sort((a, b) => compareItemsForSearch(a, b, searchQuery))
     .slice(0, 50);
 }
+

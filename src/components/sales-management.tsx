@@ -129,6 +129,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
               isSearching={isSearching}
               isPending={isPending}
               onDelete={handleDelete}
+              onSuccess={loadInitialData}
               authUser={authUser}
             />
             {hasMore && !searchTerm && (

@@ -12,6 +12,7 @@ import {
 import {
   addSale as addSaleImpl,
   deleteSale as deleteSaleImpl,
+  updateSale as updateSaleImpl,
 } from './sales-actions';
 
 export async function getSales(userId: string): Promise<Sale[]> {
@@ -49,6 +50,15 @@ export async function addSale(
   return addSaleImpl(userId, data);
 }
 
+export async function updateSale(
+  userId: string,
+  saleDocId: string,
+  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & { creditApplied?: number; total?: number; date?: string }
+): Promise<{ success: boolean; error?: string; sale?: Sale }> {
+  return updateSaleImpl(userId, saleDocId, data);
+}
+
 export async function deleteSale(userId: string, saleId: string): Promise<{ success: boolean; error?: string }> {
   return deleteSaleImpl(userId, saleId);
 }
+

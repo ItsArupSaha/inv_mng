@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { isFuzzyMatch } from '@/lib/search-utils';
+import { compareItemsForSearch, isFuzzyMatch } from '@/lib/search-utils';
 import type { Item } from '@/lib/types';
 
 interface UseItemFiltersProps {
@@ -71,6 +71,9 @@ export function useItemFilters({ allItems }: UseItemFiltersProps) {
 
     result.sort((a, b) => {
       if (sortBy === 'title-asc') {
+        if (searchQuery.trim()) {
+          return compareItemsForSearch(a, b, searchQuery.trim());
+        }
         return a.title.localeCompare(b.title);
       }
       if (sortBy === 'title-desc') {

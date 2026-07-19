@@ -352,3 +352,307 @@ export async function deleteSale(userId: string, saleId: string): Promise<{ succ
     return { success: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export async function updateSale(
+  userId: string,
+  saleDocId: string,
+  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & { creditApplied?: number; total?: number; date?: string }
+): Promise<{ success: boolean; error?: string; sale?: Sale }> {
+  if (!db || !userId || !saleDocId) return { success: false, error: "Database not configured or invalid sale ID." };
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    const saleRef = doc(userRef, 'sales', saleDocId);
+    const oldSaleSnap = await getDoc(saleRef);
+    if (!oldSaleSnap.exists()) {
+      return { success: false, error: "Sale not found." };
+    }
+    const oldSale = docToSale(oldSaleSnap);
+
+    const itemsCollection = collection(userRef, 'items');
+    const customersCollection = collection(userRef, 'customers');
+    const transactionsCollection = collection(userRef, 'transactions');
+    const saleDate = data.date ? new Date(data.date) : new Date(oldSale.date);
+
+    const relatedTransactionsQuery = query(transactionsCollection, where('saleId', '==', oldSale.saleId));
+    const relatedTransactionDocs = await getDocs(relatedTransactionsQuery);
+
+    const selectedItemRefs = data.items.map((item) => doc(itemsCollection, item.itemId));
+    const selectedItemSnaps = await Promise.all(selectedItemRefs.map((ref) => getDoc(ref)));
+
+    const batchRefsMap: Record<string, { ref: any; isMedicine: boolean; title: string }[]> = {};
+    const allBatchRefs: any[] = [];
+
+    for (let i = 0; i < selectedItemSnaps.length; i++) {
+      const snap = selectedItemSnaps[i];
+      if (!snap.exists()) {
+        return { success: false, error: `Item with id ${data.items[i].itemId} does not exist.` };
+      }
+      const itemData = snap.data() as Item;
+      const catNameLower = (itemData.categoryName || '').toLowerCase();
+      if (catNameLower === 'assets' || catNameLower === 'surgicals') {
+        return { success: false, error: `Item "${itemData.title}" is an asset/surgical product and cannot be sold.` };
+      }
+      const isMedicine = itemData.categoryName?.toLowerCase().includes('medicine') || !!itemData.expiryDate;
+      const itemId = snap.id;
+
+      if (isMedicine) {
+        const q = query(itemsCollection, where("title", "==", itemData.title));
+        const batchSnap = await getDocs(q);
+        const batches = batchSnap.docs.map((d) => ({
+          ref: d.ref,
+          isMedicine: true,
+          title: itemData.title,
+        }));
+        batchRefsMap[itemId] = batches;
+        batches.forEach((b) => {
+          if (!allBatchRefs.some((ref) => ref.path === b.ref.path)) {
+            allBatchRefs.push(b.ref);
+          }
+        });
+      } else {
+        batchRefsMap[itemId] = [{ ref: snap.ref, isMedicine: false, title: itemData.title }];
+        if (!allBatchRefs.some((ref) => ref.path === snap.ref.path)) {
+          allBatchRefs.push(snap.ref);
+        }
+      }
+    }
+
+    const oldItemRefs = oldSale.items.map((item) => doc(itemsCollection, item.itemId));
+    oldItemRefs.forEach((ref) => {
+      if (!allBatchRefs.some((bRef) => bRef.path === ref.path)) {
+        allBatchRefs.push(ref);
+      }
+    });
+
+    const result = await runTransaction(db, async (transaction) => {
+      const oldCustomerRef = doc(customersCollection, oldSale.customerId);
+      const newCustomerRef = doc(customersCollection, data.customerId);
+
+      const oldCustomerDoc = await transaction.get(oldCustomerRef);
+      const newCustomerDoc =
+        oldSale.customerId === data.customerId
+          ? oldCustomerDoc
+          : await transaction.get(newCustomerRef);
+
+      if (!newCustomerDoc.exists()) {
+        throw new Error(`Customer with id ${data.customerId} does not exist!`);
+      }
+
+      const batchDocs = await Promise.all(allBatchRefs.map((ref) => transaction.get(ref)));
+      const batchDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
+      batchDocs.forEach((d) => {
+        if (d.exists()) {
+          batchDocsMap[d.id] = {
+            ref: d.ref,
+            data: d.data() as Item,
+            id: d.id,
+          };
+        }
+      });
+
+      // 1. Restore stock from oldSale.items
+      for (const oldItem of oldSale.items) {
+        const docState = batchDocsMap[oldItem.itemId];
+        if (docState) {
+          docState.data.stock = (Number(docState.data.stock) || 0) + Number(oldItem.quantity);
+        }
+      }
+
+      // 2. Calculate new sale quantities and deduct from batch stocks
+      let calculatedSubtotal = 0;
+      let totalProductionCost = 0;
+      const itemsWithPrices: SaleItem[] = [];
+
+      for (let i = 0; i < data.items.length; i++) {
+        const saleItem = data.items[i];
+        const batches = batchRefsMap[saleItem.itemId];
+        const itemTitle = batches[0]?.title || '';
+
+        const totalAvailableStock = batches.reduce((sum, b) => {
+          const docState = batchDocsMap[b.ref.id];
+          return sum + (docState ? Number(docState.data.stock) || 0 : 0);
+        }, 0);
+
+        if (totalAvailableStock < Number(saleItem.quantity)) {
+          throw new Error(`Not enough stock for ${itemTitle}. Available: ${totalAvailableStock}, Requested: ${saleItem.quantity}`);
+        }
+
+        const sortedBatches = [...batches]
+          .map((b) => batchDocsMap[b.ref.id])
+          .filter(Boolean);
+
+        if (batches[0]?.isMedicine) {
+          sortedBatches.sort((a, b) => {
+            const expA = a.data.expiryDate || '';
+            const expB = b.data.expiryDate || '';
+            if (!expA && !expB) return 0;
+            if (!expA) return 1;
+            if (!expB) return -1;
+            return expA.localeCompare(expB);
+          });
+        }
+
+        let remainingQtyToDeduct = Number(saleItem.quantity);
+        let itemProductionCost = 0;
+
+        for (const batch of sortedBatches) {
+          if (remainingQtyToDeduct <= 0) break;
+          const currentStock = Number(batch.data.stock) || 0;
+          if (currentStock <= 0) continue;
+
+          const qtyToDeductFromThisBatch = Math.min(currentStock, remainingQtyToDeduct);
+          const newStock = currentStock - qtyToDeductFromThisBatch;
+
+          itemProductionCost += (Number(batch.data.productionPrice) || 0) * qtyToDeductFromThisBatch;
+          batch.data.stock = newStock;
+          remainingQtyToDeduct -= qtyToDeductFromThisBatch;
+        }
+
+        totalProductionCost += itemProductionCost;
+
+        const primaryDocState = batchDocsMap[saleItem.itemId];
+        const price =
+          saleItem.price !== undefined && saleItem.price !== null
+            ? Number(saleItem.price)
+            : Number(primaryDocState?.data.sellingPrice || 0);
+
+        calculatedSubtotal += price * Number(saleItem.quantity);
+        itemsWithPrices.push({ ...saleItem, price });
+      }
+
+      let discountAmount = 0;
+      if (data.discountType === 'percentage' && data.discountValue !== undefined) {
+        discountAmount = calculatedSubtotal * (data.discountValue / 100);
+      } else if (data.discountType === 'amount' && data.discountValue !== undefined) {
+        discountAmount = data.discountValue;
+      }
+      discountAmount = Math.min(calculatedSubtotal, discountAmount);
+
+      let totalAfterDiscount = calculatedSubtotal - discountAmount;
+      if (data.total !== undefined && data.total !== null && data.total >= 0) {
+        totalAfterDiscount = data.total;
+      }
+      const totalSaleProfit = totalAfterDiscount - totalProductionCost;
+
+      const creditApplied = data.creditApplied || 0;
+      const finalTotal = totalAfterDiscount - creditApplied;
+
+      // 3. Apply stock updates to firestore docs
+      Object.values(batchDocsMap).forEach((docState) => {
+        transaction.update(docState.ref, { stock: docState.data.stock });
+      });
+
+      // 4. Adjust customer due balances
+      if (oldCustomerDoc.exists()) {
+        let oldAmountDue = 0;
+        if (oldSale.paymentMethod === 'Due' || oldSale.paymentMethod === 'Split') {
+          oldAmountDue = oldSale.total - (oldSale.amountPaid || 0);
+        }
+        const oldCredit = oldSale.creditApplied || 0;
+        const currentOldDue = oldCustomerDoc.data().dueBalance || 0;
+        const newOldCustomerDue = currentOldDue - oldAmountDue + oldCredit;
+
+        if (oldSale.customerId === data.customerId) {
+          let newAmountDue = 0;
+          if (data.paymentMethod === 'Due' || data.paymentMethod === 'Split') {
+            if (data.paymentMethod === 'Split' && data.amountPaid && data.amountPaid > 0) {
+              newAmountDue = finalTotal - data.amountPaid;
+            } else {
+              newAmountDue = finalTotal;
+            }
+          }
+          const finalCustomerDue = newOldCustomerDue + newAmountDue + creditApplied;
+          transaction.update(newCustomerRef, { dueBalance: finalCustomerDue });
+        } else {
+          transaction.update(oldCustomerRef, { dueBalance: newOldCustomerDue });
+
+          const currentNewDue = newCustomerDoc.data()?.dueBalance || 0;
+          let newAmountDue = 0;
+          if (data.paymentMethod === 'Due' || data.paymentMethod === 'Split') {
+            if (data.paymentMethod === 'Split' && data.amountPaid && data.amountPaid > 0) {
+              newAmountDue = finalTotal - data.amountPaid;
+            } else {
+              newAmountDue = finalTotal;
+            }
+          }
+          const finalNewCustomerDue = currentNewDue + newAmountDue + creditApplied;
+          transaction.update(newCustomerRef, { dueBalance: finalNewCustomerDue });
+        }
+      }
+
+      // 5. Delete old related receivables
+      relatedTransactionDocs.forEach((d) => transaction.delete(d.ref));
+
+      // 6. Create new receivable transaction if Due or Split
+      if (data.paymentMethod === 'Due' || data.paymentMethod === 'Split') {
+        let dueAmount = finalTotal;
+        let realizedProfit = 0;
+
+        if (data.paymentMethod === 'Split' && data.amountPaid && data.amountPaid > 0) {
+          dueAmount = finalTotal - data.amountPaid;
+          if (finalTotal > 0) {
+            realizedProfit = totalSaleProfit * (data.amountPaid / finalTotal);
+          }
+        }
+
+        if (dueAmount > 0) {
+          const remainingProfit = totalSaleProfit - realizedProfit;
+          const receivableData = {
+            description: `Due from ${oldSale.saleId}`,
+            amount: dueAmount,
+            dueDate: Timestamp.fromDate(new Date()),
+            status: 'Pending' as const,
+            type: 'Receivable' as const,
+            customerId: data.customerId,
+            saleId: oldSale.saleId,
+            totalSaleProfit: totalSaleProfit,
+            remainingProfit: remainingProfit,
+          };
+          transaction.set(doc(transactionsCollection), receivableData);
+        }
+      }
+
+      const cleanedData: any = { ...data };
+      if (data.paymentMethod !== 'Split') {
+        delete cleanedData.amountPaid;
+        delete cleanedData.splitPaymentMethod;
+      }
+
+      const updatedSaleData: Omit<Sale, 'id'> & { date: Timestamp; creditApplied?: number } = {
+        ...cleanedData,
+        saleId: oldSale.saleId,
+        items: itemsWithPrices,
+        subtotal: calculatedSubtotal,
+        total: totalAfterDiscount,
+        date: Timestamp.fromDate(saleDate) as any,
+        creditApplied: creditApplied,
+        paymentMethod: finalTotal <= 0 ? 'Paid by Credit' : data.paymentMethod,
+      };
+
+      transaction.update(saleRef, updatedSaleData);
+
+      const saleForClient: Sale = {
+        id: saleDocId,
+        ...updatedSaleData,
+        total: totalAfterDiscount,
+        date: saleDate.toISOString(),
+      };
+
+      return { success: true, sale: saleForClient };
+    });
+
+    revalidatePath('/sales');
+    revalidatePath('/dashboard');
+    revalidatePath('/items');
+    revalidatePath('/receivables');
+    if (data.customerId) {
+      revalidatePath(`/customers/${data.customerId}`);
+    }
+    return result;
+  } catch (e) {
+    console.error("Sale update failed: ", e);
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+

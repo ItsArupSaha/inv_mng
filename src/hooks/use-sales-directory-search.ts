@@ -1,6 +1,7 @@
 import * as React from 'react';
 import type { Item } from '@/lib/types';
 import { getFormCategory, getStrengths, matchStrength } from '@/components/sales/sales-directory-utils';
+import { compareItemsForSearch } from '@/lib/search-utils';
 
 export function useSalesDirectorySearch(items: Item[]) {
   const [directoryQuery, setDirectoryQuery] = React.useState('');
@@ -56,31 +57,8 @@ export function useSalesDirectorySearch(items: Item[]) {
         (item.location || '').toLowerCase().includes(q)
     );
 
-    const getRelevanceScore = (item: Item) => {
-      const title = (item.title || '').toLowerCase();
-      const group = (item.medicineGroup || '').toLowerCase();
-      const company = (item.company || '').toLowerCase();
-      const location = (item.location || '').toLowerCase();
-
-      if (title.startsWith(q)) return 1;
-      if (title.includes(q)) return 2;
-      if (group.startsWith(q)) return 3;
-      if (group.includes(q)) return 4;
-      if (company.startsWith(q)) return 5;
-      if (company.includes(q)) return 6;
-      if (location.includes(q)) return 7;
-      return 8;
-    };
-
     return matches
-      .sort((a, b) => {
-        const scoreA = getRelevanceScore(a);
-        const scoreB = getRelevanceScore(b);
-        if (scoreA !== scoreB) {
-          return scoreA - scoreB;
-        }
-        return (a.title || '').localeCompare(b.title || '');
-      })
+      .sort((a, b) => compareItemsForSearch(a, b, q))
       .slice(0, 50);
   }, [directoryQuery, items]);
 

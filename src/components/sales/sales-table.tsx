@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import type { Sale, Item, Customer } from '@/lib/types';
 import { getSaleTransaction } from '@/lib/actions';
 import { DownloadSaleMemo } from '../download-sale-memo';
 import { SaleDetailsDialog } from '../sale-details-dialog';
+import { EditSaleDialog } from './edit-sale-dialog';
 import { getImmediateSaleStatus, getResolvedSaleStatus, type SaleStatus } from './sales-status-utils';
 
 interface SalesTableProps {
@@ -22,6 +23,7 @@ interface SalesTableProps {
   isSearching: boolean;
   isPending: boolean;
   onDelete: (id: string) => void;
+  onSuccess?: () => void;
   authUser: any;
 }
 
@@ -34,11 +36,19 @@ export function SalesTable({
   isSearching,
   isPending,
   onDelete,
+  onSuccess,
   authUser,
 }: SalesTableProps) {
   const [saleStatuses, setSaleStatuses] = React.useState<Record<string, SaleStatus>>({});
+  const [editingSale, setEditingSale] = React.useState<Sale | null>(null);
+  const [isEditOpen, setIsEditOpen] = React.useState(false);
 
   const getItemTitle = (itemId: string) => items.find((i) => i.id === itemId)?.title || 'Unknown Item';
+
+  const handleEditClick = (sale: Sale) => {
+    setEditingSale(sale);
+    setIsEditOpen(true);
+  };
 
   React.useEffect(() => {
     let isCancelled = false;
@@ -92,7 +102,7 @@ export function SalesTable({
             <TableHead>Items</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Total</TableHead>
-            <TableHead className="text-right w-[100px]">Actions</TableHead>
+            <TableHead className="text-right w-[120px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -151,12 +161,17 @@ export function SalesTable({
                   </TableCell>
                   <TableCell className="text-right font-medium">৳{sale.total.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
-                    {customer && authUser && (
-                      <DownloadSaleMemo sale={sale} customer={customer} items={items} user={authUser} />
-                    )}
-                    <Button variant="ghost" size="icon" onClick={() => onDelete(sale.id)} disabled={isPending}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      {customer && authUser && (
+                        <DownloadSaleMemo sale={sale} customer={customer} items={items} user={authUser} />
+                      )}
+                      <Button variant="ghost" size="icon" onClick={() => handleEditClick(sale)} disabled={isPending}>
+                        <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => onDelete(sale.id)} disabled={isPending}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -170,6 +185,18 @@ export function SalesTable({
           )}
         </TableBody>
       </Table>
+
+      <EditSaleDialog
+        userId={userId}
+        isOpen={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        sale={editingSale}
+        items={items}
+        customers={customers}
+        onSuccess={() => {
+          if (onSuccess) onSuccess();
+        }}
+      />
     </div>
   );
 }
