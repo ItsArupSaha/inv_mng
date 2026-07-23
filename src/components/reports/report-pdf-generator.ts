@@ -67,13 +67,18 @@ export function generateReportPdf({
   doc.setTextColor(0);
 
   // Activity Table
-  const activityBody = [
+  const activityBody: (string[])[] = [
     ['Total Sales', formatCurrencyForPdf(activity.totalSales)],
+  ];
+  if (activity.totalExtraSales && activity.totalExtraSales > 0) {
+    activityBody.push(['  └ Extra / Service Sales (100% Profit)', formatCurrencyForPdf(activity.totalExtraSales)]);
+  }
+  activityBody.push(
     ['Total Profit', formatCurrencyForPdf(activity.totalProfit)],
     ['Received Payments from Dues', formatCurrencyForPdf(activity.receivedPaymentsFromDues)],
     ['Total Donations', formatCurrencyForPdf(activity.totalDonations)],
-    ['Total Expenses', `(${formatCurrencyForPdf(activity.totalExpenses)})`],
-  ];
+    ['Total Expenses', `(${formatCurrencyForPdf(activity.totalExpenses)})`]
+  );
 
   autoTable(doc, {
     startY: 60,

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 interface ReportActivityTableProps {
   activity: {
     totalSales: number;
+    totalExtraSales?: number;
     totalProfit: number;
     receivedPaymentsFromDues: number;
     totalDonations: number;
@@ -25,6 +26,16 @@ export function ReportActivityTable({ activity, formatCurrency, title = 'Monthly
             <TableCell>Total Sales</TableCell>
             <TableCell className="text-right">{formatCurrency(activity.totalSales)}</TableCell>
           </TableRow>
+          {activity.totalExtraSales !== undefined && activity.totalExtraSales > 0 && (
+            <TableRow className="bg-muted/20">
+              <TableCell className="pl-6 text-xs text-muted-foreground font-medium">
+                └ Extra / Service Sales (100% Profit)
+              </TableCell>
+              <TableCell className="text-right text-xs font-mono text-muted-foreground font-medium">
+                {formatCurrency(activity.totalExtraSales)}
+              </TableCell>
+            </TableRow>
+          )}
           <TableRow>
             <TableCell>Total Profit</TableCell>
             <TableCell className="text-right">{formatCurrency(activity.totalProfit)}</TableCell>

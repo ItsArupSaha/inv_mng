@@ -113,14 +113,14 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
     const monthlyExpenses = operatingExpensesThisMonth.reduce((sum: number, expense: any) => sum + expense.amount, 0);
 
     const grossProfitThisMonth = salesThisMonth.reduce((totalProfit, sale) => {
-        const saleProfit = sale.items.reduce((currentSaleProfit, item) => {
-            const inventoryItem = items.find(i => i.id === item.itemId);
+        const totalProductionCost = sale.items.reduce((acc, saleItem) => {
+            const inventoryItem = items.find(i => i.id === saleItem.itemId);
             if (inventoryItem) {
-                const itemProfit = (item.price - inventoryItem.productionPrice) * item.quantity;
-                return currentSaleProfit + itemProfit;
+                return acc + (inventoryItem.productionPrice * saleItem.quantity);
             }
-            return currentSaleProfit;
+            return acc;
         }, 0);
+        const saleProfit = sale.total - totalProductionCost;
         return totalProfit + saleProfit;
     }, 0);
 

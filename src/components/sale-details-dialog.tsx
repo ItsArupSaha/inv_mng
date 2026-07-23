@@ -56,36 +56,38 @@ export function SaleDetailsDialog({ sale, items, children }: SaleDetailsDialogPr
   return (
     <Dialog onOpenChange={(open) => { if (open) fetchStatus(); }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Sale Details ({sale.saleId})</DialogTitle>
           <DialogDescription>
             Recorded on {new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(sale.date))}
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item Title</TableHead>
-                <TableHead className="text-center">Qty</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sale.items.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">{getItemTitle(item.itemId)}</TableCell>
-                  <TableCell className="text-center">{item.quantity}</TableCell>
-                  <TableCell className="text-right">৳{item.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">৳{(item.quantity * item.price).toFixed(2)}</TableCell>
+        <div className="mt-4 flex-1 overflow-y-auto space-y-4 pr-1">
+          <div className="max-h-[260px] overflow-y-auto border rounded-md relative">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10 border-b">
+                <TableRow>
+                  <TableHead>Item Title</TableHead>
+                  <TableHead className="text-center">Qty</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {sale.items.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{getItemTitle(item.itemId)}</TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-right">৳{item.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">৳{(item.quantity * item.price).toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           <Separator className="my-4" />
-          <div className="space-y-2 text-sm pr-4">
+          <div className="space-y-2 text-sm pr-1">
             <div className="flex justify-between">
               <span>Subtotal</span>
               <span>৳{sale.subtotal.toFixed(2)}</span>

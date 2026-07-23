@@ -1,10 +1,10 @@
-
 import type { Donation, Expense, Item, Sale, Transaction } from './types';
 import { isOperatingExpense } from './db/utils';
 
 export interface ReportAnalysis {
   monthlyActivity: {
     totalSales: number;
+    totalExtraSales?: number;
     profitFromPaidSales: number;
     profitFromDuePayments: number;
     receivedPaymentsFromDues: number;
@@ -81,6 +81,7 @@ export function calculateReportStats(input: ReportStatsInput) {
     .reduce((sum, t) => sum + (t.recognizedProfit || 0), 0);
 
   const totalSales = salesData.reduce((sum, sale) => sum + sale.total, 0);
+  const totalExtraSales = salesData.reduce((sum, sale) => sum + (sale.extraSales || 0), 0);
 
   const salesBreakdown = salesData.reduce(
     (acc, sale) => {
@@ -173,6 +174,7 @@ export function calculateReportStats(input: ReportStatsInput) {
 
   return {
     totalSales,
+    totalExtraSales,
     profitFromPaidSales,
     profitFromDuePayments,
     receivedPaymentsFromDues,
@@ -188,6 +190,7 @@ export function calculateReportStats(input: ReportStatsInput) {
 export interface DailyReportAnalysis {
   dailyActivity: {
     totalSales: number;
+    totalExtraSales?: number;
     profitFromPaidSales: number;
     profitFromDuePayments: number;
     receivedPaymentsFromDues: number;
@@ -224,6 +227,7 @@ export function generateDailyReport(input: DailyReportInput): DailyReportAnalysi
   return {
     dailyActivity: {
       totalSales: stats.totalSales,
+      totalExtraSales: stats.totalExtraSales,
       profitFromPaidSales: stats.profitFromPaidSales,
       profitFromDuePayments: stats.profitFromDuePayments,
       receivedPaymentsFromDues: stats.receivedPaymentsFromDues,
@@ -244,6 +248,7 @@ export function generateMonthlyReport(input: ReportInput): ReportAnalysis {
   return {
     monthlyActivity: {
       totalSales: stats.totalSales,
+      totalExtraSales: stats.totalExtraSales,
       profitFromPaidSales: stats.profitFromPaidSales,
       profitFromDuePayments: stats.profitFromDuePayments,
       receivedPaymentsFromDues: stats.receivedPaymentsFromDues,
