@@ -120,21 +120,24 @@ export async function addSale(
           throw new Error(`Not enough stock for ${itemTitle}. Available: ${totalAvailableStock}, Requested: ${saleItem.quantity}`);
         }
 
-        // Sort batches: earliest expiry date first
-        const sortedBatches = [...batches]
+        // Prioritize the explicitly selected batch first, followed by remaining batches sorted by earliest expiry date
+        const primaryBatch = batchDocsMap[saleItem.itemId];
+        const otherBatches = batches
           .map(b => batchDocsMap[b.ref.id])
-          .filter(Boolean);
+          .filter((b): b is { ref: any; data: Item; id: string } => !!b && b.id !== saleItem.itemId);
 
         if (batches[0]?.isMedicine) {
-          sortedBatches.sort((a, b) => {
+          otherBatches.sort((a, b) => {
             const expA = a.data.expiryDate || '';
             const expB = b.data.expiryDate || '';
             if (!expA && !expB) return 0;
-            if (!expA) return 1; // place items without expiry date at the end
+            if (!expA) return 1;
             if (!expB) return -1;
             return expA.localeCompare(expB);
           });
         }
+
+        const sortedBatches = primaryBatch ? [primaryBatch, ...otherBatches] : otherBatches;
 
         let remainingQtyToDeduct = Number(saleItem.quantity);
         let itemProductionCost = 0;
@@ -475,12 +478,14 @@ export async function updateSale(
           throw new Error(`Not enough stock for ${itemTitle}. Available: ${totalAvailableStock}, Requested: ${saleItem.quantity}`);
         }
 
-        const sortedBatches = [...batches]
+        // Prioritize the explicitly selected batch first, followed by remaining batches sorted by earliest expiry date
+        const primaryBatch = batchDocsMap[saleItem.itemId];
+        const otherBatches = batches
           .map((b) => batchDocsMap[b.ref.id])
-          .filter(Boolean);
+          .filter((b): b is { ref: any; data: Item; id: string } => !!b && b.id !== saleItem.itemId);
 
         if (batches[0]?.isMedicine) {
-          sortedBatches.sort((a, b) => {
+          otherBatches.sort((a, b) => {
             const expA = a.data.expiryDate || '';
             const expB = b.data.expiryDate || '';
             if (!expA && !expB) return 0;
@@ -489,6 +494,8 @@ export async function updateSale(
             return expA.localeCompare(expB);
           });
         }
+
+        const sortedBatches = primaryBatch ? [primaryBatch, ...otherBatches] : otherBatches;
 
         let remainingQtyToDeduct = Number(saleItem.quantity);
         let itemProductionCost = 0;
