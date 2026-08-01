@@ -231,7 +231,16 @@ export function compareItemsForSearch<T extends { title: string; medicineGroup?:
     if (dateA !== dateB) return dateA - dateB;
   }
 
-  return (a.title || '').localeCompare(b.title || '');
+  const titleCmp = (a.title || '').localeCompare(b.title || '');
+  if (titleCmp !== 0) return titleCmp;
+
+  // If titles are identical, tie-break by earliest expiry date first
+  const dateA = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+  const dateB = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+  if (dateA !== dateB) return dateA - dateB;
+
+  // Second tie-breaker: sort higher stock first
+  return (b.stock || 0) - (a.stock || 0);
 }
 
 

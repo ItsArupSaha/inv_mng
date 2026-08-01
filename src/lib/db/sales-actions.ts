@@ -31,12 +31,9 @@ export async function addSale(
     const customerRef = doc(customersCollection, data.customerId);
     const saleDate = new Date(data.date) || new Date();
 
-    // 1. Pre-fetch selected items and retrieve all alternative expiry batches (outside the transaction)
+    // 1. Pre-fetch selected item documents
     const selectedItemRefs = data.items.map(item => doc(itemsCollection, item.itemId));
     const selectedItemSnaps = await Promise.all(selectedItemRefs.map(ref => getDoc(ref)));
-
-    const batchRefsMap: Record<string, { ref: any; isMedicine: boolean; title: string }[]> = {};
-    const allBatchRefs: any[] = [];
 
     for (let i = 0; i < selectedItemSnaps.length; i++) {
       const snap = selectedItemSnaps[i];
@@ -48,48 +45,24 @@ export async function addSale(
       if (catNameLower === 'assets' || catNameLower === 'surgicals') {
         return { success: false, error: `Item "${itemData.title}" is an asset/surgical product and cannot be sold.` };
       }
-      const isMedicine = itemData.categoryName?.toLowerCase().includes('medicine') || !!itemData.expiryDate;
-      const itemId = snap.id;
-
-      if (isMedicine) {
-        // Query all items with the same title to find alternative expiry batches
-        const q = query(itemsCollection, where("title", "==", itemData.title));
-        const batchSnap = await getDocs(q);
-        const batches = batchSnap.docs.map(doc => ({
-          ref: doc.ref,
-          isMedicine: true,
-          title: itemData.title,
-        }));
-        batchRefsMap[itemId] = batches;
-        batches.forEach(b => {
-          if (!allBatchRefs.some(ref => ref.path === b.ref.path)) {
-            allBatchRefs.push(b.ref);
-          }
-        });
-      } else {
-        batchRefsMap[itemId] = [{ ref: snap.ref, isMedicine: false, title: itemData.title }];
-        if (!allBatchRefs.some(ref => ref.path === snap.ref.path)) {
-          allBatchRefs.push(snap.ref);
-        }
-      }
     }
 
     const result = await runTransaction(db, async (transaction) => {
       const metadataDoc = await transaction.get(metadataRef);
       const customerDoc = await transaction.get(customerRef);
-      const batchDocs = await Promise.all(allBatchRefs.map(ref => transaction.get(ref)));
+      const itemDocs = await Promise.all(selectedItemRefs.map(ref => transaction.get(ref)));
 
       if (!customerDoc.exists()) {
         throw new Error(`Customer with id ${data.customerId} does not exist!`);
       }
 
-      const batchDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
-      batchDocs.forEach(doc => {
-        if (doc.exists()) {
-          batchDocsMap[doc.id] = {
-            ref: doc.ref,
-            data: doc.data() as Item,
-            id: doc.id,
+      const itemDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
+      itemDocs.forEach(docSnap => {
+        if (docSnap.exists()) {
+          itemDocsMap[docSnap.id] = {
+            ref: docSnap.ref,
+            data: docSnap.data() as Item,
+            id: docSnap.id,
           };
         }
       });
@@ -102,72 +75,40 @@ export async function addSale(
       let totalProductionCost = 0;
       const itemsWithPrices: SaleItem[] = [];
 
-      // Array to keep track of updates we need to make to batch stocks
+      // Array to keep track of updates we need to make to item stocks
       const stockUpdatesToMake: { ref: any; newStock: number }[] = [];
 
       for (let i = 0; i < data.items.length; i++) {
         const saleItem = data.items[i];
-        const batches = batchRefsMap[saleItem.itemId];
-        const itemTitle = batches[0]?.title || '';
+        const itemState = itemDocsMap[saleItem.itemId];
 
-        // Calculate total available stock across all batches
-        const totalAvailableStock = batches.reduce((sum, b) => {
-          const docState = batchDocsMap[b.ref.id];
-          return sum + (docState ? Number(docState.data.stock) || 0 : 0);
-        }, 0);
-
-        if (totalAvailableStock < Number(saleItem.quantity)) {
-          throw new Error(`Not enough stock for ${itemTitle}. Available: ${totalAvailableStock}, Requested: ${saleItem.quantity}`);
+        if (!itemState) {
+          throw new Error(`Item with id ${saleItem.itemId} not found.`);
         }
 
-        // Prioritize the explicitly selected batch first, followed by remaining batches sorted by earliest expiry date
-        const primaryBatch = batchDocsMap[saleItem.itemId];
-        const otherBatches = batches
-          .map(b => batchDocsMap[b.ref.id])
-          .filter((b): b is { ref: any; data: Item; id: string } => !!b && b.id !== saleItem.itemId);
+        const itemTitle = itemState.data.title || '';
+        const currentStock = Number(itemState.data.stock) || 0;
+        const qtyRequested = Number(saleItem.quantity);
 
-        if (batches[0]?.isMedicine) {
-          otherBatches.sort((a, b) => {
-            const expA = a.data.expiryDate || '';
-            const expB = b.data.expiryDate || '';
-            if (!expA && !expB) return 0;
-            if (!expA) return 1;
-            if (!expB) return -1;
-            return expA.localeCompare(expB);
-          });
+        if (currentStock < qtyRequested) {
+          throw new Error(`Not enough stock for ${itemTitle}. Available in selected item: ${currentStock}, Requested: ${qtyRequested}`);
         }
 
-        const sortedBatches = primaryBatch ? [primaryBatch, ...otherBatches] : otherBatches;
+        const newStock = currentStock - qtyRequested;
+        const itemProductionCost = (Number(itemState.data.productionPrice) || 0) * qtyRequested;
 
-        let remainingQtyToDeduct = Number(saleItem.quantity);
-        let itemProductionCost = 0;
-
-        for (const batch of sortedBatches) {
-          if (remainingQtyToDeduct <= 0) break;
-          const currentStock = Number(batch.data.stock) || 0;
-          if (currentStock <= 0) continue;
-
-          const qtyToDeductFromThisBatch = Math.min(currentStock, remainingQtyToDeduct);
-          const newStock = currentStock - qtyToDeductFromThisBatch;
-
-          itemProductionCost += (Number(batch.data.productionPrice) || 0) * qtyToDeductFromThisBatch;
-          
-          stockUpdatesToMake.push({ ref: batch.ref, newStock });
-          
-          // Update local map state so other items in this transaction (if any) see intermediate stocks
-          batch.data.stock = newStock;
-          remainingQtyToDeduct -= qtyToDeductFromThisBatch;
-        }
-
+        stockUpdatesToMake.push({ ref: itemState.ref, newStock });
+        
+        // Update local map state in case the same item is included multiple times
+        itemState.data.stock = newStock;
         totalProductionCost += itemProductionCost;
         
         // Price for this sale item
-        const primaryDocState = batchDocsMap[saleItem.itemId];
         const price = saleItem.price !== undefined && saleItem.price !== null 
           ? Number(saleItem.price) 
-          : Number(primaryDocState?.data.sellingPrice || 0);
+          : Number(itemState.data.sellingPrice || 0);
 
-        calculatedSubtotal += price * Number(saleItem.quantity);
+        calculatedSubtotal += price * qtyRequested;
         itemsWithPrices.push({ ...saleItem, price });
       }
 
@@ -210,7 +151,7 @@ export async function addSale(
       transaction.set(newSaleRef, saleDataToSave);
       transaction.set(metadataRef, { lastSaleNumber: newSaleNumber }, { merge: true });
 
-      // Apply batch stock updates
+      // Apply item stock updates
       stockUpdatesToMake.forEach(update => {
         transaction.update(update.ref, { stock: update.newStock });
       });
@@ -387,9 +328,6 @@ export async function updateSale(
     const selectedItemRefs = Array.from(allItemIdsToFetch).map((id) => doc(itemsCollection, id));
     const selectedItemSnaps = await Promise.all(selectedItemRefs.map((ref) => getDoc(ref)));
 
-    const batchRefsMap: Record<string, { ref: any; isMedicine: boolean; title: string }[]> = {};
-    const allBatchRefs: any[] = [];
-
     for (let i = 0; i < selectedItemSnaps.length; i++) {
       const snap = selectedItemSnaps[i];
       if (!snap.exists()) {
@@ -399,29 +337,6 @@ export async function updateSale(
       const catNameLower = (itemData.categoryName || '').toLowerCase();
       if (catNameLower === 'assets' || catNameLower === 'surgicals') {
         return { success: false, error: `Item "${itemData.title}" is an asset/surgical product and cannot be sold.` };
-      }
-      const isMedicine = itemData.categoryName?.toLowerCase().includes('medicine') || !!itemData.expiryDate;
-      const itemId = snap.id;
-
-      if (isMedicine) {
-        const q = query(itemsCollection, where("title", "==", itemData.title));
-        const batchSnap = await getDocs(q);
-        const batches = batchSnap.docs.map((d) => ({
-          ref: d.ref,
-          isMedicine: true,
-          title: itemData.title,
-        }));
-        batchRefsMap[itemId] = batches;
-        batches.forEach((b) => {
-          if (!allBatchRefs.some((ref) => ref.path === b.ref.path)) {
-            allBatchRefs.push(b.ref);
-          }
-        });
-      } else {
-        batchRefsMap[itemId] = [{ ref: snap.ref, isMedicine: false, title: itemData.title }];
-        if (!allBatchRefs.some((ref) => ref.path === snap.ref.path)) {
-          allBatchRefs.push(snap.ref);
-        }
       }
     }
 
@@ -439,11 +354,11 @@ export async function updateSale(
         throw new Error(`Customer with id ${data.customerId} does not exist!`);
       }
 
-      const batchDocs = await Promise.all(allBatchRefs.map((ref) => transaction.get(ref)));
-      const batchDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
-      batchDocs.forEach((d) => {
+      const itemDocs = await Promise.all(selectedItemRefs.map((ref) => transaction.get(ref)));
+      const itemDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
+      itemDocs.forEach((d) => {
         if (d.exists()) {
-          batchDocsMap[d.id] = {
+          itemDocsMap[d.id] = {
             ref: d.ref,
             data: d.data() as Item,
             id: d.id,
@@ -451,77 +366,50 @@ export async function updateSale(
         }
       });
 
-      // 1. Restore stock from oldSale.items
+      // 1. Restore stock from oldSale.items to the exact old item IDs
       for (const oldItem of oldSale.items) {
-        const docState = batchDocsMap[oldItem.itemId];
-        if (docState) {
-          docState.data.stock = (Number(docState.data.stock) || 0) + Number(oldItem.quantity);
+        const itemState = itemDocsMap[oldItem.itemId];
+        if (itemState) {
+          const restoredStock = (Number(itemState.data.stock) || 0) + Number(oldItem.quantity);
+          itemState.data.stock = restoredStock;
+          transaction.update(itemState.ref, { stock: restoredStock });
         }
       }
 
-      // 2. Calculate new sale quantities and deduct from batch stocks
+      // 2. Deduct stock from newSale.items strictly on the selected item IDs
       let calculatedSubtotal = 0;
       let totalProductionCost = 0;
       const itemsWithPrices: SaleItem[] = [];
 
       for (let i = 0; i < data.items.length; i++) {
         const saleItem = data.items[i];
-        const batches = batchRefsMap[saleItem.itemId];
-        const itemTitle = batches[0]?.title || '';
+        const itemState = itemDocsMap[saleItem.itemId];
 
-        const totalAvailableStock = batches.reduce((sum, b) => {
-          const docState = batchDocsMap[b.ref.id];
-          return sum + (docState ? Number(docState.data.stock) || 0 : 0);
-        }, 0);
-
-        if (totalAvailableStock < Number(saleItem.quantity)) {
-          throw new Error(`Not enough stock for ${itemTitle}. Available: ${totalAvailableStock}, Requested: ${saleItem.quantity}`);
+        if (!itemState) {
+          throw new Error(`Item with id ${saleItem.itemId} not found.`);
         }
 
-        // Prioritize the explicitly selected batch first, followed by remaining batches sorted by earliest expiry date
-        const primaryBatch = batchDocsMap[saleItem.itemId];
-        const otherBatches = batches
-          .map((b) => batchDocsMap[b.ref.id])
-          .filter((b): b is { ref: any; data: Item; id: string } => !!b && b.id !== saleItem.itemId);
+        const itemTitle = itemState.data.title || '';
+        const currentStock = Number(itemState.data.stock) || 0;
+        const qtyRequested = Number(saleItem.quantity);
 
-        if (batches[0]?.isMedicine) {
-          otherBatches.sort((a, b) => {
-            const expA = a.data.expiryDate || '';
-            const expB = b.data.expiryDate || '';
-            if (!expA && !expB) return 0;
-            if (!expA) return 1;
-            if (!expB) return -1;
-            return expA.localeCompare(expB);
-          });
+        if (currentStock < qtyRequested) {
+          throw new Error(`Not enough stock for ${itemTitle}. Available in selected item: ${currentStock}, Requested: ${qtyRequested}`);
         }
 
-        const sortedBatches = primaryBatch ? [primaryBatch, ...otherBatches] : otherBatches;
+        const newStock = currentStock - qtyRequested;
+        const itemProductionCost = (Number(itemState.data.productionPrice) || 0) * qtyRequested;
 
-        let remainingQtyToDeduct = Number(saleItem.quantity);
-        let itemProductionCost = 0;
-
-        for (const batch of sortedBatches) {
-          if (remainingQtyToDeduct <= 0) break;
-          const currentStock = Number(batch.data.stock) || 0;
-          if (currentStock <= 0) continue;
-
-          const qtyToDeductFromThisBatch = Math.min(currentStock, remainingQtyToDeduct);
-          const newStock = currentStock - qtyToDeductFromThisBatch;
-
-          itemProductionCost += (Number(batch.data.productionPrice) || 0) * qtyToDeductFromThisBatch;
-          batch.data.stock = newStock;
-          remainingQtyToDeduct -= qtyToDeductFromThisBatch;
-        }
-
+        transaction.update(itemState.ref, { stock: newStock });
+        itemState.data.stock = newStock;
         totalProductionCost += itemProductionCost;
 
-        const primaryDocState = batchDocsMap[saleItem.itemId];
         const price =
           saleItem.price !== undefined && saleItem.price !== null
             ? Number(saleItem.price)
-            : Number(primaryDocState?.data.sellingPrice || 0);
+            : Number(itemState.data.sellingPrice || 0);
 
-        calculatedSubtotal += price * Number(saleItem.quantity);
+        calculatedSubtotal += price * qtyRequested;
         itemsWithPrices.push({ ...saleItem, price });
       }
 
@@ -541,11 +429,6 @@ export async function updateSale(
 
       const creditApplied = data.creditApplied || 0;
       const finalTotal = totalAfterDiscount - creditApplied;
-
-      // 3. Apply stock updates to firestore docs
-      Object.values(batchDocsMap).forEach((docState) => {
-        transaction.update(docState.ref, { stock: docState.data.stock });
-      });
 
       // 4. Adjust customer due balances
       if (oldCustomerDoc.exists()) {
