@@ -6,7 +6,7 @@ import { PlusCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectPortal, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Item } from '@/lib/types';
 
 interface ReturnItemsListProps {
@@ -51,21 +51,19 @@ export function ReturnItemsList({
                         <SelectValue placeholder="Select an item" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectPortal>
-                      <SelectContent>
-                        {items.map((item) => (
-                          <SelectItem
-                            key={item.id}
-                            value={item.id}
-                            disabled={watchItems.some(
-                              (i, itemIndex) => i.itemId === item.id && itemIndex !== index
-                            )}
-                          >
-                            {item.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </SelectPortal>
+                    <SelectContent>
+                      {items.map((item) => (
+                        <SelectItem
+                          key={item.id}
+                          value={item.id}
+                          disabled={watchItems.some(
+                            (i, itemIndex) => i.itemId === item.id && itemIndex !== index
+                          )}
+                        >
+                          {item.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>

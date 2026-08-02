@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectPortal, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -29,13 +29,11 @@ export function SalePaymentSection() {
                       <SelectValue placeholder="Type" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectPortal>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="percentage">%</SelectItem>
-                      <SelectItem value="amount">$</SelectItem>
-                    </SelectContent>
-                  </SelectPortal>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="percentage">%</SelectItem>
+                    <SelectItem value="amount">$</SelectItem>
+                  </SelectContent>
                 </Select>
               </FormItem>
             )}

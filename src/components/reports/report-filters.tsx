@@ -4,7 +4,7 @@ import * as React from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectPortal, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 
@@ -71,15 +71,13 @@ export function ReportFilters({
               <SelectTrigger>
                 <SelectValue placeholder="Select a month" />
               </SelectTrigger>
-              <SelectPortal>
-                <SelectContent position="popper" className="max-h-60 overflow-y-auto">
-                  {months.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </SelectPortal>
+              <SelectContent position="popper" className="max-h-60 overflow-y-auto">
+                {months.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-2">
@@ -88,15 +86,13 @@ export function ReportFilters({
               <SelectTrigger>
                 <SelectValue placeholder="Select a year" />
               </SelectTrigger>
-              <SelectPortal>
-                <SelectContent position="popper" className="max-h-60 overflow-y-auto">
-                  {years.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </SelectPortal>
+              <SelectContent position="popper" className="max-h-60 overflow-y-auto">
+                {years.map((y) => (
+                  <SelectItem key={y} value={y}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
         </div>

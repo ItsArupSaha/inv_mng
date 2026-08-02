@@ -11,7 +11,6 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectPortal,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -74,31 +73,29 @@ export function StockWarningsTable({
                 <SelectTrigger className="w-[140px] h-9 text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectPortal>
-                  <SelectContent position="popper">
-                    <SelectItem value="1" className="text-xs">
-                      Below 1 unit
-                    </SelectItem>
-                    <SelectItem value="2" className="text-xs">
-                      Below 2 units
-                    </SelectItem>
-                    <SelectItem value="3" className="text-xs">
-                      Below 3 units
-                    </SelectItem>
-                    <SelectItem value="4" className="text-xs">
-                      Below 4 units
-                    </SelectItem>
-                    <SelectItem value="5" className="text-xs">
-                      Below 5 units
-                    </SelectItem>
-                    <SelectItem value="10" className="text-xs">
-                      Below 10 units
-                    </SelectItem>
-                    <SelectItem value="20" className="text-xs">
-                      Below 20 units
-                    </SelectItem>
-                  </SelectContent>
-                </SelectPortal>
+                <SelectContent position="popper">
+                  <SelectItem value="1" className="text-xs">
+                    Below 1 unit
+                  </SelectItem>
+                  <SelectItem value="2" className="text-xs">
+                    Below 2 units
+                  </SelectItem>
+                  <SelectItem value="3" className="text-xs">
+                    Below 3 units
+                  </SelectItem>
+                  <SelectItem value="4" className="text-xs">
+                    Below 4 units
+                  </SelectItem>
+                  <SelectItem value="5" className="text-xs">
+                    Below 5 units
+                  </SelectItem>
+                  <SelectItem value="10" className="text-xs">
+                    Below 10 units
+                  </SelectItem>
+                  <SelectItem value="20" className="text-xs">
+                    Below 20 units
+                  </SelectItem>
+                </SelectContent>
               </Select>
             </div>
 
@@ -112,18 +109,16 @@ export function StockWarningsTable({
                 <SelectTrigger className="w-[160px] h-9 text-xs">
                   <SelectValue placeholder="All Companies" />
                 </SelectTrigger>
-                <SelectPortal>
-                  <SelectContent position="popper">
-                    <SelectItem value="all" className="text-xs">
-                      All Companies
+                <SelectContent position="popper">
+                  <SelectItem value="all" className="text-xs">
+                    All Companies
+                  </SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company} value={company} className="text-xs">
+                      {company}
                     </SelectItem>
-                    {companies.map((company) => (
-                      <SelectItem key={company} value={company} className="text-xs">
-                        {company}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </SelectPortal>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
 

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectPortal, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
@@ -49,38 +49,36 @@ export function SaleItemRow({
                     <SelectValue placeholder="Select an item" />
                   </SelectTrigger>
                 </FormControl>
-                <SelectPortal>
-                  <SelectContent className="max-h-60 overflow-y-auto">
-                    {items.map(item => {
-                      const now = new Date();
-                      const oneMonthFromNow = new Date();
-                      oneMonthFromNow.setDate(now.getDate() + 30);
-                      const isExpired = item.expiryDate && new Date(item.expiryDate) <= now;
-                      const isExpiringSoon = item.expiryDate && !isExpired && new Date(item.expiryDate) <= oneMonthFromNow;
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  {items.map(item => {
+                    const now = new Date();
+                    const oneMonthFromNow = new Date();
+                    oneMonthFromNow.setDate(now.getDate() + 30);
+                    const isExpired = item.expiryDate && new Date(item.expiryDate) <= now;
+                    const isExpiringSoon = item.expiryDate && !isExpired && new Date(item.expiryDate) <= oneMonthFromNow;
 
-                      const details = [
-                        item.company,
-                        item.medicineGroup,
-                        `Stock: ${item.stock}`,
-                        isExpired ? 'EXPIRED' : isExpiringSoon ? 'EXPIRING SOON' : null
-                      ].filter(Boolean).join(' - ');
+                    const details = [
+                      item.company,
+                      item.medicineGroup,
+                      `Stock: ${item.stock}`,
+                      isExpired ? 'EXPIRED' : isExpiringSoon ? 'EXPIRING SOON' : null
+                    ].filter(Boolean).join(' - ');
 
-                      const label = details ? `${item.title} (${details})` : item.title;
+                    const label = details ? `${item.title} (${details})` : item.title;
 
-                      return (
-                        <SelectItem
-                          key={item.id}
-                          value={item.id}
-                          disabled={watchItems.some((i, itemIndex) => i.itemId === item.id && itemIndex !== index)}
-                        >
-                          <span className={cn(isExpired ? 'text-destructive font-semibold' : isExpiringSoon ? 'text-amber-600 font-semibold' : '')}>
-                            {label}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </SelectPortal>
+                    return (
+                      <SelectItem
+                        key={item.id}
+                        value={item.id}
+                        disabled={watchItems.some((i, itemIndex) => i.itemId === item.id && itemIndex !== index)}
+                      >
+                        <span className={cn(isExpired ? 'text-destructive font-semibold' : isExpiringSoon ? 'text-amber-600 font-semibold' : '')}>
+                          {label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
