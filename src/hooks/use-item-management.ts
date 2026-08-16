@@ -27,7 +27,6 @@ export function useItemManagement(userId: string) {
 
   // Load inventory lists
   const loadData = React.useCallback(async () => {
-    setIsInitialLoading(true);
     try {
       const allItemsData = await getItems(userId);
       setAllItems(allItemsData);
