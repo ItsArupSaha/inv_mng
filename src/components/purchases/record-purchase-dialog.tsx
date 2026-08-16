@@ -44,7 +44,6 @@ export function RecordPurchaseDialog({
     fields,
     remove,
     isPending,
-    storeType,
     onSubmit,
     handleAddItem,
     existingItems,
@@ -71,9 +70,7 @@ export function RecordPurchaseDialog({
           <DialogDescription>
             {editingPurchase
               ? 'Update the purchase details. Stock levels and financial transactions will reconcile automatically.'
-              : storeType === 'pharmacy'
-              ? 'Enter company details and the items purchased. New items will be created automatically.'
-              : 'Enter supplier details and the items purchased. New items will be created automatically.'}
+              : 'Enter company details and the items purchased. New items will be created automatically.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -86,7 +83,6 @@ export function RecordPurchaseDialog({
                 <SupplierFormFields
                   form={form}
                   existingItems={existingItems || []}
-                  storeType={storeType}
                 />
                 <Separator />
 

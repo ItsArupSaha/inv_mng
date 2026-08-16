@@ -27,7 +27,6 @@ export function useItemFilters({ allItems }: UseItemFiltersProps) {
         (item) =>
           item.title.toLowerCase().includes(qLower) ||
           item.categoryName.toLowerCase().includes(qLower) ||
-          (item.author && item.author.toLowerCase().includes(qLower)) ||
           (item.medicineGroup && item.medicineGroup.toLowerCase().includes(qLower)) ||
           (item.company && item.company.toLowerCase().includes(qLower))
       );
@@ -37,7 +36,6 @@ export function useItemFilters({ allItems }: UseItemFiltersProps) {
           (item) =>
             isFuzzyMatch(item.title, q) ||
             isFuzzyMatch(item.categoryName, q) ||
-            (item.author && isFuzzyMatch(item.author, q)) ||
             (item.medicineGroup && isFuzzyMatch(item.medicineGroup, q)) ||
             (item.company && isFuzzyMatch(item.company, q))
         );

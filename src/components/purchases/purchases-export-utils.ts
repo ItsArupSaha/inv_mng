@@ -101,7 +101,6 @@ export async function downloadPurchasesXlsx(userId: string, dateRange: DateRange
         'Supplier': p.supplier,
         'Item Name': i.itemName,
         'Category': i.categoryName,
-        'Author': i.author || '',
         'Quantity': i.quantity,
         'Unit Cost': i.cost,
         'Total Cost': i.quantity * i.cost,

@@ -3,7 +3,6 @@ import * as z from 'zod';
 export const itemSchema = z.object({
   title: z.string().min(1, 'Name is required'),
   categoryId: z.string().min(1, 'Category is required'),
-  author: z.string().optional(),
   medicineGroup: z.string().optional(),
   company: z.string().optional(),
   expiryDate: z.string().optional(),

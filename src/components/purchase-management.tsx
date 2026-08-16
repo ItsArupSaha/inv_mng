@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getCategories, getPurchasesPaginated } from '@/lib/actions';
 import type { Category, Purchase } from '@/lib/types';
-import { AddOfficeAssetDialog } from './add-office-asset-dialog';
 import { PurchasesTable } from './purchases/purchases-table';
 import { RecordPurchaseDialog } from './purchases/record-purchase-dialog';
 import { AddCategoryDialog } from './items/add-category-dialog';
@@ -89,11 +88,6 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
               >
                 <PlusCircle className="mr-2 h-4 w-4" /> Record New Purchase
               </Button>
-              <AddOfficeAssetDialog userId={userId} onAssetAdded={loadInitialData}>
-                <Button variant="outline" className="w-full sm:w-auto">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Office Asset
-                </Button>
-              </AddOfficeAssetDialog>
               <DownloadPurchasesDialog userId={userId} authUser={authUser} />
             </div>
           </div>

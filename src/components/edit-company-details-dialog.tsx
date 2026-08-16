@@ -48,7 +48,7 @@ export function EditCompanyDetailsDialog({ user, children }: EditCompanyDetailsD
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 py-1">
-              <CompanyBaseFields form={form} user={user} />
+              <CompanyBaseFields form={form} />
               <Separator />
               <CompanyCapitalAdjustment
                 form={form}

@@ -8,11 +8,64 @@ import {
   getDocs,
   query,
   runTransaction,
-  where
+  where,
+  type CollectionReference,
+  type Transaction
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
-import type { Metadata, Purchase, Item } from '../types';
+import type { Metadata, Purchase, PurchaseItem } from '../types';
+import { resolveIsSalable } from '../item-flags';
+import {
+  computePurchaseTotals,
+  planPurchaseSettlements,
+  reconcileItemState,
+  type SettlementWrite
+} from './purchase-calculation';
+
+function itemKey(item: { itemName: string; expiryDate?: string }): string {
+  return `${item.itemName.trim()}||${item.expiryDate || ''}`;
+}
+
+/**
+ * Ledger docs written since the `purchaseId` field existed link back by exact
+ * field equality. Older docs are matched against the exact description
+ * templates historically written for this purchase — equality, never
+ * substring, so PUR-00001 entries can never attach to PUR-0001.
+ */
+function makePurchaseLedgerMatcher(purchaseId: string, suppliers: string[]) {
+  const legacyDescriptions = new Set<string>([
+    `Payment for Purchase ${purchaseId}`,
+    `Partial payment for Purchase ${purchaseId}`,
+  ]);
+  for (const supplier of suppliers) {
+    legacyDescriptions.add(`Purchase ${purchaseId} from ${supplier}`);
+    legacyDescriptions.add(`Balance for Purchase ${purchaseId} from ${supplier}`);
+  }
+
+  return (data: { purchaseId?: string; description?: string }): boolean =>
+    data.purchaseId === purchaseId || legacyDescriptions.has(data.description || '');
+}
+
+function applySettlementWrite(
+  transaction: Transaction,
+  write: SettlementWrite,
+  expensesCollection: CollectionReference,
+  transactionsCollection: CollectionReference,
+  dueDate: Date
+) {
+  if (write.kind === 'expense') {
+    transaction.set(doc(expensesCollection), {
+      ...write.data,
+      date: Timestamp.fromDate(new Date()),
+    });
+  } else {
+    transaction.set(doc(transactionsCollection), {
+      ...write.data,
+      dueDate: Timestamp.fromDate(dueDate),
+    });
+  }
+}
 
 export async function updatePurchase(
   userId: string,
@@ -25,43 +78,42 @@ export async function updatePurchase(
       const userRef = doc(db, 'users', userId);
       const purchasesCollection = collection(userRef, 'purchases');
       const purchaseRef = doc(purchasesCollection, purchaseDocId);
-      
+
       const oldPurchaseSnap = await getDoc(purchaseRef);
       if (!oldPurchaseSnap.exists()) {
           return { success: false, error: 'Purchase not found' };
       }
-      
+
       const oldPurchase = oldPurchaseSnap.data() as Purchase;
       const purchaseId = oldPurchase.purchaseId;
-      
-      // Query related expenses
+      const isPurchaseLedgerDoc = makePurchaseLedgerMatcher(purchaseId, [
+        oldPurchase.supplier,
+        data.supplier,
+      ]);
+
+      // Query related expenses and payables
       const expensesCollection = collection(userRef, 'expenses');
       const expensesSnap = await getDocs(expensesCollection);
       const relatedExpenseRefs = expensesSnap.docs
-          .filter(docSnap => docSnap.data().description?.includes(purchaseId))
+          .filter(docSnap => isPurchaseLedgerDoc(docSnap.data()))
           .map(docSnap => docSnap.ref);
 
-      // Query related transactions
       const transactionsCollection = collection(userRef, 'transactions');
       const transactionsSnap = await getDocs(transactionsCollection);
       const relatedTransactionRefs = transactionsSnap.docs
-          .filter(docSnap => docSnap.data().description?.includes(purchaseId))
+          .filter(docSnap => isPurchaseLedgerDoc(docSnap.data()))
           .map(docSnap => docSnap.ref);
 
       // Find all items affected by either old or new purchase, keyed by title + expiry
       const itemsCollection = collection(userRef, 'items');
       const itemKeys = new Set<string>();
-      oldPurchase.items.forEach(item => {
-          itemKeys.add(`${item.itemName.trim()}||${item.expiryDate || ''}`);
-      });
-      data.items.forEach(item => {
-          itemKeys.add(`${item.itemName.trim()}||${item.expiryDate || ''}`);
-      });
+      oldPurchase.items.forEach(item => itemKeys.add(itemKey(item)));
+      data.items.forEach(item => itemKeys.add(itemKey(item)));
 
       const itemDocsMap: Record<string, { ref: any; data: any }> = {};
       for (const key of itemKeys) {
           const [name, expiryDate] = key.split('||');
-          let q = query(itemsCollection, where("title", "==", name));
+          let q: ReturnType<typeof query> = query(itemsCollection, where("title", "==", name));
           if (expiryDate) {
               q = query(itemsCollection, where("title", "==", name), where("expiryDate", "==", expiryDate));
           }
@@ -74,17 +126,12 @@ export async function updatePurchase(
           }
       }
 
-      // Calculate new purchase total, discount and VAT first
-      let totalAmount = 0;
-      for (const item of data.items) {
-          totalAmount += item.cost * item.quantity;
-      }
-      const discountAmount = data.discountAmount || 0;
-      const vatType = data.vatType || 'amount';
-      const vatValue = data.vatValue || 0;
-      const vatAmount = vatType === 'percentage' ? (totalAmount * vatValue) / 100 : vatValue;
-      const finalAmount = totalAmount + vatAmount - discountAmount;
-      const factor = totalAmount > 0 ? (totalAmount + vatAmount - discountAmount) / totalAmount : 1;
+      const { totalAmount, vatAmount, finalAmount, factor } = computePurchaseTotals({
+          items: data.items,
+          discountAmount: data.discountAmount,
+          vatType: data.vatType,
+          vatValue: data.vatValue,
+      });
 
       const result = await runTransaction(db, async (transaction) => {
           const metadataRef = doc(userRef, 'metadata', 'counters');
@@ -102,78 +149,43 @@ export async function updatePurchase(
               }
           }
 
-          // Calculate intermediate state (after subtracting old purchase quantities & value)
-          const intermediateItems: Record<string, { stock: number; totalValue: number }> = {};
-          for (const key of itemKeys) {
-              const currentData = currentItemDataMap[key];
-              if (currentData) {
-                  const stock = Number(currentData.stock) || 0;
-                  const price = Number(currentData.productionPrice) || 0;
-                  intermediateItems[key] = {
-                      stock,
-                      totalValue: stock * price,
-                  };
-              } else {
-                  intermediateItems[key] = {
-                      stock: 0,
-                      totalValue: 0,
-                  };
-              }
-          }
-
+          // For each affected key, reconcile stock/cost against old and new invoice lines
+          const oldItemsByKey: Record<string, PurchaseItem[]> = {};
           for (const oldItem of oldPurchase.items) {
-              const key = `${oldItem.itemName.trim()}||${oldItem.expiryDate || ''}`;
-              const state = intermediateItems[key];
-              if (state) {
-                  const oldTotal = oldItem.quantity * oldItem.cost;
-                  state.stock = Math.max(0, state.stock - oldItem.quantity);
-                  state.totalValue = Math.max(0, state.totalValue - oldTotal);
-              }
+              const key = itemKey(oldItem);
+              (oldItemsByKey[key] ||= []).push(oldItem);
           }
 
-          // Apply new purchase quantities & value to the intermediate state
-          for (const newItem of data.items) {
-              const key = `${newItem.itemName.trim()}||${newItem.expiryDate || ''}`;
-              const state = intermediateItems[key];
-              const capitalizedCost = newItem.cost * factor;
-              if (state) {
-                  const newTotal = newItem.quantity * capitalizedCost;
-                  state.stock += newItem.quantity;
-                  state.totalValue += newTotal;
-              } else {
-                  intermediateItems[key] = {
-                      stock: newItem.quantity,
-                      totalValue: newItem.quantity * capitalizedCost,
-                  };
-              }
-          }
-
-          // Update items in database
           for (const key of itemKeys) {
               const [name, expiryDate] = key.split('||');
-              const state = intermediateItems[key];
-              const finalStock = state.stock;
-              const finalProductionPrice = finalStock > 0 ? state.totalValue / finalStock : 0;
+              const currentData = currentItemDataMap[key];
+              const oldLines = oldItemsByKey[key] || [];
+              const newLines = data.items.filter(i => itemKey(i) === key);
+
+              const reconciled = reconcileItemState(
+                  currentData ? (Number(currentData.stock) || 0) : 0,
+                  currentData ? (Number(currentData.productionPrice) || 0) : 0,
+                  oldLines.map(i => ({ quantity: i.quantity, cost: i.cost })),
+                  newLines.map(i => ({ quantity: i.quantity, cost: i.cost * factor }))
+              );
 
               const itemRef = itemDocsMap[key]?.ref;
-              const currentData = currentItemDataMap[key];
+              const newItem = newLines[0];
 
               if (itemRef && currentData) {
+                  const salable = resolveIsSalable({ isSalable: currentData.isSalable, categoryName: currentData.categoryName });
                   const updateData: any = {
-                      stock: finalStock,
-                      productionPrice: finalProductionPrice,
+                      stock: reconciled.stock,
+                      productionPrice: reconciled.productionPrice,
+                      isSalable: salable,
                       ignoredWarning: false
                   };
 
-                  const newItem = data.items.find(i => `${i.itemName.trim()}||${i.expiryDate || ''}` === key);
                   if (newItem) {
-                      const catNameLower = (newItem.categoryName || '').toLowerCase();
-                      const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
-                      if (isAssetOrSurgical) {
-                          updateData.sellingPrice = 0;
-                      } else if (newItem.sellingPrice && newItem.sellingPrice > 0) {
+                      if (salable && newItem.sellingPrice && newItem.sellingPrice > 0) {
                           updateData.sellingPrice = newItem.sellingPrice;
                       }
+                      if (!salable) updateData.sellingPrice = 0;
                       if (newItem.medicineGroup) updateData.medicineGroup = newItem.medicineGroup;
                       if (newItem.company) updateData.company = newItem.company;
                       if (newItem.expiryDate) updateData.expiryDate = newItem.expiryDate;
@@ -181,35 +193,29 @@ export async function updatePurchase(
                   }
 
                   transaction.update(itemRef, updateData);
-              } else {
-                  const newItem = data.items.find(i => `${i.itemName.trim()}||${i.expiryDate || ''}` === key);
-                  if (newItem) {
-                      const newItemRef = doc(itemsCollection);
-                      const capitalizedCost = newItem.cost * factor;
-                      const catNameLower = (newItem.categoryName || '').toLowerCase();
-                      const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
-                      const sellingPrice = isAssetOrSurgical ? 0 : (newItem.sellingPrice && newItem.sellingPrice > 0 ? newItem.sellingPrice : capitalizedCost * 1.5);
-                      const newItemData: any = {
-                          title: name,
-                          categoryId: newItem.categoryId,
-                          categoryName: newItem.categoryName,
-                          stock: finalStock,
-                          productionPrice: finalProductionPrice,
-                          sellingPrice: sellingPrice,
-                          ignoredWarning: false
-                      };
-                      if (newItem.author) {
-                          newItemData.author = newItem.author;
-                      } else if (newItem.categoryName === 'Book') {
-                          newItemData.author = 'Unknown';
-                      }
-                      if (newItem.medicineGroup) newItemData.medicineGroup = newItem.medicineGroup;
-                      if (newItem.company) newItemData.company = newItem.company;
-                      if (newItem.expiryDate) newItemData.expiryDate = newItem.expiryDate;
-                      if (newItem.location) newItemData.location = newItem.location;
+              } else if (newItem) {
+                  const newItemRef = doc(itemsCollection);
+                  const capitalizedCost = newItem.cost * factor;
+                  const salable = resolveIsSalable({ categoryName: newItem.categoryName });
+                  const sellingPrice = salable
+                    ? (newItem.sellingPrice && newItem.sellingPrice > 0 ? newItem.sellingPrice : capitalizedCost * 1.5)
+                    : 0;
+                  const newItemData: any = {
+                      title: name,
+                      categoryId: newItem.categoryId,
+                      categoryName: newItem.categoryName,
+                      stock: reconciled.stock,
+                      productionPrice: reconciled.productionPrice,
+                      sellingPrice: sellingPrice,
+                      isSalable: salable,
+                      ignoredWarning: false
+                  };
+                  if (newItem.medicineGroup) newItemData.medicineGroup = newItem.medicineGroup;
+                  if (newItem.company) newItemData.company = newItem.company;
+                  if (newItem.expiryDate) newItemData.expiryDate = newItem.expiryDate;
+                  if (newItem.location) newItemData.location = newItem.location;
 
-                      transaction.set(newItemRef, newItemData);
-                  }
+                  transaction.set(newItemRef, newItemData);
               }
           }
 
@@ -229,68 +235,30 @@ export async function updatePurchase(
               date: oldPurchase.date, // keep original date
               dueDate: Timestamp.fromDate(new Date(data.dueDate)),
               totalAmount,
-              discountAmount,
-              vatType,
-              vatValue,
+              discountAmount: data.discountAmount || 0,
+              vatType: data.vatType || 'amount',
+              vatValue: data.vatValue || 0,
               vatAmount,
           };
           transaction.set(purchaseRef, purchaseData);
 
-          // Generate new expense or transaction if needed
-          let lastExpenseNumber = (metadataDoc.data() as Metadata)?.lastExpenseNumber || 0;
-          if (finalAmount > 0) {
-              if (data.paymentMethod === 'Cash' || data.paymentMethod === 'Bank') {
-                  lastExpenseNumber += 1;
-                  const expenseId = `EXP-${String(lastExpenseNumber).padStart(4, '0')}`;
-                  const expenseData = {
-                      expenseId,
-                      description: `Payment for Purchase ${purchaseId}`,
-                      amount: finalAmount,
-                      date: Timestamp.fromDate(new Date()),
-                      paymentMethod: data.paymentMethod,
-                  };
-                  transaction.set(doc(expensesCollection), expenseData);
-              } else if (data.paymentMethod === 'Split') {
-                  const amountPaid = data.amountPaid || 0;
-                  const payableAmount = finalAmount - amountPaid;
-
-                  if (amountPaid > 0) {
-                      lastExpenseNumber += 1;
-                      const expenseId = `EXP-${String(lastExpenseNumber).padStart(4, '0')}`;
-                      const expenseData = {
-                          expenseId,
-                          description: `Partial payment for Purchase ${purchaseId}`,
-                          amount: amountPaid,
-                          date: Timestamp.fromDate(new Date()),
-                          paymentMethod: data.splitPaymentMethod,
-                      };
-                      transaction.set(doc(expensesCollection), expenseData);
-                  }
-
-                  if (payableAmount > 0) {
-                      const payableData = {
-                          description: `Balance for Purchase ${purchaseId} from ${data.supplier}`,
-                          amount: payableAmount,
-                          dueDate: Timestamp.fromDate(new Date(data.dueDate)),
-                          status: 'Pending' as const,
-                          type: 'Payable' as const,
-                      };
-                      transaction.set(doc(transactionsCollection), payableData);
-                  }
-              } else if (data.paymentMethod === 'Due') {
-                  const payableData = {
-                      description: `Purchase ${purchaseId} from ${data.supplier}`,
-                      amount: finalAmount,
-                      dueDate: Timestamp.fromDate(new Date(data.dueDate)),
-                      status: 'Pending' as const,
-                      type: 'Payable' as const,
-                      };
-                  transaction.set(doc(transactionsCollection), payableData);
-              }
+          // Regenerate expense/payable writes for the edited purchase
+          const nextExpenseNumber = (metadataDoc.data() as Metadata)?.lastExpenseNumber || 0;
+          const settlement = planPurchaseSettlements({
+              purchaseId,
+              supplier: data.supplier,
+              finalAmount,
+              paymentMethod: data.paymentMethod,
+              amountPaid: data.amountPaid,
+              splitPaymentMethod: data.splitPaymentMethod,
+              nextExpenseNumber,
+          });
+          for (const write of settlement.writes) {
+              applySettlementWrite(transaction, write, expensesCollection, transactionsCollection, new Date(data.dueDate));
           }
 
-          if (lastExpenseNumber > ((metadataDoc.data() as Metadata)?.lastExpenseNumber || 0)) {
-              transaction.set(metadataRef, { lastExpenseNumber }, { merge: true });
+          if (settlement.lastExpenseNumber > nextExpenseNumber) {
+              transaction.set(metadataRef, { lastExpenseNumber: settlement.lastExpenseNumber }, { merge: true });
           }
 
           return { success: true };

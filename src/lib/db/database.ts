@@ -34,7 +34,7 @@ export async function initializeNewUser(userId: string) {
   // Create metadata for counters
   const metadataCollection = collection(userDocRef, 'metadata');
   const countersRef = doc(metadataCollection, 'counters');
-  batch.set(countersRef, { lastPurchaseNumber: 0, lastSaleNumber: 0, lastReturnNumber: 0, lastExpenseNumber: 0, lastDonationNumber: 0 });
+  batch.set(countersRef, { lastPurchaseNumber: 0, lastSaleNumber: 0, lastReturnNumber: 0, lastExpenseNumber: 0 });
   
   // Mark user as initialized (but onboarding not yet complete)
   batch.set(userDocRef, { initialized: true }, { merge: true });
@@ -48,7 +48,7 @@ export async function completeOnboarding(userId: string, data: any) {
   if (!db || !userId) return;
 
   const userDocRef = doc(db, 'users', userId);
-  
+
   // 1. Update user document with company info and mark onboarding as complete
   const userData: Partial<AuthUser> = {
     companyName: data.companyName,
@@ -58,17 +58,12 @@ export async function completeOnboarding(userId: string, data: any) {
     bkashNumber: data.bkashNumber,
     bankInfo: data.bankInfo,
     onboardingComplete: true,
-    storeType: data.storeType || 'general',
   };
-
-  if (data.secretKey) {
-    userData.secretKey = data.secretKey;
-  }
 
   await updateDoc(userDocRef, userData);
 
-  // Initialize default categories based on store type
-  await initializeDefaultCategories(userId, data.storeType || 'general');
+  // Initialize default pharmacy categories
+  await initializeDefaultCategories(userId);
 
   // 2. Record initial capital into a dedicated 'capital' collection
   const capitalCollection = collection(userDocRef, 'capital');
@@ -102,52 +97,20 @@ export async function completeOnboarding(userId: string, data: any) {
 export async function updateCompanyDetails(userId: string, data: Partial<AuthUser>) {
     if (!db || !userId) return;
     const userDocRef = doc(db, 'users', userId);
-    
-    // Construct the data object with only the fields we want to update
-    const updateData: { [key: string]: any } = {};
+
+    const updateData: Partial<AuthUser> = {};
     if (data.companyName) updateData.companyName = data.companyName;
     if (data.subtitle !== undefined) updateData.subtitle = data.subtitle;
     if (data.address) updateData.address = data.address;
     if (data.phone) updateData.phone = data.phone;
     if (data.bkashNumber !== undefined) updateData.bkashNumber = data.bkashNumber;
     if (data.bankInfo !== undefined) updateData.bankInfo = data.bankInfo;
-    // Only add secretKey to the update object if it's provided.
-    // The UI should prevent this from being sent if a key already exists.
-    if (data.secretKey) updateData.secretKey = data.secretKey;
 
     await updateDoc(userDocRef, updateData);
     revalidatePath('/dashboard', 'layout');
 }
 
-
-// --- Database Seeding/Resetting for a specific user ---
-export async function resetDatabase(userId: string) {
-  if (!db || !userId) {
-    console.warn('Firebase not configured or no user ID provided. Database reset skipped.');
-    return;
-  }
-  console.log(`Starting database reset for user: ${userId}`);
-
-  const userRef = doc(db, 'users', userId);
-  const batch = writeBatch(db);
-
-          const collectionsToDelete = ['items', 'customers', 'sales', 'sales_returns', 'expenses', 'transactions', 'purchases', 'donations', 'capital', 'metadata'];
-  for (const coll of collectionsToDelete) {
-    const snapshot = await getDocs(collection(userRef, coll));
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
-  }
-  
-  await batch.commit();
-  console.log(`All collections cleared for user: ${userId}`);
-  
-  // Re-initialize with the empty state + walk-in customer
-  await initializeNewUser(userId);
-  console.log(`Database reset and re-initialized for user: ${userId}`);
-
-  // Revalidate all paths
-  const paths = ['/dashboard', '/books', '/customers', '/sales', '/sales-returns', '/expenses', '/payables', '/purchases'];
-  paths.forEach(path => revalidatePath(path));
-}
+// --- Database Summary ---
 
 // Get the summed initial capital
 export async function getInitialCapital(userId: string): Promise<InitialCapital> {

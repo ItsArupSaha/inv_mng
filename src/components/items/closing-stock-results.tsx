@@ -30,12 +30,9 @@ export function ClosingStockResults({
   onDownloadXlsx,
   onClear
 }: ClosingStockResultsProps) {
-  const { authUser } = useAuth();
-  const storeType = authUser?.storeType || 'general';
-
   if (closingStockData.length === 0) return null;
 
-  const detailHeader = storeType === 'pharmacy' ? 'Group (Generic)' : storeType === 'bookstore' ? 'Author' : 'Author/Group';
+  const detailHeader = 'Group (Generic)';
 
   return (
     <div className="mb-6">
@@ -62,7 +59,7 @@ export function ClosingStockResults({
                 <TableCell className="font-medium">{item.title}</TableCell>
                 <TableCell>{item.categoryName}</TableCell>
                 <TableCell>
-                  {storeType === 'pharmacy' ? (item.medicineGroup || '-') : storeType === 'bookstore' ? (item.author || '-') : (item.author || item.medicineGroup || '-')}
+                  {item.medicineGroup || '-'}
                 </TableCell>
                 <TableCell>{item.company || '-'}</TableCell>
                 <TableCell>

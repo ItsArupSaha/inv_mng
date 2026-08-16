@@ -14,13 +14,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 
 interface OnboardingFormProps {
@@ -39,32 +32,10 @@ export function OnboardingForm({ form, isSubmitting, onSubmit }: OnboardingFormP
             name="companyName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Store / Company Name</FormLabel>
+                <FormLabel>Pharmacy Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., MediCare Pharmacy, General Mart" {...field} />
+                  <Input placeholder="e.g., MediCare Pharmacy" {...field} />
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="storeType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Store Type</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select business type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="general">General Shop / Inventory</SelectItem>
-                    <SelectItem value="pharmacy">Pharmacy / Medical Shop</SelectItem>
-                    <SelectItem value="bookstore">Book Store</SelectItem>
-                  </SelectContent>
-                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -138,21 +109,6 @@ export function OnboardingForm({ form, isSubmitting, onSubmit }: OnboardingFormP
                 <Textarea placeholder="e.g., Bank Name, Account Number" {...field} />
               </FormControl>
               <FormDescription>This can be useful for your records and reports.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="secretKey"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Secret Key (Optional)</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="Your secret key" {...field} />
-              </FormControl>
-              <FormDescription>This key will be used for future integrations.</FormDescription>
               <FormMessage />
             </FormItem>
           )}

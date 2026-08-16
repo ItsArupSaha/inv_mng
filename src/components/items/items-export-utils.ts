@@ -10,7 +10,6 @@ interface AuthUserProps {
   phone?: string;
   bkashNumber?: string;
   bankInfo?: string;
-  storeType?: string;
 }
 
 export function exportClosingStockPdf(
@@ -49,8 +48,7 @@ export function exportClosingStockPdf(
   doc.text(`As of ${dateString}`, 105, 51, { align: 'center' });
   doc.setTextColor(0);
 
-  const storeType = authUser.storeType || 'general';
-  const detailHeader = storeType === 'pharmacy' ? 'Group (Generic)' : storeType === 'bookstore' ? 'Author' : 'Author/Group';
+  const detailHeader = 'Group (Generic)';
 
   autoTable(doc, {
     startY: 60,
@@ -58,7 +56,7 @@ export function exportClosingStockPdf(
     body: closingStockData.map(item => [
       item.title,
       item.categoryName,
-      storeType === 'pharmacy' ? (item.medicineGroup || '-') : storeType === 'bookstore' ? (item.author || '-') : (item.author || item.medicineGroup || '-'),
+      item.medicineGroup || '-',
       item.company || '-',
       item.expiryDate || '-',
       item.productionPrice.toFixed(2),
@@ -72,18 +70,16 @@ export function exportClosingStockPdf(
 
 export function exportClosingStockXlsx(
   closingStockData: ClosingStock[],
-  closingStockDate: Date,
-  storeType?: string
+  closingStockDate: Date
 ) {
   if (!closingStockData.length || !closingStockDate) return;
 
-  const currentStoreType = storeType || 'general';
-  const detailHeader = currentStoreType === 'pharmacy' ? 'Group (Generic)' : currentStoreType === 'bookstore' ? 'Author' : 'Author/Group';
+  const detailHeader = 'Group (Generic)';
 
   const dataToExport = closingStockData.map(item => ({
     Title: item.title,
     Category: item.categoryName,
-    [detailHeader]: currentStoreType === 'pharmacy' ? (item.medicineGroup || '-') : currentStoreType === 'bookstore' ? (item.author || '-') : (item.author || item.medicineGroup || '-'),
+    [detailHeader]: item.medicineGroup || '-',
     Company: item.company || '-',
     'Expiry Date': item.expiryDate || '-',
     'Production Price': item.productionPrice,

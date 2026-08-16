@@ -10,7 +10,6 @@ interface UsePurchaseAutofillProps {
   isOpen: boolean;
   userId: string;
   categories: Category[];
-  storeType: string;
 }
 
 export function usePurchaseAutofill({
@@ -18,7 +17,6 @@ export function usePurchaseAutofill({
   isOpen,
   userId,
   categories,
-  storeType,
 }: UsePurchaseAutofillProps) {
   const [existingItems, setExistingItems] = React.useState<any[]>([]);
 
@@ -69,19 +67,14 @@ export function usePurchaseAutofill({
     if (isOpen && categories.length > 0) {
       const items = form.getValues('items');
       if (items && items.length === 1 && !items[0].categoryId) {
-        const defaultCategory = categories.find((c) => {
-          const name = c.name.toLowerCase();
-          if (storeType === 'pharmacy') return name.includes('medicine');
-          if (storeType === 'bookstore') return name.includes('book');
-          return false;
-        });
+        const defaultCategory = categories.find((c) => c.name.toLowerCase().includes('medicine'));
         if (defaultCategory) {
           form.setValue('items.0.categoryId', defaultCategory.id);
           form.setValue('items.0.categoryName', defaultCategory.name);
         }
       }
     }
-  }, [isOpen, categories, storeType, form]);
+  }, [isOpen, categories, form]);
 
   return {
     existingItems,

@@ -3,28 +3,16 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/use-auth';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { authUser } = useAuth();
-
-  const storeType = authUser?.storeType || 'general';
 
   // Dynamic Page Title resolution based on current path
   const pageTitle = React.useMemo(() => {
     const matched = [
       { href: '/sales', label: 'Sell' },
-      {
-        href: '/items',
-        label:
-          storeType === 'pharmacy'
-            ? 'Items / Stocks'
-            : storeType === 'bookstore'
-            ? 'Books / Stocks'
-            : 'Items & Stocks',
-      },
+      { href: '/items', label: 'Medicines / Stocks' },
       { href: '/expenses', label: 'Expense' },
       { href: '/purchases', label: 'Purchase' },
       { href: '/expiry-alerts', label: 'Expiry Alerts' },
@@ -37,7 +25,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     ].find((item) => pathname.startsWith(item.href));
 
     return matched?.label || 'Sell';
-  }, [pathname, storeType]);
+  }, [pathname]);
 
   return (
     <SidebarProvider>

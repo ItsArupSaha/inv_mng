@@ -7,7 +7,7 @@ export type AuthUser = {
   photoURL: string | null;
   isApproved: boolean;
   createdAt: any; // Firestore Timestamp
-  
+
   // Onboarding fields
   companyName?: string;
   subtitle?: string;
@@ -16,8 +16,7 @@ export type AuthUser = {
   bkashNumber?: string;
   bankInfo?: string;
   onboardingComplete?: boolean;
-  secretKey?: string;
-  // New fields for initial capital
+  // Initial capital
   initialCash?: number;
   initialBank?: number;
   storeType?: 'general' | 'pharmacy' | 'bookstore';
@@ -49,15 +48,15 @@ export type Item = {
   title: string;
   categoryId: string;
   categoryName: string;
-  author?: string; // Optional, only for books
-  medicineGroup?: string; // Optional, only for medicines
-  company?: string; // Optional, only for medicines
-  expiryDate?: string; // Optional, only for medicines (stored as YYYY-MM-DD string)
+  medicineGroup?: string; // Generic / salt name
+  company?: string; // Manufacturer
+  expiryDate?: string; // Stored as YYYY-MM-DD string
   location?: string; // Optional shelf/row storage location
   productionPrice: number;
   sellingPrice: number;
   stock: number;
   ignoredWarning?: boolean;
+  isSalable?: boolean; // false for owned equipment (assets/surgicals); defaults true
 };
 
 export type ClosingStock = Item & {
@@ -107,7 +106,6 @@ export type PurchaseItem = {
     itemName: string;
     categoryId: string;
     categoryName: string;
-    author?: string;
     medicineGroup?: string;
     company?: string;
     expiryDate?: string;
@@ -142,16 +140,6 @@ export type Expense = {
   description: string;
   amount: number;
   paymentMethod?: 'Cash' | 'Bank';
-};
-
-export type Donation = {
-  id: string;
-  donationId: string; // The auto-generated ID like DON-0001
-  date: string;
-  donorName: string;
-  amount: number;
-  paymentMethod: 'Cash' | 'Bank';
-  notes?: string;
 };
 
 export type Capital = {
@@ -212,7 +200,6 @@ export type Metadata = {
   lastSaleNumber: number;
   lastReturnNumber: number;
   lastExpenseNumber: number;
-  lastDonationNumber: number;
 }
 
 export type PackageItem = {

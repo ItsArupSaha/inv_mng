@@ -12,12 +12,10 @@ import { useCapitalAdjustments } from './use-capital-adjustments';
 export const companyDetailsSchema = z.object({
   companyName: z.string().min(2, 'Company name must be at least 2 characters.'),
   subtitle: z.string().optional(),
-  storeType: z.enum(['general', 'pharmacy', 'bookstore']),
   address: z.string().min(5, 'Please enter a valid address.'),
   phone: z.string().min(5, 'Please enter a valid phone number.'),
   bkashNumber: z.string().optional(),
   bankInfo: z.string().optional(),
-  secretKey: z.string().optional(),
   cashAdjustment: z.coerce.number().optional(),
   bankAdjustment: z.coerce.number().optional(),
 });
@@ -41,12 +39,10 @@ export function useEditCompanyDetails({ user }: UseEditCompanyDetailsProps) {
     defaultValues: {
       companyName: user.companyName || '',
       subtitle: user.subtitle || '',
-      storeType: user.storeType || 'general',
       address: user.address || '',
       phone: user.phone || '',
       bkashNumber: user.bkashNumber || '',
       bankInfo: user.bankInfo || '',
-      secretKey: '',
       cashAdjustment: 0,
       bankAdjustment: 0,
     },
@@ -58,12 +54,10 @@ export function useEditCompanyDetails({ user }: UseEditCompanyDetailsProps) {
       form.reset({
         companyName: user.companyName || '',
         subtitle: user.subtitle || '',
-        storeType: user.storeType || 'general',
         address: user.address || '',
         phone: user.phone || '',
         bkashNumber: user.bkashNumber || '',
         bankInfo: user.bankInfo || '',
-        secretKey: '',
         cashAdjustment: 0,
         bankAdjustment: 0,
       });

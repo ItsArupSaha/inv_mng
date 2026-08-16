@@ -13,6 +13,8 @@ import {
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Item, Metadata, Sale, SaleItem } from '../types';
+import { resolveIsSalable } from '../item-flags';
+import { buildReceivable, computeSaleTotals } from './sale-calculation';
 import { docToSale } from './utils';
 
 export async function addSale(
@@ -41,9 +43,8 @@ export async function addSale(
         return { success: false, error: `Item with id ${data.items[i].itemId} does not exist.` };
       }
       const itemData = snap.data() as Item;
-      const catNameLower = (itemData.categoryName || '').toLowerCase();
-      if (catNameLower === 'assets' || catNameLower === 'surgicals') {
-        return { success: false, error: `Item "${itemData.title}" is an asset/surgical product and cannot be sold.` };
+      if (!resolveIsSalable(itemData)) {
+        return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
       }
     }
 
@@ -71,7 +72,6 @@ export async function addSale(
       const newSaleNumber = lastSaleNumber + 1;
       const saleId = `SALE-${String(newSaleNumber).padStart(4, '0')}`;
 
-      let calculatedSubtotal = 0;
       let totalProductionCost = 0;
       const itemsWithPrices: SaleItem[] = [];
 
@@ -98,36 +98,28 @@ export async function addSale(
         const itemProductionCost = (Number(itemState.data.productionPrice) || 0) * qtyRequested;
 
         stockUpdatesToMake.push({ ref: itemState.ref, newStock });
-        
+
         // Update local map state in case the same item is included multiple times
         itemState.data.stock = newStock;
         totalProductionCost += itemProductionCost;
-        
+
         // Price for this sale item
-        const price = saleItem.price !== undefined && saleItem.price !== null 
-          ? Number(saleItem.price) 
+        const price = saleItem.price !== undefined && saleItem.price !== null
+          ? Number(saleItem.price)
           : Number(itemState.data.sellingPrice || 0);
 
-        calculatedSubtotal += price * qtyRequested;
         itemsWithPrices.push({ ...saleItem, price });
       }
 
-      let discountAmount = 0;
-      if (data.discountType === 'percentage' && data.discountValue !== undefined) {
-        discountAmount = calculatedSubtotal * (data.discountValue / 100);
-      } else if (data.discountType === 'amount' && data.discountValue !== undefined) {
-        discountAmount = data.discountValue;
-      }
-      discountAmount = Math.min(calculatedSubtotal, discountAmount);
-
-      let totalAfterDiscount = calculatedSubtotal - discountAmount;
-      if (data.total !== undefined && data.total !== null && data.total >= 0) {
-        totalAfterDiscount = data.total;
-      }
-      const totalSaleProfit = totalAfterDiscount - totalProductionCost;
-
       const creditApplied = data.creditApplied || 0;
-      const finalTotal = totalAfterDiscount - creditApplied;
+      const { subtotal: calculatedSubtotal, totalAfterDiscount, finalTotal, totalSaleProfit } = computeSaleTotals({
+        items: itemsWithPrices,
+        totalProductionCost,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        totalOverride: data.total,
+        creditApplied,
+      });
 
       const newSaleRef = doc(salesCollection);
 
@@ -164,33 +156,22 @@ export async function addSale(
       }
 
       if (data.paymentMethod === 'Due' || data.paymentMethod === 'Split') {
-        let dueAmount = finalTotal;
-        let realizedProfit = 0;
+        const receivable = buildReceivable({
+          paymentMethod: data.paymentMethod,
+          amountPaid: data.amountPaid,
+          finalTotal,
+          totalSaleProfit,
+          creditApplied,
+          saleId,
+          customerId: data.customerId,
+        });
 
-        if (data.paymentMethod === 'Split' && data.amountPaid && data.amountPaid > 0) {
-          dueAmount = finalTotal - data.amountPaid;
-
-          if (finalTotal > 0) {
-            realizedProfit = totalSaleProfit * (data.amountPaid / finalTotal);
-          }
-        }
-
-        if (dueAmount > 0) {
-          finalDue += dueAmount;
-          const remainingProfit = totalSaleProfit - realizedProfit;
-
-          const receivableData = {
-            description: `Due from ${saleId}`,
-            amount: dueAmount,
+        if (receivable) {
+          finalDue += receivable.amount;
+          transaction.set(doc(transactionsCollection), {
+            ...receivable,
             dueDate: Timestamp.fromDate(new Date()),
-            status: 'Pending' as const,
-            type: 'Receivable' as const,
-            customerId: data.customerId,
-            saleId: saleId,
-            totalSaleProfit: totalSaleProfit,
-            remainingProfit: remainingProfit,
-          };
-          transaction.set(doc(transactionsCollection), receivableData);
+          });
         }
       }
 
@@ -334,9 +315,8 @@ export async function updateSale(
         continue;
       }
       const itemData = snap.data() as Item;
-      const catNameLower = (itemData.categoryName || '').toLowerCase();
-      if (catNameLower === 'assets' || catNameLower === 'surgicals') {
-        return { success: false, error: `Item "${itemData.title}" is an asset/surgical product and cannot be sold.` };
+      if (!resolveIsSalable(itemData)) {
+        return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
       }
     }
 
@@ -377,7 +357,6 @@ export async function updateSale(
       }
 
       // 2. Deduct stock from newSale.items strictly on the selected item IDs
-      let calculatedSubtotal = 0;
       let totalProductionCost = 0;
       const itemsWithPrices: SaleItem[] = [];
 
@@ -409,26 +388,18 @@ export async function updateSale(
             ? Number(saleItem.price)
             : Number(itemState.data.sellingPrice || 0);
 
-        calculatedSubtotal += price * qtyRequested;
         itemsWithPrices.push({ ...saleItem, price });
       }
 
-      let discountAmount = 0;
-      if (data.discountType === 'percentage' && data.discountValue !== undefined) {
-        discountAmount = calculatedSubtotal * (data.discountValue / 100);
-      } else if (data.discountType === 'amount' && data.discountValue !== undefined) {
-        discountAmount = data.discountValue;
-      }
-      discountAmount = Math.min(calculatedSubtotal, discountAmount);
-
-      let totalAfterDiscount = calculatedSubtotal - discountAmount;
-      if (data.total !== undefined && data.total !== null && data.total >= 0) {
-        totalAfterDiscount = data.total;
-      }
-      const totalSaleProfit = totalAfterDiscount - totalProductionCost;
-
       const creditApplied = data.creditApplied || 0;
-      const finalTotal = totalAfterDiscount - creditApplied;
+      const { subtotal: calculatedSubtotal, totalAfterDiscount, finalTotal, totalSaleProfit } = computeSaleTotals({
+        items: itemsWithPrices,
+        totalProductionCost,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        totalOverride: data.total,
+        creditApplied,
+      });
 
       // 4. Adjust customer due balances
       if (oldCustomerDoc.exists()) {
@@ -473,30 +444,21 @@ export async function updateSale(
 
       // 6. Create new receivable transaction if Due or Split
       if (data.paymentMethod === 'Due' || data.paymentMethod === 'Split') {
-        let dueAmount = finalTotal;
-        let realizedProfit = 0;
+        const receivable = buildReceivable({
+          paymentMethod: data.paymentMethod,
+          amountPaid: data.amountPaid,
+          finalTotal,
+          totalSaleProfit,
+          creditApplied,
+          saleId: oldSale.saleId,
+          customerId: data.customerId,
+        });
 
-        if (data.paymentMethod === 'Split' && data.amountPaid && data.amountPaid > 0) {
-          dueAmount = finalTotal - data.amountPaid;
-          if (finalTotal > 0) {
-            realizedProfit = totalSaleProfit * (data.amountPaid / finalTotal);
-          }
-        }
-
-        if (dueAmount > 0) {
-          const remainingProfit = totalSaleProfit - realizedProfit;
-          const receivableData = {
-            description: `Due from ${oldSale.saleId}`,
-            amount: dueAmount,
+        if (receivable) {
+          transaction.set(doc(transactionsCollection), {
+            ...receivable,
             dueDate: Timestamp.fromDate(new Date()),
-            status: 'Pending' as const,
-            type: 'Receivable' as const,
-            customerId: data.customerId,
-            saleId: oldSale.saleId,
-            totalSaleProfit: totalSaleProfit,
-            remainingProfit: remainingProfit,
-          };
-          transaction.set(doc(transactionsCollection), receivableData);
+          });
         }
       }
 

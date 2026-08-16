@@ -43,7 +43,7 @@ export function useClosingStock({ userId, authUser }: UseClosingStockProps) {
 
   const handleDownloadClosingStockXlsx = () => {
     if (!closingStockDate) return;
-    exportClosingStockXlsx(closingStockData, closingStockDate, authUser?.storeType);
+    exportClosingStockXlsx(closingStockData, closingStockDate);
   };
 
   return {

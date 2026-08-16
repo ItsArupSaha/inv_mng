@@ -18,30 +18,18 @@ import {
 } from '@/components/ui/select';
 import type { Category } from '@/lib/types';
 import { PharmacyFormFields } from './pharmacy-form-fields';
-import { BookstoreFormFields } from './bookstore-form-fields';
-import { GeneralFormFields } from './general-form-fields';
 
 interface ItemFormFieldsProps {
   form: any;
-  storeType: string;
   categories: Category[];
   onAddCategoryClick: () => void;
-  showAdvanced: boolean;
-  setShowAdvanced: (show: boolean) => void;
 }
 
 export function ItemFormFields({
   form,
-  storeType,
   categories,
   onAddCategoryClick,
-  showAdvanced,
-  setShowAdvanced,
 }: ItemFormFieldsProps) {
-  const showAuthorDirectly = storeType === 'bookstore';
-  const showPharmaDirectly = storeType === 'pharmacy';
-  const showLocationDirectly = storeType === 'pharmacy' || storeType === 'bookstore';
-
   return (
     <>
       <div className="flex gap-2">
@@ -80,33 +68,21 @@ export function ItemFormFields({
         </Button>
       </div>
 
-      {showAuthorDirectly && <BookstoreFormFields form={form} />}
+      <PharmacyFormFields form={form} />
 
-      {showPharmaDirectly && <PharmacyFormFields form={form} />}
-
-      {showLocationDirectly && (
-        <FormField
-          control={form.control}
-          name="location"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{storeType === 'pharmacy' ? 'Shelf / Row Location' : 'Shelf Location'}</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g. Shelf A-3, Drawer 2" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      )}
-
-      {storeType === 'general' && (
-        <GeneralFormFields
-          form={form}
-          showAdvanced={showAdvanced}
-          setShowAdvanced={setShowAdvanced}
-        />
-      )}
+      <FormField
+        control={form.control}
+        name="location"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Shelf / Row Location</FormLabel>
+            <FormControl>
+              <Input placeholder="e.g. Shelf A-3, Drawer 2" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </>
   );
 }

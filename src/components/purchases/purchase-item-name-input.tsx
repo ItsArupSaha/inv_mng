@@ -46,7 +46,6 @@ export function PurchaseItemNameInput({
         const currentMedicineGroup = watch(`items.${index}.medicineGroup`);
         const currentSellingPrice = watch(`items.${index}.sellingPrice`);
         const currentCost = watch(`items.${index}.cost`);
-        const currentAuthor = watch(`items.${index}.author`);
         const currentExpiry = watch(`items.${index}.expiryDate`);
         const currentLocation = watch(`items.${index}.location`);
 
@@ -65,9 +64,6 @@ export function PurchaseItemNameInput({
             `items.${index}.cost`,
             matchingItem.productionPrice ?? matchingItem.sellingPrice
           );
-        }
-        if (!currentAuthor && matchingItem.author) {
-          setValue(`items.${index}.author`, matchingItem.author);
         }
         if (!currentExpiry && matchingItem.expiryDate) {
           setValue(`items.${index}.expiryDate`, matchingItem.expiryDate);
@@ -114,9 +110,6 @@ export function PurchaseItemNameInput({
                           `items.${index}.cost`,
                           item.productionPrice ?? item.sellingPrice
                         );
-                        if (item.author) {
-                          setValue(`items.${index}.author`, item.author);
-                        }
                         if (item.expiryDate) {
                           setValue(`items.${index}.expiryDate`, item.expiryDate);
                         }

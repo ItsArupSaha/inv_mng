@@ -56,54 +56,29 @@ export async function deleteCategory(userId: string, id: string) {
   revalidatePath('/items');
 }
 
-// Initialize default categories for new users based on store type
-export async function initializeDefaultCategories(userId: string, storeType: 'general' | 'pharmacy' | 'bookstore' = 'general') {
+// Initialize default pharmacy categories for new users
+export async function initializeDefaultCategories(userId: string) {
   if (!db || !userId) return;
-  
+
   const categoriesCollection = collection(db, 'users', userId, 'categories');
   const snapshot = await getDocs(categoriesCollection);
-  
+
   // Only add default categories if none exist
   if (snapshot.empty) {
-    if (storeType === 'pharmacy') {
-      await addDoc(categoriesCollection, {
-        name: 'Medicines',
-        description: 'Prescription and OTC drugs',
-        createdAt: new Date()
-      });
-      await addDoc(categoriesCollection, {
-        name: 'Surgicals',
-        description: 'Surgical tools and instruments',
-        createdAt: new Date()
-      });
-      await addDoc(categoriesCollection, {
-        name: 'General Products',
-        description: 'Toiletries, baby care, etc.',
-        createdAt: new Date()
-      });
-    } else if (storeType === 'bookstore') {
-      await addDoc(categoriesCollection, {
-        name: 'Books',
-        description: 'Standard books for sale',
-        createdAt: new Date()
-      });
-      await addDoc(categoriesCollection, {
-        name: 'Stationery',
-        description: 'Pens, pencils, notebooks, etc.',
-        createdAt: new Date()
-      });
-    } else {
-      // General shop
-      await addDoc(categoriesCollection, {
-        name: 'General Products',
-        description: 'Standard inventory items',
-        createdAt: new Date()
-      });
-      await addDoc(categoriesCollection, {
-        name: 'Services',
-        description: 'Service items or bills',
-        createdAt: new Date()
-      });
-    }
+    await addDoc(categoriesCollection, {
+      name: 'Medicines',
+      description: 'Prescription and OTC drugs',
+      createdAt: new Date()
+    });
+    await addDoc(categoriesCollection, {
+      name: 'Surgicals',
+      description: 'Surgical tools and instruments',
+      createdAt: new Date()
+    });
+    await addDoc(categoriesCollection, {
+      name: 'General Products',
+      description: 'Toiletries, baby care, etc.',
+      createdAt: new Date()
+    });
   }
 }

@@ -84,11 +84,8 @@ export default function DashboardPage() {
       </div>
 
       {alertCount > 0 && (() => {
-        const storeType = authUser?.storeType || 'general';
-        const alertTitle = storeType === 'pharmacy' ? 'Medicine Expiry Warning' : 'Item Expiry Warning';
-        const alertText = storeType === 'pharmacy' 
-          ? `There are ${alertCount} medicine(s) expired or expiring within 30 days. Please check and return or replace them.`
-          : `There are ${alertCount} item(s) expired or expiring within 30 days. Please check and return or replace them.`;
+        const alertTitle = 'Medicine Expiry Warning';
+        const alertText = `There are ${alertCount} medicine(s) expired or expiring within 30 days. Please check and return or replace them.`;
         return (
           <div className="p-4 border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 rounded-lg flex items-start gap-3 animate-in slide-in-from-top duration-300">
             <span className="text-xl">⚠️</span>

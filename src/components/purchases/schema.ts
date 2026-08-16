@@ -4,7 +4,6 @@ export const purchaseItemSchema = z.object({
   itemName: z.string().min(1, 'Item name is required'),
   categoryId: z.string().min(1, 'Category is required'),
   categoryName: z.string().min(1, 'Category name is required'),
-  author: z.string().optional(),
   medicineGroup: z.string().optional(),
   company: z.string().optional(),
   expiryDate: z.string().optional(),
@@ -12,14 +11,6 @@ export const purchaseItemSchema = z.object({
   quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1'),
   cost: z.coerce.number().min(0, 'Cost must be non-negative'),
   sellingPrice: z.coerce.number().optional(),
-}).refine(data => {
-    if (data.categoryName === 'Book') {
-        return !!data.author && data.author.length > 0;
-    }
-    return true;
-}, {
-    message: "Author is required for books.",
-    path: ['author'],
 });
 
 export const purchaseFormSchema = z.object({

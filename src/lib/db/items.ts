@@ -19,6 +19,7 @@ import { revalidatePath } from 'next/cache';
 
 import { db } from '../firebase';
 import type { Item } from '../types';
+import { isNonSalableCategory, resolveIsSalable } from '../item-flags';
 
 // --- Items Actions ---
 export async function getItems(userId: string): Promise<Item[]> {
@@ -30,21 +31,23 @@ export async function getItems(userId: string): Promise<Item[]> {
     ...doc.data()
   } as Item));
 
-  // Auto-migrate: check if any Assets or Surgicals have a non-zero sellingPrice
+  // Auto-migrate legacy docs: backfill isSalable (from category) and force
+  // non-salable items to a zero selling price.
   const legacyItems = items.filter(item => {
-    const catNameLower = (item.categoryName || '').toLowerCase();
-    const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
-    return isAssetOrSurgical && item.sellingPrice !== 0;
+    const nonSalable = isNonSalableCategory(item.categoryName);
+    const missingFlag = typeof item.isSalable !== 'boolean';
+    return (nonSalable && missingFlag) || (nonSalable && item.sellingPrice !== 0);
   });
 
   if (legacyItems.length > 0) {
     Promise.all(legacyItems.map(async (item) => {
       try {
         const itemRef = doc(db!, 'users', userId, 'items', item.id);
-        await updateDoc(itemRef, { sellingPrice: 0 });
-        item.sellingPrice = 0; // update local copy
+        await updateDoc(itemRef, { isSalable: false, sellingPrice: 0 });
+        item.isSalable = false;
+        item.sellingPrice = 0;
       } catch (e) {
-        console.error(`Failed to auto-migrate item ${item.id} sellingPrice:`, e);
+        console.error(`Failed to auto-migrate item ${item.id}:`, e);
       }
     })).then(() => {
       revalidatePath('/items');
@@ -74,12 +77,12 @@ export async function getItemsPaginated({ userId, pageLimit = 10, lastVisibleId 
   const snapshot = await getDocs(q);
   const items = snapshot.docs.map(doc => {
     const data = doc.data();
-    const catNameLower = (data.categoryName || '').toLowerCase();
-    const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
+    const salable = resolveIsSalable({ isSalable: data.isSalable, categoryName: data.categoryName });
     return {
       id: doc.id,
       ...data,
-      sellingPrice: isAssetOrSurgical ? 0 : (data.sellingPrice || 0)
+      isSalable: salable,
+      sellingPrice: salable ? (data.sellingPrice || 0) : 0,
     } as Item;
   });
   
@@ -96,26 +99,26 @@ export async function getItemsPaginated({ userId, pageLimit = 10, lastVisibleId 
 
 export async function addItem(userId: string, data: Omit<Item, 'id'>) {
   if (!db || !userId) return;
-  const catNameLower = (data.categoryName || '').toLowerCase();
-  const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
-  if (isAssetOrSurgical) {
-    data.sellingPrice = 0;
-  }
+  const salable = resolveIsSalable(data);
   const itemsCollection = collection(db, 'users', userId, 'items');
-  const newDocRef = await addDoc(itemsCollection, data);
+  const newDocRef = await addDoc(itemsCollection, {
+    ...data,
+    isSalable: salable,
+    sellingPrice: salable ? data.sellingPrice : 0,
+  });
   revalidatePath('/items');
-  return { id: newDocRef.id, ...data };
+  return { id: newDocRef.id, ...data, isSalable: salable };
 }
 
 export async function updateItem(userId: string, id: string, data: Omit<Item, 'id'>) {
   if (!db || !userId) return;
-  const catNameLower = (data.categoryName || '').toLowerCase();
-  const isAssetOrSurgical = catNameLower === 'assets' || catNameLower === 'surgicals';
-  if (isAssetOrSurgical) {
-    data.sellingPrice = 0;
-  }
+  const salable = resolveIsSalable(data);
   const itemRef = doc(db, 'users', userId, 'items', id);
-  await updateDoc(itemRef, data);
+  await updateDoc(itemRef, {
+    ...data,
+    isSalable: salable,
+    sellingPrice: salable ? data.sellingPrice : 0,
+  });
   revalidatePath('/items');
 }
 

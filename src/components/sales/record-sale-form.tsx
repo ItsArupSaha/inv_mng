@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Printer } from 'lucide-react';
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -23,7 +24,7 @@ interface RecordSaleFormProps {
   authUser: any;
 }
 
-const DEFAULT_ROWS = Array.from({ length: 10 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
+const DEFAULT_ROWS = Array.from({ length: 1 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
 
 const getDefaultValues = () => ({
   items: DEFAULT_ROWS,
@@ -48,6 +49,7 @@ export function RecordSaleForm({
   const { toast } = useToast();
   const [isPending, startTransition] = React.useTransition();
   const [completedSale, setCompletedSale] = React.useState<Sale | null>(null);
+  const [lastSale, setLastSale] = React.useState<Sale | null>(null);
 
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(saleFormSchema),
@@ -72,11 +74,26 @@ export function RecordSaleForm({
     }, 0);
   }, [watchItems]);
 
+  const focusFirstSearch = React.useCallback(() => {
+    requestAnimationFrame(() => {
+      const firstInput = document.querySelector<HTMLInputElement>('[data-row="0"][data-col="0"]');
+      if (firstInput) {
+        firstInput.focus();
+        firstInput.select();
+      }
+    });
+  }, []);
+
+  React.useEffect(() => {
+    focusFirstSearch();
+  }, [focusFirstSearch]);
+
   const handleAddNewRow = () => append({ itemId: '', quantity: 1, price: 0 });
 
   const handleResetForm = () => {
     form.reset(getDefaultValues() as any);
     setCompletedSale(null);
+    focusFirstSearch();
   };
 
   const onSubmit = (data: SaleFormValues) => {
@@ -107,6 +124,7 @@ export function RecordSaleForm({
         if (result?.success && result.sale) {
           toast({ title: 'Sale Recorded', description: 'The new sale has been successfully saved.' });
           setCompletedSale(result.sale);
+          setLastSale(result.sale);
           onSuccess();
         } else {
           toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to record sale.' });
@@ -119,11 +137,10 @@ export function RecordSaleForm({
   };
 
   const sellableItems = React.useMemo(() => {
-    return items.filter((item) => {
-      const catName = (item.categoryName || '').toLowerCase();
-      return catName !== 'assets' && catName !== 'surgicals';
-    });
+    return items.filter((item) => item.isSalable !== false);
   }, [items]);
+
+  const memoSale = completedSale || lastSale;
 
   return (
     <div className="space-y-6 w-full max-w-none">
@@ -138,6 +155,15 @@ export function RecordSaleForm({
           />
           <SaleSummaryCard subtotal={subtotal} />
           <div className="flex justify-end gap-2 border-t pt-4">
+            {lastSale && !completedSale && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCompletedSale(lastSale)}
+              >
+                <Printer className="mr-2 h-4 w-4" /> Reprint Last Memo
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={handleResetForm} disabled={isPending}>
               Reset Form
             </Button>
@@ -150,9 +176,9 @@ export function RecordSaleForm({
 
       <Dialog open={!!completedSale} onOpenChange={(open) => !open && handleResetForm()}>
         <DialogContent className="sm:max-w-2xl">
-          {completedSale && authUser && (
+          {memoSale && authUser && (
             <SaleMemo
-              sale={completedSale}
+              sale={memoSale}
               customer={walkInCustomer}
               items={items}
               onNewSale={handleResetForm}

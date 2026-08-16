@@ -33,14 +33,11 @@ export function ItemsTable({
   onDelete,
   isPending,
 }: ItemsTableProps) {
-  const { authUser } = useAuth();
-  const storeType = authUser?.storeType || 'general';
-
-  // Label configuration based on store type
-  const titleHeader = storeType === 'pharmacy' ? 'Medicine Name' : storeType === 'bookstore' ? 'Book Title' : 'Item Name';
-  const detailHeader = storeType === 'pharmacy' ? 'Group (Generic)' : storeType === 'bookstore' ? 'Author' : 'Brand / Detail';
-  const companyHeader = storeType === 'pharmacy' ? 'Manufacturer' : storeType === 'bookstore' ? 'Publisher / Company' : 'Company / Brand';
-  const locationHeader = storeType === 'pharmacy' ? 'Shelf / Row' : storeType === 'bookstore' ? 'Shelf Location' : 'Storage Loc';
+  // Pharmacy column labels
+  const titleHeader = 'Medicine Name';
+  const detailHeader = 'Group (Generic)';
+  const companyHeader = 'Manufacturer';
+  const locationHeader = 'Shelf / Row';
 
   return (
     <div className="border rounded-md overflow-x-auto w-full">
@@ -96,7 +93,7 @@ export function ItemsTable({
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">{item.categoryName}</TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {storeType === 'pharmacy' ? (item.medicineGroup || '-') : storeType === 'bookstore' ? (item.author || '-') : (item.author || item.medicineGroup || '-')}
+                    {item.medicineGroup || '-'}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{item.company || '-'}</TableCell>
                   <TableCell className={cn(

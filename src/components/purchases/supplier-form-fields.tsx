@@ -9,10 +9,9 @@ import type { Item } from '@/lib/types';
 interface SupplierFormFieldsProps {
   form: UseFormReturn<any>;
   existingItems: Item[];
-  storeType: string;
 }
 
-export function SupplierFormFields({ form, existingItems, storeType }: SupplierFormFieldsProps) {
+export function SupplierFormFields({ form, existingItems }: SupplierFormFieldsProps) {
   const existingCompanies = React.useMemo(() => {
     if (!existingItems) return [];
     const set = new Set<string>();
@@ -41,15 +40,11 @@ export function SupplierFormFields({ form, existingItems, storeType }: SupplierF
         name="supplier"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>{storeType === 'pharmacy' ? 'Company Name' : 'Supplier Name'}</FormLabel>
+            <FormLabel>Company Name</FormLabel>
             <FormControl>
               <div className="relative">
                 <Input
-                  placeholder={
-                    storeType === 'pharmacy'
-                      ? 'e.g., Square Pharmaceuticals'
-                      : 'e.g., Global Publishing House'
-                  }
+                  placeholder="e.g., Square Pharmaceuticals"
                   {...field}
                   onFocus={() => setShowCompanySuggestions(true)}
                   onBlur={() => {
@@ -84,21 +79,19 @@ export function SupplierFormFields({ form, existingItems, storeType }: SupplierF
           </FormItem>
         )}
       />
-      {storeType === 'pharmacy' && (
-        <FormField
-          control={form.control}
-          name="location"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Shelf / Row</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., 2, Shelf-A, Row-3" {...field} autoComplete="off" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      )}
+      <FormField
+        control={form.control}
+        name="location"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Shelf / Row</FormLabel>
+            <FormControl>
+              <Input placeholder="e.g., 2, Shelf-A, Row-3" {...field} autoComplete="off" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </div>
   );
 }

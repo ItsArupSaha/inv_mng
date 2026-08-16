@@ -1,5 +1,9 @@
-import type { Donation, Expense, Item, Sale, Transaction } from './types';
+import type { Expense, Item, Sale, Transaction } from './types';
 import { isOperatingExpense } from './db/utils';
+
+// Donation entries have no creation UI anymore; reports keep the slot so
+// historical ledgers still render if any old docs exist.
+type Donation = { amount: number; paymentMethod?: 'Cash' | 'Bank' };
 
 export interface ReportAnalysis {
   monthlyActivity: {

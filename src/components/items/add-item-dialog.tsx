@@ -45,9 +45,6 @@ export function AddItemDialog({
   const {
     itemForm,
     isPending,
-    showAdvanced,
-    setShowAdvanced,
-    storeType,
     onSubmit,
     nameLabel,
     isAssetOrSurgical,
@@ -89,11 +86,8 @@ export function AddItemDialog({
                 
                 <ItemFormFields
                   form={itemForm}
-                  storeType={storeType}
                   categories={categories}
                   onAddCategoryClick={onAddCategoryClick}
-                  showAdvanced={showAdvanced}
-                  setShowAdvanced={setShowAdvanced}
                 />
 
                 <div className="grid grid-cols-2 gap-4">

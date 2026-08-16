@@ -4,7 +4,6 @@ import * as React from 'react';
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { AddExistingAssetDialog } from '../add-existing-asset-dialog';
 import { ClosingStockDialog } from './closing-stock-dialog';
 
 interface ItemManagementHeaderProps {
@@ -41,11 +40,6 @@ export function ItemManagementHeader({
           <Button onClick={handleAddNewItem} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Item
           </Button>
-          <AddExistingAssetDialog userId={userId} onAssetAdded={loadData}>
-            <Button variant="outline" className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Existing Asset
-            </Button>
-          </AddExistingAssetDialog>
           <ClosingStockDialog
             isOpen={isStockDialogOpen}
             onOpenChange={setIsStockDialogOpen}

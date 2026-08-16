@@ -40,71 +40,53 @@ export function AppSidebar() {
   const [alertCount, setAlertCount] = React.useState(0);
   const [stockWarningCount, setStockWarningCount] = React.useState(0);
 
+  const refreshCounts = React.useCallback(() => {
+    if (!user) return;
+    getItems(user.uid)
+      .then((items) => {
+        const ninetyDaysFromNow = new Date();
+        ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+
+        const expCount = items.filter(
+          (item) => item.expiryDate && new Date(item.expiryDate) <= ninetyDaysFromNow
+        ).length;
+        setAlertCount(expCount);
+
+        const stockCount = items.filter((item) => item.isSalable !== false && item.stock < 1).length;
+        setStockWarningCount(stockCount);
+      })
+      .catch((err) => console.error('Failed to fetch alert count for sidebar:', err));
+  }, [user]);
+
+  // Fetch badge counts once on login and when the tab regains focus,
+  // instead of refetching the whole catalog on every navigation.
   React.useEffect(() => {
-    if (user) {
-      getItems(user.uid)
-        .then((items) => {
-          const now = new Date();
-          const ninetyDaysFromNow = new Date();
-          ninetyDaysFromNow.setDate(now.getDate() + 90);
-
-          const expCount = items.filter(
-            (item) => item.expiryDate && new Date(item.expiryDate) <= ninetyDaysFromNow
-          ).length;
-          setAlertCount(expCount);
-
-          const stockCount = items.filter((item) => {
-            const cat = (item.categoryName || '').toLowerCase();
-            if (cat === 'assets' || cat === 'surgicals') return false;
-            return item.stock < 1;
-          }).length;
-          setStockWarningCount(stockCount);
-        })
-        .catch((err) => console.error('Failed to fetch alert count for sidebar:', err));
-    }
-  }, [user, pathname]);
-
-  const storeType = authUser?.storeType || 'general';
+    refreshCounts();
+    window.addEventListener('focus', refreshCounts);
+    return () => window.removeEventListener('focus', refreshCounts);
+  }, [refreshCounts]);
 
   const coreItems = React.useMemo(
     () => [
       { href: '/sales', icon: ShoppingCart, label: 'Sell' },
-      {
-        href: '/items',
-        icon: Package,
-        label:
-          storeType === 'pharmacy'
-            ? 'Items / Stocks'
-            : storeType === 'bookstore'
-            ? 'Books / Stocks'
-            : 'Items & Stocks',
-      },
+      { href: '/items', icon: Package, label: 'Medicines / Stocks' },
       { href: '/expenses', icon: CreditCard, label: 'Expense' },
       { href: '/purchases', icon: ShoppingBag, label: 'Purchase' },
-      ...(storeType === 'pharmacy'
-        ? [{ href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true }]
-        : []),
+      { href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true },
       { href: '/stock-warnings', icon: ShieldAlert, label: 'Stock Warnings', stockBadge: true },
       { href: '/reports', icon: FileText, label: 'Reports' },
       { href: '/balance-sheet', icon: Store, label: 'Business Overview' },
     ],
-    [storeType]
+    []
   );
 
   const otherItems = React.useMemo(
     () => [
-      ...(storeType !== 'pharmacy'
-        ? [
-            { href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true },
-          ]
-        : []),
       { href: '/payables', icon: ArrowRightLeft, label: 'Payables (Suppliers)' },
       { href: '/transfer', icon: ArrowLeftRight, label: 'Transfers (Cash/Bank)' },
-      ...(storeType === 'pharmacy'
-        ? [{ href: '/bulk-shelf-update', icon: FolderSync, label: 'Shelf Update (Bulk)' }]
-        : []),
+      { href: '/bulk-shelf-update', icon: FolderSync, label: 'Shelf Update (Bulk)' },
     ],
-    [storeType]
+    []
   );
 
   const renderMenuItems = (itemsList: typeof coreItems) => {
@@ -148,7 +130,7 @@ export function AppSidebar() {
             <h1 className="font-headline text-lg font-bold text-foreground truncate">
               {authUser?.companyName || 'Smart Stock'}
             </h1>
-            <p className="text-xs text-muted-foreground capitalize">{storeType} Management</p>
+            <p className="text-xs text-muted-foreground capitalize">Pharmacy Management</p>
           </div>
         </div>
       </SidebarHeader>

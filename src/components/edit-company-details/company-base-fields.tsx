@@ -12,60 +12,27 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import type { AuthUser } from '@/lib/types';
 
 interface CompanyBaseFieldsProps {
   form: UseFormReturn<any>;
-  user: AuthUser;
 }
 
-export function CompanyBaseFields({ form, user }: CompanyBaseFieldsProps) {
+export function CompanyBaseFields({ form }: CompanyBaseFieldsProps) {
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          control={form.control}
-          name="companyName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Store / Company Name</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., MediCare Pharmacy, General Mart" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="storeType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Store Type</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select business type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="general">General Shop / Inventory</SelectItem>
-                  <SelectItem value="pharmacy">Pharmacy / Medical Shop</SelectItem>
-                  <SelectItem value="bookstore">Book Store</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+      <FormField
+        control={form.control}
+        name="companyName"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Pharmacy Name</FormLabel>
+            <FormControl>
+              <Input placeholder="e.g., MediCare Pharmacy" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
       <FormField
         control={form.control}
         name="subtitle"
@@ -99,9 +66,9 @@ export function CompanyBaseFields({ form, user }: CompanyBaseFieldsProps) {
           name="bkashNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Bkash Number (Optional)</FormLabel>
+              <FormLabel>bKash Number (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="Your Bkash account number" {...field} />
+                <Input placeholder="Your bKash account number" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -116,7 +83,7 @@ export function CompanyBaseFields({ form, user }: CompanyBaseFieldsProps) {
           <FormItem>
             <FormLabel>Store Address</FormLabel>
             <FormControl>
-              <Textarea placeholder="123 Bookworm Lane, Readsville, USA" {...field} />
+              <Textarea placeholder="e.g., 123 Main Road, Dhaka" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -136,25 +103,6 @@ export function CompanyBaseFields({ form, user }: CompanyBaseFieldsProps) {
           </FormItem>
         )}
       />
-
-      {!user.secretKey && (
-        <FormField
-          control={form.control}
-          name="secretKey"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Secret Key (Set Once)</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="Enter your secret key" {...field} />
-              </FormControl>
-              <FormDescription>
-                This key is for future integrations and can only be set once. It cannot be changed later.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      )}
     </>
   );
 }

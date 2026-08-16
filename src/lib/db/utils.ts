@@ -1,6 +1,6 @@
 
 
-import type { Customer, Donation, Expense, Item, Purchase, Sale, SalesReturn, Transaction, Transfer } from '../types';
+import type { Customer, Expense, Item, Purchase, Sale, SalesReturn, Transaction, Transfer } from '../types';
 
 // Helper to convert Firestore docs to our types
 export function docToItem(d: any): Item {
@@ -42,15 +42,6 @@ export function docToExpense(d: any): Expense {
         ...data,
         date: data.date.toDate().toISOString(),
     } as Expense;
-}
-export function docToDonation(d: any): Donation {
-    const data = d.data();
-    return { 
-        id: d.id, 
-        donationId: data.donationId || `DON-${String(d.id).slice(0, 8)}`, // Fallback for existing donations
-        ...data,
-        date: data.date.toDate().toISOString(),
-    } as Donation;
 }
 export function docToTransaction(d: any): Transaction {
     const data = d.data();

@@ -20,12 +20,10 @@ export function useOnboarding() {
     defaultValues: {
       companyName: '',
       subtitle: '',
-      storeType: 'general',
       address: '',
       phone: '',
       bkashNumber: '',
       bankInfo: '',
-      secretKey: '',
       initialCash: 0,
       initialBank: 0,
     },

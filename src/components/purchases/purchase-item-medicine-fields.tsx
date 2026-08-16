@@ -7,10 +7,9 @@ import { Input } from '@/components/ui/input';
 
 interface PurchaseItemMedicineFieldsProps {
   index: number;
-  storeType: string;
 }
 
-export function PurchaseItemMedicineFields({ index, storeType }: PurchaseItemMedicineFieldsProps) {
+export function PurchaseItemMedicineFields({ index }: PurchaseItemMedicineFieldsProps) {
   const { control } = useFormContext();
 
   return (
@@ -19,7 +18,7 @@ export function PurchaseItemMedicineFields({ index, storeType }: PurchaseItemMed
         control={control}
         name={`items.${index}.medicineGroup`}
         render={({ field }) => (
-          <FormItem className={storeType === 'pharmacy' ? 'md:col-span-3' : 'md:col-span-2'}>
+          <FormItem className={'md:col-span-3'}>
             <FormLabel className="text-xs">Group (Generic)</FormLabel>
             <FormControl>
               <Input placeholder="e.g., Paracetamol" {...field} />
@@ -32,7 +31,7 @@ export function PurchaseItemMedicineFields({ index, storeType }: PurchaseItemMed
         control={control}
         name={`items.${index}.expiryDate`}
         render={({ field }) => (
-          <FormItem className={storeType === 'pharmacy' ? 'md:col-span-3' : 'md:col-span-2'}>
+          <FormItem className={'md:col-span-3'}>
             <FormLabel className="text-xs">Expiry Date</FormLabel>
             <FormControl>
               <Input type="date" {...field} />
@@ -41,21 +40,6 @@ export function PurchaseItemMedicineFields({ index, storeType }: PurchaseItemMed
           </FormItem>
         )}
       />
-      {storeType !== 'pharmacy' && (
-        <FormField
-          control={control}
-          name={`items.${index}.location`}
-          render={({ field }) => (
-            <FormItem className="md:col-span-2">
-              <FormLabel className="text-xs">Shelf / Row</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Row A3" {...field} autoComplete="off" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      )}
     </>
   );
 }

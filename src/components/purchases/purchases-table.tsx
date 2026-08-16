@@ -6,7 +6,6 @@ import { Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/use-auth';
 import type { Purchase } from '@/lib/types';
 
 interface PurchasesTableProps {
@@ -20,9 +19,6 @@ export function PurchasesTable({
   isInitialLoading,
   onEdit,
 }: PurchasesTableProps) {
-  const { authUser } = useAuth();
-  const storeType = authUser?.storeType || 'general';
-
   return (
     <div className="border rounded-md overflow-x-auto w-full">
       <Table>
@@ -30,7 +26,7 @@ export function PurchasesTable({
           <TableRow>
             <TableHead>Date</TableHead>
             <TableHead className="hidden sm:table-cell">Purchase ID</TableHead>
-            <TableHead>{storeType === 'pharmacy' ? 'Company' : 'Supplier'}</TableHead>
+            <TableHead>Company</TableHead>
             <TableHead>Items</TableHead>
             <TableHead className="hidden sm:table-cell">Payment</TableHead>
             <TableHead className="text-right hidden sm:table-cell">Total</TableHead>

@@ -4,7 +4,6 @@ import * as React from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
 import { addPurchase, updatePurchase } from '@/lib/actions';
 import type { Category, Purchase } from '@/lib/types';
 import { purchaseFormSchema, type PurchaseFormValues } from '@/components/purchases/schema';
@@ -19,6 +18,19 @@ interface UseRecordPurchaseProps {
   onSuccess: () => void;
 }
 
+const emptyItemRow = (categoryId = '', categoryName = '') => ({
+  itemName: '',
+  categoryId,
+  categoryName,
+  medicineGroup: '',
+  company: '',
+  expiryDate: '',
+  location: '',
+  quantity: 1,
+  cost: 0,
+  sellingPrice: 0,
+});
+
 export function useRecordPurchase({
   userId,
   isOpen,
@@ -28,17 +40,14 @@ export function useRecordPurchase({
   onSuccess,
 }: UseRecordPurchaseProps) {
   const { toast } = useToast();
-  const { authUser } = useAuth();
   const [isPending, startTransition] = React.useTransition();
-
-  const storeType = authUser?.storeType || 'general';
 
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       supplier: '',
       location: '',
-      items: [{ itemName: '', categoryId: '', categoryName: '', author: '', medicineGroup: '', company: '', expiryDate: '', location: '', quantity: 1, cost: 0, sellingPrice: 0 }],
+      items: [emptyItemRow()],
       discountType: 'amount',
       discountValue: 0,
       vatType: 'amount',
@@ -61,7 +70,6 @@ export function useRecordPurchase({
     isOpen,
     userId,
     categories,
-    storeType,
   });
 
   const wasOpenRef = React.useRef(false);
@@ -79,7 +87,6 @@ export function useRecordPurchase({
             itemName: item.itemName,
             categoryId: item.categoryId,
             categoryName: item.categoryName,
-            author: item.author || '',
             medicineGroup: item.medicineGroup || '',
             company: item.company || '',
             expiryDate: item.expiryDate || '',
@@ -103,31 +110,11 @@ export function useRecordPurchase({
             dueDate: editingPurchase.dueDate ? new Date(editingPurchase.dueDate) : new Date(),
           });
         } else {
-          const defaultCategory = categories.find(c => {
-            const name = c.name.toLowerCase();
-            if (storeType === 'pharmacy') return name.includes('medicine');
-            if (storeType === 'bookstore') return name.includes('book');
-            return false;
-          });
-          const initialCategoryId = defaultCategory?.id || '';
-          const initialCategoryName = defaultCategory?.name || '';
-
+          const defaultCategory = categories.find(c => c.name.toLowerCase().includes('medicine'));
           form.reset({
             supplier: '',
             location: '',
-            items: [{ 
-              itemName: '', 
-              categoryId: initialCategoryId, 
-              categoryName: initialCategoryName, 
-              author: '', 
-              medicineGroup: '', 
-              company: '', 
-              expiryDate: '', 
-              location: '', 
-              quantity: 1, 
-              cost: 0, 
-              sellingPrice: 0 
-            }],
+            items: [emptyItemRow(defaultCategory?.id, defaultCategory?.name)],
             discountType: 'amount',
             discountValue: 0,
             vatType: 'amount',
@@ -144,21 +131,23 @@ export function useRecordPurchase({
       prevPurchaseIdRef.current = null;
     }
     wasOpenRef.current = isOpen;
-  }, [isOpen, form, categories, storeType, editingPurchase]);
+  }, [isOpen, form, categories, editingPurchase]);
 
   // Form submission coordinator
   const onSubmit = (data: PurchaseFormValues) => {
     startTransition(async () => {
       try {
         const calculatedTotal = data.items.reduce((acc, item) => acc + (item.cost * item.quantity), 0);
-        const calculatedDiscount = data.discountType === 'percentage' 
-            ? (calculatedTotal * (data.discountValue || 0)) / 100 
+        const calculatedDiscount = data.discountType === 'percentage'
+            ? (calculatedTotal * (data.discountValue || 0)) / 100
             : (data.discountValue || 0);
 
+        // Pharmacy convention: the supplier is the medicine company and the
+        // invoice-level shelf location applies to every line.
         const mappedItems = data.items.map(item => ({
           ...item,
-          company: storeType === 'pharmacy' ? data.supplier : item.company,
-          location: storeType === 'pharmacy' ? data.location : item.location
+          company: data.supplier,
+          location: data.location
         }));
 
         const purchaseData = {
@@ -167,7 +156,7 @@ export function useRecordPurchase({
           discountAmount: calculatedDiscount,
           dueDate: data.dueDate.toISOString()
         };
-        
+
         // @ts-ignore
         delete purchaseData.discountType;
         // @ts-ignore
@@ -175,14 +164,14 @@ export function useRecordPurchase({
         // @ts-ignore
         delete purchaseData.location;
 
-        const result = editingPurchase 
+        const result = editingPurchase
           ? await updatePurchase(userId, editingPurchase.id, purchaseData)
           : await addPurchase(userId, purchaseData);
 
         if (result?.success) {
-          toast({ 
-            title: editingPurchase ? 'Purchase Updated' : 'Purchase Recorded', 
-            description: editingPurchase ? 'The purchase details and inventory have been updated.' : 'The new purchase has been added and stock updated.' 
+          toast({
+            title: editingPurchase ? 'Purchase Updated' : 'Purchase Recorded',
+            description: editingPurchase ? 'The purchase details and inventory have been updated.' : 'The new purchase has been added and stock updated.'
           });
           onSuccess();
           onOpenChange(false);
@@ -196,27 +185,8 @@ export function useRecordPurchase({
   };
 
   const handleAddItem = () => {
-    const defaultCategory = categories.find(c => {
-      const name = c.name.toLowerCase();
-      if (storeType === 'pharmacy') return name.includes('medicine');
-      if (storeType === 'bookstore') return name.includes('book');
-      return false;
-    });
-    const initialCategoryId = defaultCategory?.id || '';
-    const initialCategoryName = defaultCategory?.name || '';
-    append({ 
-      itemName: '', 
-      categoryId: initialCategoryId, 
-      categoryName: initialCategoryName, 
-      author: '', 
-      medicineGroup: '', 
-      company: '', 
-      expiryDate: '', 
-      location: '', 
-      quantity: 1, 
-      cost: 0, 
-      sellingPrice: 0 
-    });
+    const defaultCategory = categories.find(c => c.name.toLowerCase().includes('medicine'));
+    append(emptyItemRow(defaultCategory?.id, defaultCategory?.name));
   };
 
   return {
@@ -225,7 +195,6 @@ export function useRecordPurchase({
     append,
     remove,
     isPending,
-    storeType,
     onSubmit,
     handleAddItem,
     existingItems,

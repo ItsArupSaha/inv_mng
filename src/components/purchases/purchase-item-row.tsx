@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/use-auth';
 import type { Category } from '@/lib/types';
 import { PurchaseItemNameInput } from './purchase-item-name-input';
 import { PurchaseItemMedicineFields } from './purchase-item-medicine-fields';
@@ -30,9 +29,6 @@ export function PurchaseItemRow({
   onRemove,
   disabledRemove,
 }: PurchaseItemRowProps) {
-  const { authUser } = useAuth();
-  const storeType = authUser?.storeType || 'general';
-
   const { control, watch, setValue } = useFormContext();
   const watchCategoryId = watch(`items.${index}.categoryId`);
   const selectedCategory = categories.find((c) => c.id === watchCategoryId);
@@ -93,23 +89,7 @@ export function PurchaseItemRow({
           </Button>
         </div>
 
-        {selectedCategory?.name === 'Book' && (
-          <FormField
-            control={control}
-            name={`items.${index}.author`}
-            render={({ field }) => (
-              <FormItem className="md:col-span-2">
-                <FormLabel className="text-xs">Author</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., Matt Haig" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        {isMedicine && <PurchaseItemMedicineFields index={index} storeType={storeType} />}
+        {isMedicine && <PurchaseItemMedicineFields index={index} />}
 
         <FormField
           control={control}
@@ -131,8 +111,8 @@ export function PurchaseItemRow({
           render={({ field }) => (
             <FormItem
               className={cn(
-                storeType === 'pharmacy' ? 'md:col-span-2' : isMedicine ? 'md:col-span-3' : '',
-                selectedCategory?.name !== 'Book' && !isMedicine ? 'md:col-start-4' : ''
+                isMedicine ? 'md:col-span-2' : '',
+                !isMedicine ? 'md:col-start-4' : ''
               )}
             >
               <FormLabel className="text-xs">Unit Cost</FormLabel>
@@ -148,9 +128,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.sellingPrice`}
           render={({ field }) => (
-            <FormItem
-              className={storeType === 'pharmacy' ? 'md:col-span-2' : isMedicine ? 'md:col-span-3' : ''}
-            >
+            <FormItem className={isMedicine ? 'md:col-span-2' : ''}>
               <FormLabel className="text-xs">Selling Price</FormLabel>
               <FormControl>
                 <Input type="number" step="0.01" placeholder="0.00" disabled={isAssetOrSurgical} {...field} />
