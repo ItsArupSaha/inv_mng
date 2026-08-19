@@ -1,137 +1,99 @@
 /**
- * Search Utilities for Fuzzy Spelling and Phonetic Matches.
- * Used across the POS selectors and inventory directory lists.
+ * Search ranking for medicine/item lists.
+ * Pure scoring over title/group/company text: exact beats prefix beats
+ * substring beats typo-tolerant (Damerau) beats phonetic-only. All tiers are
+ * graded so closer typos sort before distant ones.
  */
+import {
+  normalizePhonetic,
+  getLevenshteinDistance,
+  typoDistance,
+} from './string-similarity';
+
+// Re-exported for existing callers.
+export { normalizePhonetic, getLevenshteinDistance };
+
+const splitWords = (s: string): string[] => s.toLowerCase().trim().split(/[\s\-,.]+/).filter(Boolean);
 
 /**
- * Normalizes text phonetically to handle common brand name typos.
- */
-export function normalizePhonetic(str: string): string {
-  return str
-    .toLowerCase()
-    .trim()
-    .replace(/ph/g, 'f')
-    .replace(/th/g, 't')
-    .replace(/sh/g, 'z') // soft sibilants mapped to common z sound
-    .replace(/ch/g, 'k')
-    .replace(/c/g, 'k')
-    .replace(/q/g, 'k')
-    .replace(/x/g, 'z')
-    .replace(/j/g, 'z')
-    .replace(/g/g, 'z')
-    .replace(/s/g, 'z')
-    .replace(/w/g, 'v') // w and v are frequently swapped
-    .replace(/[aeiouy]/g, 'a') // collapse all vowel spaces to 'a'
-    .replace(/(.)\1+/g, '$1'); // collapse duplicate letters
-}
-
-/**
- * Computes Levenshtein Distance (Edit Distance) between two strings.
- */
-export function getLevenshteinDistance(a: string, b: string): number {
-  const matrix: number[][] = [];
-  for (let i = 0; i <= b.length; i++) {
-    matrix[i] = [i];
-  }
-  for (let j = 0; j <= a.length; j++) {
-    matrix[0][j] = j;
-  }
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1,     // insertion
-          matrix[i - 1][j] + 1      // deletion
-        );
-      }
-    }
-  }
-  return matrix[b.length][a.length];
-}
-
-/**
- * Checks if target matches the query string using substring, phonetic,
- * or keyboard-typo (edit distance) similarity matching.
+ * True when target matches query via substring, phonetic equivalence, or a
+ * tolerated typo (edit distance within limits) on any word.
  */
 export function isFuzzyMatch(target: string | null | undefined, query: string): boolean {
   if (!target || !query) return false;
-  
+
   const targetLower = target.toLowerCase().trim();
   const queryLower = query.toLowerCase().trim();
-  
   if (!queryLower) return false;
 
-  // 1. Direct exact match or substring match
+  // 1. Direct substring
   if (targetLower.includes(queryLower)) return true;
-  
-  // 2. Phonetic normalized substring match
-  const normTarget = normalizePhonetic(targetLower);
-  const normQuery = normalizePhonetic(queryLower);
-  if (normTarget.includes(normQuery)) return true;
 
-  // 3. Edit distance check on individual normalized words
-  const targetWords = targetLower.split(/[\s\-]+/);
-  const queryWords = queryLower.split(/[\s\-]+/);
-  
-  for (const qWord of queryWords) {
-    if (qWord.length < 3) continue; // skip very short query words
-    const maxDist = qWord.length >= 5 ? 2 : 1;
-    const normQ = normalizePhonetic(qWord);
-    
-    for (const tWord of targetWords) {
-      if (tWord.length < 3) continue;
-      const normT = normalizePhonetic(tWord);
-      const prefix = normT.substring(0, normQ.length);
-      const dist = getLevenshteinDistance(prefix, normQ);
-      if (dist <= maxDist) return true;
+  // 2. Phonetic normalized substring (transliteration drift)
+  if (normalizePhonetic(targetLower).includes(normalizePhonetic(queryLower))) return true;
+
+  // 3. Typo tolerance per word, raw and phonetic
+  const targetWords = splitWords(targetLower);
+  const normTargetWords = targetWords.map(normalizePhonetic);
+  for (const qWord of splitWords(queryLower)) {
+    const normQWord = normalizePhonetic(qWord);
+    for (let i = 0; i < targetWords.length; i++) {
+      if (typoDistance(qWord, targetWords[i]) !== null) return true;
+      if (typoDistance(normQWord, normTargetWords[i]) !== null) return true;
     }
   }
-  
+
   return false;
 }
 
 /**
  * Categorizes item form factor for priority listing:
- * 1 = Tablets & Capsules
- * 2 = Suspensions & Syrups (liquids, drops, solutions)
- * 3 = Creams & Ointments (gels)
- * 4 = Injections (infusions, vials, ampoules)
- * 5 = Others
+ * 1 = Tablets & Capsules, 2 = Suspensions & Syrups, 3 = Creams & Ointments,
+ * 4 = Injections, 5 = Others.
  */
 export function getFormFactorRank(title: string | null | undefined): number {
   if (!title) return 5;
   const t = title.toLowerCase();
 
-  // Rank 1: Tablets & Capsules
-  if (/\b(tab|tablets?|cap|capsules?)\b/i.test(t)) {
-    return 1;
-  }
-
-  // Rank 2: Suspensions & Syrups, Liquids, Drops
-  if (/\b(syr|syrups?|syp|susp|suspensions?|drop|drops|sol|solutions?|liq|liquids?)\b/i.test(t)) {
-    return 2;
-  }
-
-  // Rank 3: Creams & Ointments, Gels
-  if (/\b(cream|creams?|oint|ointments?|gel|gels?)\b/i.test(t)) {
-    return 3;
-  }
-
-  // Rank 4: Injections, Infusions, Vials, Ampoules
-  if (/\b(inj|injections?|infusion|infusions?|vial|ampoule|ampoules?)\b/i.test(t)) {
-    return 4;
-  }
-
-  // Rank 5: Others
+  if (/\b(tab|tablets?|cap|capsules?)\b/i.test(t)) return 1;
+  if (/\b(syr|syrups?|syp|susp|suspensions?|drop|drops|sol|solutions?|liq|liquids?)\b/i.test(t)) return 2;
+  if (/\b(cream|creams?|oint|ointments?|gel|gels?)\b/i.test(t)) return 3;
+  if (/\b(inj|injections?|infusion|infusions?|vial|ampoule|ampoules?)\b/i.test(t)) return 4;
   return 5;
 }
 
 /**
- * Calculates search match relevance score for an item against a query.
- * Lower score = higher priority.
+ * Best typo/phonetic grade for a query against one field's words.
+ * Returns a small penalty (smaller = closer) or null when nothing matches.
+ */
+function gradedFuzzyPenalty(queryLower: string, field: string | null | undefined): number | null {
+  if (!field) return null;
+
+  let bestRaw: number | null = null;
+  let bestPhonetic: number | null = null;
+
+  const fieldWords = splitWords(field);
+  const normFieldWords = fieldWords.map(normalizePhonetic);
+  for (const qWord of splitWords(queryLower)) {
+    const normQWord = normalizePhonetic(qWord);
+    for (let i = 0; i < fieldWords.length; i++) {
+      const raw = typoDistance(qWord, fieldWords[i]);
+      if (raw !== null && (bestRaw === null || raw < bestRaw)) bestRaw = raw;
+
+      const phon = typoDistance(normQWord, normFieldWords[i]);
+      if (phon !== null && (bestPhonetic === null || phon < bestPhonetic)) bestPhonetic = phon;
+    }
+  }
+
+  if (bestRaw !== null) return bestRaw * 0.05;        // 0.05 / 0.10
+  if (bestPhonetic !== null) return 0.2 + bestPhonetic * 0.05; // 0.25 / 0.30
+  return null;
+}
+
+/**
+ * Search relevance score for an item against a query. Lower = better.
+ * Coarse tiers 1–7 as before; typo tiers are graded (8.x title, 9.x
+ * group/company) so closer spellings rank ahead of distant ones.
  */
 export function getSearchMatchRank(
   title: string | null | undefined,
@@ -146,22 +108,22 @@ export function getSearchMatchRank(
   const g = (group || '').trim().toLowerCase();
   const c = (company || '').trim().toLowerCase();
 
-  // 1. Exact match on title, group, or company
+  // 1. Exact match on any field
   if (t === q || g === q || c === q) return 1;
 
   // 2. Title starts with query
   if (t.startsWith(q)) return 2;
 
   // 3. Title word starts with query
-  const tWords = t.split(/[\s\-]+/);
+  const tWords = splitWords(t);
   if (tWords.some((w) => w.startsWith(q))) return 3;
 
   // 4. Group or company starts with query
   if (g.startsWith(q) || c.startsWith(q)) return 4;
 
   // 5. Group or company word starts with query
-  const gWords = g.split(/[\s\-]+/);
-  const cWords = c.split(/[\s\-]+/);
+  const gWords = splitWords(g);
+  const cWords = splitWords(c);
   if (gWords.some((w) => w.startsWith(q)) || cWords.some((w) => w.startsWith(q))) return 5;
 
   // 6. Title contains query
@@ -170,18 +132,20 @@ export function getSearchMatchRank(
   // 7. Group or company contains query
   if (g.includes(q) || c.includes(q)) return 7;
 
-  // 8. Fuzzy title match
-  if (isFuzzyMatch(title, q)) return 8;
+  // 8. Graded typo match on title
+  const titlePenalty = gradedFuzzyPenalty(q, t);
+  if (titlePenalty !== null) return 8 + titlePenalty;
 
-  // 9. Fuzzy group or company match
-  if (isFuzzyMatch(group, q) || isFuzzyMatch(company, q)) return 9;
+  // 9. Graded typo match on group or company
+  const metaPenalty = gradedFuzzyPenalty(q, g) ?? gradedFuzzyPenalty(q, c);
+  if (metaPenalty !== null) return 8.35 + metaPenalty;
 
   return 10;
 }
 
 /**
- * Helper to compare two items when searching:
- * First by match relevance, second by form factor (Tablets > Syrups > Others), third by user's chosen sortBy or title.
+ * Compares two items during search: match relevance first, then form factor
+ * (tablets before syrups), then the active sortBy with sensible fallbacks.
  */
 export function compareItemsForSearch<T extends { title: string; medicineGroup?: string; company?: string; stock?: number; expiryDate?: string }>(
   a: T,
@@ -192,37 +156,21 @@ export function compareItemsForSearch<T extends { title: string; medicineGroup?:
   const matchA = getSearchMatchRank(a.title, query, a.medicineGroup, a.company);
   const matchB = getSearchMatchRank(b.title, query, b.medicineGroup, b.company);
 
-  if (matchA !== matchB) {
-    return matchA - matchB;
-  }
+  if (matchA !== matchB) return matchA - matchB;
 
   const formA = getFormFactorRank(a.title);
   const formB = getFormFactorRank(b.title);
+  if (formA !== formB) return formA - formB;
 
-  if (formA !== formB) {
-    return formA - formB;
-  }
-
-  // Tie-breaker based on active sortBy
-  if (sortBy === 'title-desc') {
-    return (b.title || '').localeCompare(a.title || '');
-  }
-  if (sortBy === 'stock-asc') {
-    return (a.stock || 0) - (b.stock || 0);
-  }
-  if (sortBy === 'stock-desc') {
-    return (b.stock || 0) - (a.stock || 0);
-  }
+  if (sortBy === 'title-desc') return (b.title || '').localeCompare(a.title || '');
+  if (sortBy === 'stock-asc') return (a.stock || 0) - (b.stock || 0);
+  if (sortBy === 'stock-desc') return (b.stock || 0) - (a.stock || 0);
   if (sortBy === 'group-asc') {
-    const groupA = a.medicineGroup || '';
-    const groupB = b.medicineGroup || '';
-    const groupCmp = groupA.localeCompare(groupB);
+    const groupCmp = (a.medicineGroup || '').localeCompare(b.medicineGroup || '');
     if (groupCmp !== 0) return groupCmp;
   }
   if (sortBy === 'company-asc') {
-    const companyA = a.company || '';
-    const companyB = b.company || '';
-    const companyCmp = companyA.localeCompare(companyB);
+    const companyCmp = (a.company || '').localeCompare(b.company || '');
     if (companyCmp !== 0) return companyCmp;
   }
   if (sortBy === 'expiry-asc') {
@@ -234,13 +182,9 @@ export function compareItemsForSearch<T extends { title: string; medicineGroup?:
   const titleCmp = (a.title || '').localeCompare(b.title || '');
   if (titleCmp !== 0) return titleCmp;
 
-  // If titles are identical, tie-break by earliest expiry date first
   const dateA = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
   const dateB = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
   if (dateA !== dateB) return dateA - dateB;
 
-  // Second tie-breaker: sort higher stock first
   return (b.stock || 0) - (a.stock || 0);
 }
-
-
