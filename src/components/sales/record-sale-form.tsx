@@ -24,7 +24,7 @@ interface RecordSaleFormProps {
   authUser: any;
 }
 
-const DEFAULT_ROWS = Array.from({ length: 1 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
+const DEFAULT_ROWS = Array.from({ length: 7 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
 
 const getDefaultValues = () => ({
   items: DEFAULT_ROWS,
