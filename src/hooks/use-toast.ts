@@ -152,6 +152,12 @@ function toast({ ...props }: Toast) {
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
+  // Only errors surface as banners. Success confirmations are visible in
+  // the UI itself (dialogs, updated tables), so they stay silent.
+  if (props.variant !== "destructive") {
+    return { id, dismiss, update }
+  }
+
   dispatch({
     type: "ADD_TOAST",
     toast: {

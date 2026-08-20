@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { Item } from '@/lib/types';
 import { getFormCategory, getStrengths, matchStrength } from '@/components/sales/sales-directory-utils';
-import { compareItemsForSearch } from '@/lib/search-utils';
+import { compareItemsForSearch, isFuzzyMatch } from '@/lib/search-utils';
 
 export function useSalesDirectorySearch(items: Item[]) {
   const [directoryQuery, setDirectoryQuery] = React.useState('');
@@ -54,7 +54,10 @@ export function useSalesDirectorySearch(items: Item[]) {
         (item.title || '').toLowerCase().includes(q) ||
         (item.medicineGroup || '').toLowerCase().includes(q) ||
         (item.company || '').toLowerCase().includes(q) ||
-        (item.location || '').toLowerCase().includes(q)
+        (item.location || '').toLowerCase().includes(q) ||
+        isFuzzyMatch(item.title, q) ||
+        isFuzzyMatch(item.medicineGroup, q) ||
+        isFuzzyMatch(item.company, q)
     );
 
     return matches

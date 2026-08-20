@@ -63,10 +63,29 @@ export type ClosingStock = Item & {
   closingStock: number;
 };
 
+export type SaleBatchAllocation = {
+  batchId: string;
+  batchNo: string;
+  expiryDate?: string | null;
+  quantity: number;
+  costAtSale: number; // frozen batch cost per unit at sale time
+};
+
 export type SaleItem = {
     itemId: string;
     quantity: number;
     price: number; // This is the selling price at the time of sale
+    batches?: SaleBatchAllocation[]; // FEFO allocation when the item is batch-tracked
+};
+
+export type ItemBatch = {
+  batchNo: string;
+  expiryDate?: string | null; // YYYY-MM-DD
+  quantity: number;
+  initialQuantity: number;
+  cost: number; // landed (capitalized) cost per unit
+  purchaseId?: string; // purchase that received this batch
+  createdAt?: any; // Firestore Timestamp
 };
 
 export type Sale = {
@@ -109,6 +128,7 @@ export type PurchaseItem = {
     medicineGroup?: string;
     company?: string;
     expiryDate?: string;
+    batchNo?: string;
     location?: string;
     quantity: number;
     cost: number;

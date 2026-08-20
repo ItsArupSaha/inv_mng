@@ -122,7 +122,6 @@ export function RecordSaleForm({
         const result = await addSale(userId, saleData);
 
         if (result?.success && result.sale) {
-          toast({ title: 'Sale Recorded', description: 'The new sale has been successfully saved.' });
           setCompletedSale(result.sale);
           setLastSale(result.sale);
           onSuccess();

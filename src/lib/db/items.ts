@@ -11,6 +11,7 @@ import {
   orderBy,
   query,
   startAfter,
+  Timestamp,
   updateDoc,
   where,
   writeBatch
@@ -20,6 +21,8 @@ import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Item } from '../types';
 import { isNonSalableCategory, resolveIsSalable } from '../item-flags';
+import { sumBatchQuantities, distributeStockDelta } from '../batch-allocation';
+import { batchesCollectionRef, batchDocRef, fetchItemBatches } from './batch-utils';
 
 // --- Items Actions ---
 export async function getItems(userId: string): Promise<Item[]> {
@@ -119,6 +122,29 @@ export async function updateItem(userId: string, id: string, data: Omit<Item, 'i
     isSalable: salable,
     sellingPrice: salable ? data.sellingPrice : 0,
   });
+
+  // Manual stock edits must flow into batches when batch tracking is active,
+  // otherwise the next FEFO sale would see a stale quantity.
+  const batches = await fetchItemBatches(userId, id);
+  if (batches.length > 0) {
+    const delta = data.stock - sumBatchQuantities(batches);
+    if (delta !== 0) {
+      const { updates, surplus } = distributeStockDelta(batches, delta);
+      for (const u of updates) {
+        await updateDoc(batchDocRef(userId, id, u.id), { quantity: u.quantity });
+      }
+      if (surplus > 0) {
+        await addDoc(batchesCollectionRef(userId, id), {
+          batchNo: 'ADJUSTMENT',
+          expiryDate: null,
+          quantity: surplus,
+          initialQuantity: surplus,
+          cost: data.productionPrice || 0,
+          createdAt: Timestamp.now(),
+        });
+      }
+    }
+  }
   revalidatePath('/items');
 }
 

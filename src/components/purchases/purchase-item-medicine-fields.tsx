@@ -18,7 +18,7 @@ export function PurchaseItemMedicineFields({ index }: PurchaseItemMedicineFields
         control={control}
         name={`items.${index}.medicineGroup`}
         render={({ field }) => (
-          <FormItem className={'md:col-span-3'}>
+          <FormItem className={'md:col-span-2'}>
             <FormLabel className="text-xs">Group (Generic)</FormLabel>
             <FormControl>
               <Input placeholder="e.g., Paracetamol" {...field} />
@@ -29,9 +29,22 @@ export function PurchaseItemMedicineFields({ index }: PurchaseItemMedicineFields
       />
       <FormField
         control={control}
+        name={`items.${index}.batchNo`}
+        render={({ field }) => (
+          <FormItem className={'md:col-span-2'}>
+            <FormLabel className="text-xs">Batch No</FormLabel>
+            <FormControl>
+              <Input placeholder="e.g., BN-2401" {...field} autoComplete="off" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={control}
         name={`items.${index}.expiryDate`}
         render={({ field }) => (
-          <FormItem className={'md:col-span-3'}>
+          <FormItem className={'md:col-span-2'}>
             <FormLabel className="text-xs">Expiry Date</FormLabel>
             <FormControl>
               <Input type="date" {...field} />

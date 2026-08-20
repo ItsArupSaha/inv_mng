@@ -12,6 +12,8 @@ import {
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Item, Metadata, Purchase } from '../types';
+import { earlierExpiry } from '../batch-allocation';
+import { receivePurchaseBatch } from './batch-utils';
 import { computePurchaseTotals, mergeReceivedStock, planPurchaseSettlements } from './purchase-calculation';
 import { resolveIsSalable } from '../item-flags';
 
@@ -92,7 +94,7 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                                                 : Math.max(bookData.sellingPrice || 0, newProductionPrice * 1.5))
                                             : 0;
                   
-                  const updateData: any = { 
+                  const updateData: any = {
                       stock: newStock,
                       productionPrice: newProductionPrice,
                       sellingPrice: newSellingPrice,
@@ -101,10 +103,22 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   };
                   if (item.medicineGroup) updateData.medicineGroup = item.medicineGroup;
                   if (item.company) updateData.company = item.company;
-                  if (item.expiryDate) updateData.expiryDate = item.expiryDate;
+                  // Keep the EARLIEST known expiry so an older batch's shelf
+                  // life is never silently overwritten by a newer invoice.
+                  if (item.expiryDate) updateData.expiryDate = earlierExpiry(bookData.expiryDate, item.expiryDate);
                   if (item.location) updateData.location = item.location;
 
                   transaction.update(bookDoc.ref, updateData);
+
+                  // Receive the line into its batch (merge same batch number)
+                  await receivePurchaseBatch(
+                      userId,
+                      transaction,
+                      bookDoc.ref.id,
+                      purchaseId,
+                      item,
+                      capitalizedCost
+                  );
               } else {
                   const newItemRef = doc(itemsCollection);
                   const salable = resolveIsSalable({ categoryName: item.categoryName });
@@ -130,6 +144,16 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
                   if (item.location) newItemData.location = item.location;
 
                   transaction.set(newItemRef, newItemData);
+
+                  // Every received line gets a batch record for FEFO
+                  await receivePurchaseBatch(
+                      userId,
+                      transaction,
+                      newItemRef.id,
+                      purchaseId,
+                      item,
+                      capitalizedCost
+                  );
               }
           }
 

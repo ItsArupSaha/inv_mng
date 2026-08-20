@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Sale } from '../types';
+import { isFuzzyMatch } from '../search-utils';
 import { docToSale } from './utils';
 
 // --- Sales Actions ---
@@ -114,22 +115,41 @@ export async function searchSales(userId: string, searchTerm: string): Promise<S
 
   const searchLower = searchTerm.toLowerCase();
 
-  // 1. Fetch matching customers first
+  // 1. Fuzzy-match customers by name
   const customersCollection = collection(db, 'users', userId, 'customers');
   const customersSnapshot = await getDocs(customersCollection);
   const matchingCustomerIds = customersSnapshot.docs
-    .filter(doc => doc.data().name.toLowerCase().includes(searchLower))
+    .filter(doc => {
+      const name = (doc.data().name || '').toLowerCase();
+      return name.includes(searchLower) || isFuzzyMatch(doc.data().name, searchLower);
+    })
     .map(doc => doc.id);
 
-  // 2. Fetch all sales to perform fuzzy in-memory filtering
+  // 2. Fuzzy-match medicines so sales can be found by item name/typo
+  const itemsSnapshot = await getDocs(collection(db, 'users', userId, 'items'));
+  const matchingItemIds = new Set(
+    itemsSnapshot.docs
+      .filter(doc => {
+        const data = doc.data();
+        return (
+          isFuzzyMatch(data.title, searchLower) ||
+          isFuzzyMatch(data.medicineGroup, searchLower) ||
+          isFuzzyMatch(data.company, searchLower)
+        );
+      })
+      .map(doc => doc.id)
+  );
+
+  // 3. Fetch all sales to perform in-memory filtering
   const salesCollection = collection(db, 'users', userId, 'sales');
   const salesSnapshot = await getDocs(query(salesCollection, orderBy('date', 'desc')));
   const allSales = salesSnapshot.docs.map(docToSale);
 
-  // 3. Filter based on saleId OR customerId match
+  // 4. Filter: sale id, customer name, or any line item's medicine
   return allSales.filter(sale => {
     const matchesSaleId = sale.saleId.toLowerCase().includes(searchLower);
     const matchesCustomer = matchingCustomerIds.includes(sale.customerId);
-    return matchesSaleId || matchesCustomer;
+    const matchesItem = sale.items.some(item => matchingItemIds.has(item.itemId));
+    return matchesSaleId || matchesCustomer || matchesItem;
   });
 }

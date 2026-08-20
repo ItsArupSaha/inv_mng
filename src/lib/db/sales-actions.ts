@@ -10,12 +10,192 @@ import {
   runTransaction,
   where
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
-import { db } from '../firebase';
-import type { Item, Metadata, Sale, SaleItem } from '../types';
+import { revalidatePath } from 'next/cache';import { db } from '../firebase';
+import type { Item, ItemBatch, Metadata, Sale, SaleItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
+import { allocateFEFO, sumBatchQuantities } from '../batch-allocation';
+import { batchDocRef, buildBatchData, fetchItemBatches, newBatchDocRef, type ItemBatchWithId } from './batch-utils';
 import { buildReceivable, computeSaleTotals } from './sale-calculation';
 import { docToSale } from './utils';
+import type { Transaction } from 'firebase/firestore';
+
+type SaleBatch = ItemBatchWithId & { isNew?: boolean };
+
+/**
+ * Reads an item's batches outside the transaction (plain getDocs — the
+ * transaction query API is unavailable in this Firestore build). Stock that
+ * predates batch tracking, or drifted past batch totals, is staged as a
+ * virtual LEGACY entry the caller persists inside the transaction.
+ */
+async function loadBatchesForSale(
+  userId: string,
+  itemId: string,
+  itemData: Item
+): Promise<{ batches: SaleBatch[]; originalQuantities: Record<string, number> }> {
+  const batches: SaleBatch[] = (await fetchItemBatches(userId, itemId)).map(b => ({ ...b }));
+  const originalQuantities: Record<string, number> = {};
+  for (const b of batches) originalQuantities[b.id] = b.quantity;
+
+  const stock = Number(itemData.stock) || 0;
+
+  if (batches.length === 0 && stock > 0) {
+    const ref = newBatchDocRef(userId, itemId);
+    const legacy = buildBatchData({
+      batchNo: 'LEGACY',
+      expiryDate: itemData.expiryDate ?? null,
+      quantity: stock,
+      initialQuantity: stock,
+      cost: Number(itemData.productionPrice) || 0,
+    });
+    batches.push({ ...legacy, id: ref.id, isNew: true });
+    originalQuantities[ref.id] = 0;
+  }
+
+  // Self-heal drift: stock recorded on the item beyond what batches account
+  // for (manual edits, pre-batch purchases) lands in the LEGACY batch.
+  const drift = stock - sumBatchQuantities(batches);
+  if (batches.length > 0 && drift > 0) {
+    let legacy = batches.find(b => b.batchNo === 'LEGACY');
+    if (!legacy) {
+      const ref = newBatchDocRef(userId, itemId);
+      const data = buildBatchData({
+        batchNo: 'LEGACY',
+        expiryDate: itemData.expiryDate ?? null,
+        quantity: 0,
+        initialQuantity: 0,
+        cost: Number(itemData.productionPrice) || 0,
+      });
+      legacy = { ...data, id: ref.id, isNew: true };
+      batches.push(legacy);
+      originalQuantities[ref.id] = 0;
+    }
+    legacy.quantity += drift;
+  }
+
+  return { batches, originalQuantities };
+}
+
+interface DeductResult {
+  itemsWithPrices: SaleItem[];
+  totalProductionCost: number;
+}
+
+/**
+ * FEFO deduction shared by addSale and updateSale: validates stock against
+ * live batch quantities, consumes earliest-expiry batches first, writes the
+ * per-batch decrements plus the item stock total, and freezes per-unit cost
+ * at sale time on each line's allocation.
+ */
+async function deductSaleLinesFEFO(
+  transaction: Transaction,
+  userId: string,
+  itemDocsMap: Record<string, { ref: any; data: Item; id: string }>,
+  saleItems: SaleItem[]
+): Promise<DeductResult> {
+  const itemsWithPrices: SaleItem[] = [];
+  let totalProductionCost = 0;
+
+  const batchesByItem: Record<string, SaleBatch[]> = {};
+  const originalsByItem: Record<string, Record<string, number>> = {};
+  const ensureBatches = async (itemId: string) => {
+    if (!batchesByItem[itemId]) {
+      const itemState = itemDocsMap[itemId];
+      const { batches, originalQuantities } = await loadBatchesForSale(userId, itemId, itemState.data);
+      batchesByItem[itemId] = batches;
+      originalsByItem[itemId] = originalQuantities;
+    }
+    return batchesByItem[itemId];
+  };
+
+  for (const saleItem of saleItems) {
+    const itemState = itemDocsMap[saleItem.itemId];
+    if (!itemState) {
+      throw new Error(`Item with id ${saleItem.itemId} not found.`);
+    }
+
+    const itemTitle = itemState.data.title || '';
+    const qtyRequested = Number(saleItem.quantity);
+    const batches = await ensureBatches(saleItem.itemId);
+    const effectiveStock = batches.length > 0 ? sumBatchQuantities(batches) : Number(itemState.data.stock) || 0;
+
+    if (effectiveStock < qtyRequested) {
+      throw new Error(`Not enough stock for ${itemTitle}. Available in selected item: ${effectiveStock}, Requested: ${qtyRequested}`);
+    }
+
+    const price = saleItem.price !== undefined && saleItem.price !== null
+      ? Number(saleItem.price)
+      : Number(itemState.data.sellingPrice || 0);
+
+    let lineCost = 0;
+    let allocations: SaleItem['batches'];
+
+    if (batches.length > 0) {
+      const plan = allocateFEFO(batches, qtyRequested);
+      for (const alloc of plan.allocations) {
+        const batch = batches.find(b => b.id === alloc.batchId);
+        if (batch) batch.quantity -= alloc.quantity;
+        lineCost += alloc.quantity * alloc.costAtSale;
+      }
+      allocations = plan.allocations;
+    } else {
+      lineCost = (Number(itemState.data.productionPrice) || 0) * qtyRequested;
+    }
+
+    const newStockTotal = effectiveStock - qtyRequested;
+    transaction.update(itemState.ref, { stock: newStockTotal });
+    itemState.data.stock = newStockTotal; // keep local state fresh for duplicate lines
+    totalProductionCost += lineCost;
+
+    itemsWithPrices.push({ ...saleItem, price, batches: allocations });
+  }
+
+  // Persist every batch change once, after all lines are allocated: virtual
+  // LEGACY entries are created, existing batches get their final quantity.
+  for (const [itemId, batches] of Object.entries(batchesByItem)) {
+    const originals = originalsByItem[itemId];
+    for (const batch of batches) {
+      const ref = batchDocRef(userId, itemId, batch.id);
+      if (batch.isNew) {
+        const { id: _id, isNew: _isNew, ...data } = batch;
+        transaction.set(ref, data);
+      } else if (batch.quantity !== originals[batch.id]) {
+        transaction.update(ref, { quantity: batch.quantity });
+      }
+    }
+  }
+
+  return { itemsWithPrices, totalProductionCost };
+}
+
+/**
+ * Returns sold quantities to their originating batches (editing/deleting a
+ * sale). Batches deleted in the meantime are recreated from the allocation
+ * record so nothing is silently dropped.
+ */
+async function restoreSaleLineBatches(
+  transaction: Transaction,
+  userId: string,
+  itemId: string,
+  line: SaleItem
+): Promise<void> {
+  if (!line.batches?.length) return;
+
+  for (const alloc of line.batches) {
+    const ref = batchDocRef(userId, itemId, alloc.batchId);
+    const snap = await transaction.get(ref);
+    if (snap.exists()) {
+      transaction.update(ref, { quantity: (Number(snap.data().quantity) || 0) + alloc.quantity });
+    } else {
+      transaction.set(ref, buildBatchData({
+        batchNo: alloc.batchNo,
+        expiryDate: alloc.expiryDate ?? null,
+        quantity: alloc.quantity,
+        initialQuantity: alloc.quantity,
+        cost: alloc.costAtSale,
+      }));
+    }
+  }
+}
 
 export async function addSale(
   userId: string,
@@ -72,44 +252,12 @@ export async function addSale(
       const newSaleNumber = lastSaleNumber + 1;
       const saleId = `SALE-${String(newSaleNumber).padStart(4, '0')}`;
 
-      let totalProductionCost = 0;
-      const itemsWithPrices: SaleItem[] = [];
-
-      // Array to keep track of updates we need to make to item stocks
-      const stockUpdatesToMake: { ref: any; newStock: number }[] = [];
-
-      for (let i = 0; i < data.items.length; i++) {
-        const saleItem = data.items[i];
-        const itemState = itemDocsMap[saleItem.itemId];
-
-        if (!itemState) {
-          throw new Error(`Item with id ${saleItem.itemId} not found.`);
-        }
-
-        const itemTitle = itemState.data.title || '';
-        const currentStock = Number(itemState.data.stock) || 0;
-        const qtyRequested = Number(saleItem.quantity);
-
-        if (currentStock < qtyRequested) {
-          throw new Error(`Not enough stock for ${itemTitle}. Available in selected item: ${currentStock}, Requested: ${qtyRequested}`);
-        }
-
-        const newStock = currentStock - qtyRequested;
-        const itemProductionCost = (Number(itemState.data.productionPrice) || 0) * qtyRequested;
-
-        stockUpdatesToMake.push({ ref: itemState.ref, newStock });
-
-        // Update local map state in case the same item is included multiple times
-        itemState.data.stock = newStock;
-        totalProductionCost += itemProductionCost;
-
-        // Price for this sale item
-        const price = saleItem.price !== undefined && saleItem.price !== null
-          ? Number(saleItem.price)
-          : Number(itemState.data.sellingPrice || 0);
-
-        itemsWithPrices.push({ ...saleItem, price });
-      }
+      const { itemsWithPrices, totalProductionCost } = await deductSaleLinesFEFO(
+        transaction,
+        userId,
+        itemDocsMap,
+        data.items
+      );
 
       const creditApplied = data.creditApplied || 0;
       const { subtotal: calculatedSubtotal, totalAfterDiscount, finalTotal, totalSaleProfit } = computeSaleTotals({
@@ -142,11 +290,6 @@ export async function addSale(
       };
       transaction.set(newSaleRef, saleDataToSave);
       transaction.set(metadataRef, { lastSaleNumber: newSaleNumber }, { merge: true });
-
-      // Apply item stock updates
-      stockUpdatesToMake.forEach(update => {
-        transaction.update(update.ref, { stock: update.newStock });
-      });
 
       const currentDue = customerDoc.data()?.dueBalance || 0;
       let finalDue = currentDue;
@@ -235,12 +378,13 @@ export async function deleteSale(userId: string, saleId: string): Promise<{ succ
 
       // --- WRITE PHASE ---
 
-      // 1. Restore item stock
+      // 1. Restore item stock and return quantities to originating batches
       for (let i = 0; i < itemDocs.length; i++) {
         const itemDoc = itemDocs[i];
         if (itemDoc.exists()) {
           const newStock = Number(itemDoc.data().stock) + Number(saleToDelete.items[i].quantity);
           transaction.update(itemDoc.ref, { stock: newStock });
+          await restoreSaleLineBatches(transaction, userId, saleToDelete.items[i].itemId, saleToDelete.items[i]);
         }
       }
 
@@ -347,49 +491,24 @@ export async function updateSale(
       });
 
       // 1. Restore stock from oldSale.items to the exact old item IDs
+      //    (item total plus the originating batches)
       for (const oldItem of oldSale.items) {
         const itemState = itemDocsMap[oldItem.itemId];
         if (itemState) {
           const restoredStock = (Number(itemState.data.stock) || 0) + Number(oldItem.quantity);
           itemState.data.stock = restoredStock;
           transaction.update(itemState.ref, { stock: restoredStock });
+          await restoreSaleLineBatches(transaction, userId, oldItem.itemId, oldItem);
         }
       }
 
-      // 2. Deduct stock from newSale.items strictly on the selected item IDs
-      let totalProductionCost = 0;
-      const itemsWithPrices: SaleItem[] = [];
-
-      for (let i = 0; i < data.items.length; i++) {
-        const saleItem = data.items[i];
-        const itemState = itemDocsMap[saleItem.itemId];
-
-        if (!itemState) {
-          throw new Error(`Item with id ${saleItem.itemId} not found.`);
-        }
-
-        const itemTitle = itemState.data.title || '';
-        const currentStock = Number(itemState.data.stock) || 0;
-        const qtyRequested = Number(saleItem.quantity);
-
-        if (currentStock < qtyRequested) {
-          throw new Error(`Not enough stock for ${itemTitle}. Available in selected item: ${currentStock}, Requested: ${qtyRequested}`);
-        }
-
-        const newStock = currentStock - qtyRequested;
-        const itemProductionCost = (Number(itemState.data.productionPrice) || 0) * qtyRequested;
-
-        transaction.update(itemState.ref, { stock: newStock });
-        itemState.data.stock = newStock;
-        totalProductionCost += itemProductionCost;
-
-        const price =
-          saleItem.price !== undefined && saleItem.price !== null
-            ? Number(saleItem.price)
-            : Number(itemState.data.sellingPrice || 0);
-
-        itemsWithPrices.push({ ...saleItem, price });
-      }
+      // 2. Deduct stock from newSale.items strictly on the selected item IDs (FEFO)
+      const { itemsWithPrices, totalProductionCost } = await deductSaleLinesFEFO(
+        transaction,
+        userId,
+        itemDocsMap,
+        data.items
+      );
 
       const creditApplied = data.creditApplied || 0;
       const { subtotal: calculatedSubtotal, totalAfterDiscount, finalTotal, totalSaleProfit } = computeSaleTotals({

@@ -16,6 +16,8 @@ import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Metadata, Purchase, PurchaseItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
+import { earlierExpiry, sumBatchQuantities } from '../batch-allocation';
+import { batchesCollectionRef, receivePurchaseBatch, withdrawPurchaseBatch } from './batch-utils';
 import {
   computePurchaseTotals,
   planPurchaseSettlements,
@@ -172,6 +174,18 @@ export async function updatePurchase(
               const itemRef = itemDocsMap[key]?.ref;
               const newItem = newLines[0];
 
+              // Take old invoice lines back out of their batches, then
+              // receive the new lines. When batches were already active for
+              // this item, batch quantities become the stock source of truth.
+              let batchesWereActive = false;
+              if (itemRef) {
+                  const preBatches = await getDocs(query(batchesCollectionRef(userId, itemRef.id)));
+                  batchesWereActive = !preBatches.empty;
+                  for (const oldLine of oldLines) {
+                      await withdrawPurchaseBatch(userId, transaction, itemRef.id, purchaseId, oldLine);
+                  }
+              }
+
               if (itemRef && currentData) {
                   const salable = resolveIsSalable({ isSalable: currentData.isSalable, categoryName: currentData.categoryName });
                   const updateData: any = {
@@ -188,8 +202,25 @@ export async function updatePurchase(
                       if (!salable) updateData.sellingPrice = 0;
                       if (newItem.medicineGroup) updateData.medicineGroup = newItem.medicineGroup;
                       if (newItem.company) updateData.company = newItem.company;
-                      if (newItem.expiryDate) updateData.expiryDate = newItem.expiryDate;
+                      if (newItem.expiryDate) updateData.expiryDate = earlierExpiry(currentData.expiryDate, newItem.expiryDate);
                       if (newItem.location) updateData.location = newItem.location;
+                  }
+
+                  for (const newLine of newLines) {
+                      await receivePurchaseBatch(
+                          userId,
+                          transaction,
+                          itemRef.id,
+                          purchaseId,
+                          newLine,
+                          newLine.cost * factor
+                      );
+                  }
+
+                  if (batchesWereActive) {
+                      const after = await getDocs(query(batchesCollectionRef(userId, itemRef.id)));
+                      const batchTotal = sumBatchQuantities(after.docs.map(d => d.data() as { quantity: number }));
+                      updateData.stock = batchTotal;
                   }
 
                   transaction.update(itemRef, updateData);
@@ -216,6 +247,17 @@ export async function updatePurchase(
                   if (newItem.location) newItemData.location = newItem.location;
 
                   transaction.set(newItemRef, newItemData);
+
+                  for (const newLine of newLines) {
+                      await receivePurchaseBatch(
+                          userId,
+                          transaction,
+                          newItemRef.id,
+                          purchaseId,
+                          newLine,
+                          newLine.cost * factor
+                      );
+                  }
               }
           }
 
