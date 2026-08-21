@@ -33,7 +33,7 @@ import {
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/use-auth';
-import { countExpiringItems, countLowStockSalableItems } from '@/lib/db/item-alerts';
+import { getAlertCounts } from '@/lib/db/item-alerts';
 import { APP_NAME } from '@/lib/app-info';
 import { ProfileButton } from './profile-button';
 
@@ -45,23 +45,29 @@ export function AppSidebar() {
 
   const refreshCounts = React.useCallback(() => {
     if (!user) return;
-    Promise.all([
-      countExpiringItems(user.uid, 90),
-      countLowStockSalableItems(user.uid),
-    ])
-      .then(([expCount, stockCount]) => {
-        setAlertCount(expCount);
-        setStockWarningCount(stockCount);
+    getAlertCounts(user.uid, 90)
+      .then(({ expiring, lowStock }) => {
+        setAlertCount(expiring);
+        setStockWarningCount(lowStock);
       })
       .catch((err) => console.error('Failed to fetch badge counts for sidebar:', err));
   }, [user]);
 
-  // Fetch badge counts once on login and when the tab regains focus,
-  // instead of refetching the whole catalog on every navigation.
+  // Fetch badge counts once on login and at most once per minute when the tab
+  // regains focus — browsers fire focus on every window/app switch, and an
+  // unthrottled listener turns routine window-switching into constant reads.
+  const lastFetchRef = React.useRef(0);
   React.useEffect(() => {
     refreshCounts();
-    window.addEventListener('focus', refreshCounts);
-    return () => window.removeEventListener('focus', refreshCounts);
+    lastFetchRef.current = Date.now();
+    const onFocus = () => {
+      if (Date.now() - lastFetchRef.current > 60_000) {
+        lastFetchRef.current = Date.now();
+        refreshCounts();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [refreshCounts]);
 
   const coreItems = React.useMemo(
