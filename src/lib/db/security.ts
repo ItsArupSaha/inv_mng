@@ -3,6 +3,7 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
+import { invalidateLedgerCaches } from './collection-cache';
 import type { SecurityDeposit } from '../types';
 
 /**
@@ -79,6 +80,7 @@ export async function addSecurityDeposit(
       notes: data.notes || '',
     });
 
+    invalidateLedgerCaches(userId);
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {
@@ -124,6 +126,7 @@ export async function updateSecurityDeposit(
 
     await updateDoc(docRef, updateData);
 
+    invalidateLedgerCaches(userId);
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {
@@ -141,6 +144,7 @@ export async function deleteSecurityDeposit(userId: string, id: string): Promise
     const docRef = doc(db, 'users', userId, 'security_deposits', id);
     await deleteDoc(docRef);
 
+    invalidateLedgerCaches(userId);
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {

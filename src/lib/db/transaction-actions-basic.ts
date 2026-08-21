@@ -12,6 +12,7 @@ import {
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Transaction } from '../types';
+import { invalidateLedgerCaches } from './collection-cache';
 
 export async function addTransaction(userId: string, data: Omit<Transaction, 'id' | 'dueDate' | 'status'> & { dueDate: Date }): Promise<Transaction> {
   if (!db || !userId) throw new Error("Database not connected");
@@ -22,6 +23,7 @@ export async function addTransaction(userId: string, data: Omit<Transaction, 'id
     dueDate: Timestamp.fromDate(data.dueDate),
   };
   const newDocRef = await addDoc(transactionsCollection, transactionData);
+  invalidateLedgerCaches(userId);
   revalidatePath(`/${data.type.toLowerCase()}s`);
   revalidatePath('/dashboard');
   if (data.customerId) {
@@ -54,6 +56,7 @@ export async function recordTransfer(
 
   await addDoc(transfersCollection, transferData);
 
+  invalidateLedgerCaches(userId);
   revalidatePath('/dashboard');
 }
 
@@ -64,6 +67,7 @@ export async function updateTransactionStatus(userId: string, id: string, status
 
   await updateDoc(transRef, { status });
 
+  invalidateLedgerCaches(userId);
   revalidatePath(`/${type.toLowerCase()}s`);
   revalidatePath('/dashboard');
   if (transDoc.exists()) {
@@ -79,6 +83,7 @@ export async function deleteTransaction(userId: string, id: string, type: 'Recei
   if (!db || !userId) return;
   const transRef = doc(db, 'users', userId, 'transactions', id);
   await deleteDoc(transRef);
+  invalidateLedgerCaches(userId);
   revalidatePath(`/${type.toLowerCase()}s`);
   revalidatePath('/dashboard');
 }

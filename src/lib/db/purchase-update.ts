@@ -19,7 +19,7 @@ import type { Metadata, Purchase, PurchaseItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
 import { earlierExpiry } from '../batch-allocation';
 import { BatchWriteLedger } from './batch-ledger';
-import { invalidateCollectionCache } from './collection-cache';
+import { invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
 import {
   computePurchaseTotals,
   planPurchaseSettlements,
@@ -301,6 +301,7 @@ export async function updatePurchase(
       });
 
       invalidateCollectionCache('items', userId);
+      invalidateLedgerCaches(userId);
       revalidatePath('/purchases');
       revalidatePath('/items');
       revalidatePath('/payables');

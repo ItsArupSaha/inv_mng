@@ -10,7 +10,7 @@ import {
   where
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
-import { invalidateCollectionCache } from './collection-cache';
+import { invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
 import { db } from '../firebase';
 import type { Item, Metadata, Purchase } from '../types';
 import { earlierExpiry } from '../batch-allocation';
@@ -193,6 +193,7 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
       });
 
       invalidateCollectionCache('items', userId);
+      invalidateLedgerCaches(userId);
       revalidatePath('/purchases');
       revalidatePath('/items');
       revalidatePath('/payables');

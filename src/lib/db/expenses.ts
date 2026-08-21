@@ -20,6 +20,7 @@ import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Expense, Metadata } from '../types';
 import { docToExpense } from './utils';
+import { invalidateLedgerCaches } from './collection-cache';
 
 // --- Expenses Actions ---
 export async function getExpenses(userId: string): Promise<Expense[]> {
@@ -141,6 +142,7 @@ export async function addExpense(userId: string, data: Omit<Expense, 'id' | 'exp
             return { id: newDocRef.id, expenseId, ...data, date: data.date.toISOString() };
         });
         
+        invalidateLedgerCaches(userId);
         revalidatePath('/expenses');
         revalidatePath('/dashboard');
         return result;
@@ -167,6 +169,7 @@ export async function updateExpense(userId: string, id: string, data: Omit<Expen
         date: Timestamp.fromDate(data.date),
     };
     await updateDoc(expenseRef, expenseData);
+    invalidateLedgerCaches(userId);
     revalidatePath('/expenses');
     revalidatePath('/dashboard');
     return { ...data, id, expenseId: existingData.expenseId, date: data.date.toISOString() };
@@ -176,6 +179,7 @@ export async function deleteExpense(userId: string, id: string) {
     if (!db || !userId) return;
     const expenseRef = doc(db, 'users', userId, 'expenses', id);
     await deleteDoc(expenseRef);
+    invalidateLedgerCaches(userId);
     revalidatePath('/expenses');
     revalidatePath('/dashboard');
 }

@@ -23,9 +23,12 @@ import {
   payPayable as payPayableImpl,
   refundCustomerOverpayment as refundCustomerOverpaymentImpl,
 } from './transaction-actions';
+import { cachedCollection } from './collection-cache';
 
 export async function getTransactions(userId: string, type: 'Receivable' | 'Payable'): Promise<Transaction[]> {
-  return getTransactionsImpl(userId, type);
+  // Cached per type; every ledger mutation evicts the whole `transactions`
+  // family via invalidateLedgerCaches.
+  return cachedCollection(`transactions:${type}`, userId, () => getTransactionsImpl(userId, type));
 }
 
 export async function getTransactionsPaginated(params: {

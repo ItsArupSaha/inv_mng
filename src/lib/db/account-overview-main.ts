@@ -15,6 +15,7 @@ import {
   calculateStockAndAssets,
   calculateReceivables,
 } from './account-overview-helpers';
+import { cachedCollection } from './collection-cache';
 
 
 export async function getAccountOverview(userId: string, asOfDate?: Date) {
@@ -22,18 +23,23 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         throw new Error("Database not connected");
     }
 
+    const database = db;
+    // The overview joins eleven collections; caching it (keyed by the as-of
+    // date the caller picked) keeps repeat visits from re-streaming the whole
+    // ledger. Any ledger mutation evicts the family via invalidateLedgerCaches.
+    return cachedCollection(`account-overview:${asOfDate ? asOfDate.toISOString().slice(0, 10) : 'all-time'}`, userId, async () => {
     const cutoffTimestamp = asOfDate ? Timestamp.fromDate(asOfDate) : undefined;
 
     const [allItems, allSales, allExpenses, allTransactionsData, allPurchases, capitalData, allCustomers, transfersData, donationsData, allReturns, allSecurityDeposits] = await Promise.all([
         getItems(userId),
         getSales(userId),
         getExpenses(userId),
-        getDocs(collection(db, 'users', userId, 'transactions')),
+        getDocs(collection(database, 'users', userId, 'transactions')),
         getPurchases(userId),
-        getDocs(collection(db, 'users', userId, 'capital')),
+        getDocs(collection(database, 'users', userId, 'capital')),
         getCustomers(userId),
-        getDocs(collection(db, 'users', userId, 'transfers')),
-        getDocs(collection(db, 'users', userId, 'donations')),
+        getDocs(collection(database, 'users', userId, 'transfers')),
+        getDocs(collection(database, 'users', userId, 'donations')),
         getSalesReturns(userId),
         getSecurityDeposits(userId),
     ]);
@@ -244,5 +250,6 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         totalExpenses,
         totalStockCount,
     };
+    });
 }
 

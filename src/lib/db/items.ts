@@ -23,7 +23,7 @@ import type { Item } from '../types';
 import { isNonSalableCategory, resolveIsSalable } from '../item-flags';
 import { sumBatchQuantities, distributeStockDelta } from '../batch-allocation';
 import { batchesCollectionRef, batchDocRef, fetchItemBatches } from './batch-utils';
-import { cachedCollection, invalidateCollectionCache } from './collection-cache';
+import { cachedCollection, invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
 
 // --- Items Actions ---
 export async function getItems(userId: string): Promise<Item[]> {
@@ -112,6 +112,7 @@ export async function addItem(userId: string, data: Omit<Item, 'id'>) {
     sellingPrice: salable ? data.sellingPrice : 0,
   });
   invalidateCollectionCache('items', userId);
+  invalidateLedgerCaches(userId);
   revalidatePath('/items');
   return { id: newDocRef.id, ...data, isSalable: salable };
 }
@@ -149,6 +150,7 @@ export async function updateItem(userId: string, id: string, data: Omit<Item, 'i
     }
   }
   invalidateCollectionCache('items', userId);
+  invalidateLedgerCaches(userId);
   revalidatePath('/items');
 }
 
@@ -157,6 +159,7 @@ export async function deleteItem(userId: string, id: string) {
   const itemRef = doc(db, 'users', userId, 'items', id);
   await deleteDoc(itemRef);
   invalidateCollectionCache('items', userId);
+  invalidateLedgerCaches(userId);
   revalidatePath('/items');
 }
 

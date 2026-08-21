@@ -12,6 +12,9 @@ type CacheEntry<T> = { value: T; fetchedAt: number };
 
 const entries = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
+// Bumped on invalidation so a load that started before the mutation cannot
+// write its (now stale) result back into the cache after it resolves.
+const epochs = new Map<string, number>();
 
 export const COLLECTION_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -34,10 +37,13 @@ export async function cachedCollection<T>(
   const pending = inFlight.get(cacheKey) as Promise<T> | undefined;
   if (pending) return pending;
 
+  const epoch = epochs.get(cacheKey) ?? 0;
   const load = fetcher()
     .then((value) => {
-      entries.set(cacheKey, { value, fetchedAt: Date.now() });
       inFlight.delete(cacheKey);
+      if ((epochs.get(cacheKey) ?? 0) === epoch) {
+        entries.set(cacheKey, { value, fetchedAt: Date.now() });
+      }
       return value;
     })
     .catch((error) => {
@@ -49,5 +55,39 @@ export async function cachedCollection<T>(
 }
 
 export function invalidateCollectionCache(cacheName: string, userId: string): void {
-  entries.delete(key(cacheName, userId));
+  const cacheKey = key(cacheName, userId);
+  entries.delete(cacheKey);
+  inFlight.delete(cacheKey);
+  epochs.set(cacheKey, (epochs.get(cacheKey) ?? 0) + 1);
+}
+
+/**
+ * Clears every cache whose name starts with `prefix` for the user — for
+ * families like `transactions:Receivable` / `transactions:Payable` or
+ * per-timezone/per-date dashboard keys that can't be enumerated at the call
+ * site.
+ */
+export function invalidateCollectionCacheFamily(prefix: string, userId: string): void {
+  const stale: string[] = [];
+  for (const cacheKey of entries.keys()) {
+    if (cacheKey.startsWith(`${prefix}:`) && cacheKey.endsWith(`:${userId}`)) stale.push(cacheKey);
+  }
+  for (const flightKey of inFlight.keys()) {
+    if (flightKey.startsWith(`${prefix}:`) && flightKey.endsWith(`:${userId}`)) stale.push(flightKey);
+  }
+  for (const cacheKey of stale) {
+    entries.delete(cacheKey);
+    inFlight.delete(cacheKey);
+    epochs.set(cacheKey, (epochs.get(cacheKey) ?? 0) + 1);
+  }
+}
+
+// Financial aggregates (dashboard stats, Business Overview, transaction
+// listings) all derive from the ledger collections, so any ledger write must
+// evict the whole family. Mutations call this single helper instead of
+// tracking each key individually.
+export function invalidateLedgerCaches(userId: string): void {
+  invalidateCollectionCacheFamily('dashboard-stats', userId);
+  invalidateCollectionCacheFamily('account-overview', userId);
+  invalidateCollectionCacheFamily('transactions', userId);
 }

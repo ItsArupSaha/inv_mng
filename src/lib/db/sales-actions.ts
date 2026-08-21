@@ -11,7 +11,7 @@ import {
   where
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';import { db } from '../firebase';
-import { invalidateCollectionCache } from './collection-cache';
+import { invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
 import type { Item, ItemBatch, Metadata, Sale, SaleItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
 import { allocateFEFO, sumBatchQuantities } from '../batch-allocation';
@@ -335,6 +335,7 @@ export async function addSale(
 
     invalidateCollectionCache('items', userId);
     invalidateCollectionCache('customers', userId);
+    invalidateLedgerCaches(userId);
     revalidatePath('/sales');
     revalidatePath('/dashboard');
     revalidatePath('/items');
@@ -414,6 +415,7 @@ export async function deleteSale(userId: string, saleId: string): Promise<{ succ
 
     invalidateCollectionCache('items', userId);
     invalidateCollectionCache('customers', userId);
+    invalidateLedgerCaches(userId);
     revalidatePath('/sales');
     revalidatePath('/items');
     revalidatePath('/dashboard');
@@ -617,6 +619,7 @@ export async function updateSale(
 
     invalidateCollectionCache('items', userId);
     invalidateCollectionCache('customers', userId);
+    invalidateLedgerCaches(userId);
     revalidatePath('/sales');
     revalidatePath('/dashboard');
     revalidatePath('/items');

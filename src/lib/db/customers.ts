@@ -19,7 +19,7 @@ import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Customer, CustomerWithDue } from '../types';
 import { docToCustomer } from './utils';
-import { cachedCollection, invalidateCollectionCache } from './collection-cache';
+import { cachedCollection, invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
 
 // --- Customers Actions ---
 export async function getCustomers(userId: string): Promise<Customer[]> {
@@ -137,6 +137,7 @@ export async function addCustomer(userId: string, data: Omit<Customer, 'id' | 'd
     const dataWithDue = { ...data, dueBalance: data.openingBalance || 0 };
     const newDocRef = await addDoc(customersCollection, dataWithDue);
     invalidateCollectionCache('customers', userId);
+    invalidateLedgerCaches(userId);
     revalidatePath('/customers');
     return { id: newDocRef.id, ...dataWithDue };
 }
@@ -156,6 +157,7 @@ export async function deleteCustomer(userId: string, id: string) {
     const customerRef = doc(db, 'users', userId, 'customers', id);
     await deleteDoc(customerRef);
     invalidateCollectionCache('customers', userId);
+    invalidateLedgerCaches(userId);
     revalidatePath('/customers');
     revalidatePath('/receivables');
 }

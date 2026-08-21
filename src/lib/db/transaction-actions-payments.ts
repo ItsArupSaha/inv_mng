@@ -12,7 +12,7 @@ import {
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import { docToTransaction } from './utils';
-import { invalidateCollectionCache } from './collection-cache';
+import { invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
 
 export async function addPayment(userId: string, data: { customerId: string, amount: number, paymentMethod: 'Cash' | 'Bank' }) {
   if (!db || !userId) throw new Error("Database not configured.");
@@ -102,6 +102,7 @@ export async function addPayment(userId: string, data: { customerId: string, amo
     });
 
     invalidateCollectionCache('customers', userId);
+    invalidateLedgerCaches(userId);
     revalidatePath('/receivables');
     revalidatePath('/dashboard');
     revalidatePath('/reports');
@@ -195,6 +196,7 @@ export async function payPayable(userId: string, data: { transactionId: string, 
       return { success: true };
     });
 
+    invalidateLedgerCaches(userId);
     revalidatePath('/payables');
     revalidatePath('/dashboard');
     revalidatePath('/expenses');
@@ -281,6 +283,7 @@ export async function refundCustomerOverpayment(userId: string, data: { customer
     });
 
     invalidateCollectionCache('customers', userId);
+    invalidateLedgerCaches(userId);
     revalidatePath('/payables');
     revalidatePath('/dashboard');
     revalidatePath('/expenses');

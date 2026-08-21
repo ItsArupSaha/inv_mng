@@ -1,10 +1,21 @@
 'use server';
 
-import { collection, doc, getDoc, getDocs, query, Timestamp, where } from 'firebase/firestore';
+import {
+  collection,
+  count,
+  doc,
+  getAggregateFromServer,
+  getDoc,
+  getDocs,
+  query,
+  sum,
+  Timestamp,
+  where,
+} from 'firebase/firestore';
 import { db } from '../firebase';
-import { getCustomersWithDueBalance } from './customers';
 import { getExpensesForMonth } from './expenses';
 import { docToSale, docToSalesReturn, isOperatingExpense } from './utils';
+import { cachedCollection, invalidateLedgerCaches } from './collection-cache';
 import type { Sale, SalesReturn } from '../types';
 
 // Profit is computed from the frozen `costAtSale` on FEFO batch allocations
@@ -64,7 +75,13 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
         };
     }
 
-    const userRef = doc(db, 'users', userId);
+    // Cached per timezone offset: the dashboard is re-requested on every visit
+    // but its inputs only change on ledger mutations, which invalidate this
+    // family via invalidateLedgerCaches.
+    const database = db;
+    return cachedCollection(`dashboard-stats:${offsetMinutes ?? 'utc'}`, userId, async () => {
+
+    const userRef = doc(database, 'users', userId);
     const salesCollection = collection(userRef, 'sales');
     const returnsCollection = collection(userRef, 'sales_returns');
 
@@ -112,11 +129,16 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
     const [
         salesSnapshot, 
         returnsSnapshot, 
-        customersWithDue
+        receivablesAggregate
     ] = await Promise.all([
         safeGetDocs(salesQuery),
         safeGetDocs(returnsQuery),
-        getCustomersWithDueBalance(userId)
+        // Aggregate query: ~1 billed read per 1,000 index entries instead of
+        // streaming every due-customer document.
+        getAggregateFromServer(
+            query(collection(db!, 'users', userId, 'customers'), where('dueBalance', '>', 0)),
+            { totalDue: sum('dueBalance'), dueCount: count() }
+        ).catch(() => null)
     ]);
 
     const salesThisMonth = salesSnapshot.docs.map(docToSale);
@@ -142,8 +164,8 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
 
     const netProfit = grossProfitThisMonth - monthlyExpenses - totalReturnCost;
 
-    const receivablesAmount = customersWithDue.reduce((sum, c) => sum + c.dueBalance, 0);
-    const pendingReceivablesCount = customersWithDue.length;
+    const receivablesAmount = receivablesAggregate?.data().totalDue ?? 0;
+    const pendingReceivablesCount = receivablesAggregate?.data().dueCount ?? 0;
 
     return {
         monthlySalesValue,
@@ -153,4 +175,5 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
         receivablesAmount,
         pendingReceivablesCount,
     };
+    });
 }
