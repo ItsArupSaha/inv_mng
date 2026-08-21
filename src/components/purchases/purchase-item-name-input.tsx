@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { compareItemsForSearch, isFuzzyMatch } from '@/lib/search-utils';
 
 interface PurchaseItemNameInputProps {
   index: number;
@@ -29,7 +30,11 @@ export function PurchaseItemNameInput({
     const query = itemName.trim().toLowerCase();
     if (!query) return [];
     return existingItems
-      .filter((item) => item.title && item.title.toLowerCase().includes(query))
+      .filter((item) => {
+        const title = (item.title || '').toLowerCase();
+        return title.includes(query) || isFuzzyMatch(item.title, query);
+      })
+      .sort((a, b) => compareItemsForSearch(a, b, query))
       .slice(0, 5);
   }, [itemName, existingItems]);
 

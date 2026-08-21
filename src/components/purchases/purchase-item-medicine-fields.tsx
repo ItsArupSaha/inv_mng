@@ -29,19 +29,6 @@ export function PurchaseItemMedicineFields({ index }: PurchaseItemMedicineFields
       />
       <FormField
         control={control}
-        name={`items.${index}.batchNo`}
-        render={({ field }) => (
-          <FormItem className={'md:col-span-2'}>
-            <FormLabel className="text-xs">Batch No</FormLabel>
-            <FormControl>
-              <Input placeholder="e.g., BN-2401" {...field} autoComplete="off" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
         name={`items.${index}.expiryDate`}
         render={({ field }) => (
           <FormItem className={'md:col-span-2'}>

@@ -5,7 +5,6 @@ export const purchaseItemSchema = z.object({
   categoryId: z.string().min(1, 'Category is required'),
   categoryName: z.string().min(1, 'Category name is required'),
   medicineGroup: z.string().optional(),
-  batchNo: z.string().optional(),
   company: z.string().optional(),
   expiryDate: z.string().optional(),
   location: z.string().optional(),
