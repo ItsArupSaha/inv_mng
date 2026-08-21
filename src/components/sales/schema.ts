@@ -17,6 +17,7 @@ export const saleFormSchema = z.object({
   splitPaymentMethod: z.enum(['Cash', 'Bank']).optional(),
   creditApplied: z.coerce.number().optional(),
   extraSales: z.coerce.number().min(0, 'Extra sales must be non-negative').default(0).optional(),
+  prescriptionRef: z.string().optional(),
   total: z.coerce.number().min(0, 'Total must be non-negative').optional(),
 }).refine(data => {
   if (data.discountType === 'percentage' && data.discountValue !== undefined) {

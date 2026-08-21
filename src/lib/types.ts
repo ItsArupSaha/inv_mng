@@ -57,6 +57,7 @@ export type Item = {
   stock: number;
   ignoredWarning?: boolean;
   isSalable?: boolean; // false for owned equipment (assets/surgicals); defaults true
+  schedule?: 'narcotic' | 'controlled'; // DGDA schedule flag; absent = ordinary medicine
 };
 
 export type ClosingStock = Item & {
@@ -103,6 +104,7 @@ export type Sale = {
   splitPaymentMethod?: 'Cash' | 'Bank';
   creditApplied?: number;
   extraSales?: number;
+  prescriptionRef?: string; // Required when the sale contains scheduled medicines
 };
 
 export type SalesReturnItem = {

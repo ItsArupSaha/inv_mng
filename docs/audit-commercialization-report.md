@@ -254,7 +254,7 @@ Constraint honored: **no rewrite of working math.** Every phase keeps the `runTr
 
 ### Phase 3 — Pro Features Integration (~4–6 weeks)
 1. Supplier entity + ledger + **purchase returns** (debit note reverses batch qty and payable).
-2. Mushak 6.3 invoice + VAT on sales (`vatRate` → line VAT, 2-decimal money helpers), BIN on memo, VAT report by month.
+2. ~~Mushak 6.3 invoice + VAT on sales~~ — **dropped (2026-08-21)**: in Bangladesh, commercial VAT on medicines is deducted at the company/distributor level; retail pharmacies do not charge VAT on sales, so the feature adds burden without value.
 3. Drug schedule flags + narcotics register + prescription ref on scheduled sales.
 4. Expiry dashboard on batches: ৳-at-risk, quarantine flow, dead-stock/ABC; reorder suggestions.
 5. Barcode: field + POS scan-to-add + label print (jsPDF), EAN-13.

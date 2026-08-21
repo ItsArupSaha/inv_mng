@@ -81,6 +81,13 @@ interface DeductResult {
   totalProductionCost: number;
 }
 
+type BatchRestorePlan = {
+  ref: ReturnType<typeof batchDocRef>;
+  exists: boolean;
+  currentQty: number;
+  alloc: NonNullable<SaleItem['batches']>[number];
+};
+
 /**
  * FEFO deduction shared by addSale and updateSale: validates stock against
  * live batch quantities, consumes earliest-expiry batches first, writes the
@@ -169,30 +176,47 @@ async function deductSaleLinesFEFO(
 }
 
 /**
- * Returns sold quantities to their originating batches (editing/deleting a
- * sale). Batches deleted in the meantime are recreated from the allocation
- * record so nothing is silently dropped.
+ * Read phase of batch restoration: fetches every batch document a sale line's
+ * allocations point at via transaction reads. Firestore requires all
+ * transaction reads before the first staged write, so planning and applying
+ * are separate steps.
  */
-async function restoreSaleLineBatches(
+async function planBatchRestores(
   transaction: Transaction,
   userId: string,
-  itemId: string,
   line: SaleItem
-): Promise<void> {
-  if (!line.batches?.length) return;
+): Promise<BatchRestorePlan[]> {
+  if (!line.batches?.length) return [];
 
+  const plans: BatchRestorePlan[] = [];
   for (const alloc of line.batches) {
-    const ref = batchDocRef(userId, itemId, alloc.batchId);
+    const ref = batchDocRef(userId, line.itemId, alloc.batchId);
     const snap = await transaction.get(ref);
-    if (snap.exists()) {
-      transaction.update(ref, { quantity: (Number(snap.data().quantity) || 0) + alloc.quantity });
+    plans.push({
+      ref,
+      exists: snap.exists(),
+      currentQty: snap.exists() ? Number(snap.data().quantity) || 0 : 0,
+      alloc,
+    });
+  }
+  return plans;
+}
+
+/** Write phase of batch restoration; pairs with planBatchRestores. */
+function applyBatchRestores(
+  transaction: Transaction,
+  plans: BatchRestorePlan[]
+): void {
+  for (const plan of plans) {
+    if (plan.exists) {
+      transaction.update(plan.ref, { quantity: plan.currentQty + plan.alloc.quantity });
     } else {
-      transaction.set(ref, buildBatchData({
-        batchNo: alloc.batchNo,
-        expiryDate: alloc.expiryDate ?? null,
-        quantity: alloc.quantity,
-        initialQuantity: alloc.quantity,
-        cost: alloc.costAtSale,
+      transaction.set(plan.ref, buildBatchData({
+        batchNo: plan.alloc.batchNo,
+        expiryDate: plan.alloc.expiryDate ?? null,
+        quantity: plan.alloc.quantity,
+        initialQuantity: plan.alloc.quantity,
+        cost: plan.alloc.costAtSale,
       }));
     }
   }
@@ -226,6 +250,15 @@ export async function addSale(
       const itemData = snap.data() as Item;
       if (!resolveIsSalable(itemData)) {
         return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
+      }
+      // Narcotics register compliance: server-side guard so scheduled
+      // medicines can never be committed without a prescription reference,
+      // even if the POS validation is bypassed.
+      if (itemData.schedule && !data.prescriptionRef?.trim()) {
+        return {
+          success: false,
+          error: `A prescription reference is required for the scheduled medicine "${itemData.title}".`,
+        };
       }
     }
 
@@ -277,6 +310,9 @@ export async function addSale(
       if (data.paymentMethod !== 'Split') {
         delete cleanedData.amountPaid;
         delete cleanedData.splitPaymentMethod;
+      }
+      if (!data.prescriptionRef?.trim()) {
+        delete cleanedData.prescriptionRef;
       }
 
       const saleDataToSave: Omit<Sale, 'id'> & { date: Timestamp, creditApplied?: number } = {
@@ -380,6 +416,11 @@ export async function deleteSale(userId: string, saleId: string): Promise<{ succ
       const relatedTransactionsQuery = query(transactionsCollection, where('saleId', '==', saleToDelete.saleId));
       const relatedTransactionDocs = await getDocs(relatedTransactionsQuery);
 
+      // Batch restore reads must also complete before the first write.
+      const restorePlans = await Promise.all(
+        saleToDelete.items.map((line) => planBatchRestores(transaction, userId, line))
+      );
+
       // --- WRITE PHASE ---
 
       // 1. Restore item stock and return quantities to originating batches
@@ -388,7 +429,7 @@ export async function deleteSale(userId: string, saleId: string): Promise<{ succ
         if (itemDoc.exists()) {
           const newStock = Number(itemDoc.data().stock) + Number(saleToDelete.items[i].quantity);
           transaction.update(itemDoc.ref, { stock: newStock });
-          await restoreSaleLineBatches(transaction, userId, saleToDelete.items[i].itemId, saleToDelete.items[i]);
+          applyBatchRestores(transaction, restorePlans[i]);
         }
       }
 
@@ -469,6 +510,19 @@ export async function updateSale(
       if (!resolveIsSalable(itemData)) {
         return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
       }
+      // Scheduled-medicine guard; edits keep the reference already recorded on
+      // the original sale when the dialog doesn't resend it.
+      if (
+        itemData.schedule &&
+        data.items.some((line) => line.itemId === snap.id) &&
+        !data.prescriptionRef?.trim() &&
+        !oldSale.prescriptionRef?.trim()
+      ) {
+        return {
+          success: false,
+          error: `A prescription reference is required for the scheduled medicine "${itemData.title}".`,
+        };
+      }
     }
 
     const result = await runTransaction(db, async (transaction) => {
@@ -497,17 +551,22 @@ export async function updateSale(
         }
       });
 
+      // Batch restore reads must complete before the first staged write.
+      const restorePlans = await Promise.all(
+        oldSale.items.map((oldItem) => planBatchRestores(transaction, userId, oldItem))
+      );
+
       // 1. Restore stock from oldSale.items to the exact old item IDs
       //    (item total plus the originating batches)
-      for (const oldItem of oldSale.items) {
+      oldSale.items.forEach((oldItem, index) => {
         const itemState = itemDocsMap[oldItem.itemId];
         if (itemState) {
           const restoredStock = (Number(itemState.data.stock) || 0) + Number(oldItem.quantity);
           itemState.data.stock = restoredStock;
           transaction.update(itemState.ref, { stock: restoredStock });
-          await restoreSaleLineBatches(transaction, userId, oldItem.itemId, oldItem);
+          applyBatchRestores(transaction, restorePlans[index]);
         }
-      }
+      });
 
       // 2. Deduct stock from newSale.items strictly on the selected item IDs (FEFO)
       const { itemsWithPrices, totalProductionCost } = await deductSaleLinesFEFO(
@@ -592,6 +651,16 @@ export async function updateSale(
       if (data.paymentMethod !== 'Split') {
         delete cleanedData.amountPaid;
         delete cleanedData.splitPaymentMethod;
+      }
+      // Preserve the recorded prescription reference when the edit dialog
+      // doesn't resend it; strip it entirely when neither source has one so
+      // Firestore never receives an undefined field value.
+      if (data.prescriptionRef?.trim()) {
+        cleanedData.prescriptionRef = data.prescriptionRef.trim();
+      } else if (oldSale.prescriptionRef?.trim()) {
+        cleanedData.prescriptionRef = oldSale.prescriptionRef;
+      } else {
+        delete cleanedData.prescriptionRef;
       }
 
       const updatedSaleData: Omit<Sale, 'id'> & { date: Timestamp; creditApplied?: number } = {

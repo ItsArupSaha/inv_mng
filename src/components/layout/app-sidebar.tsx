@@ -83,6 +83,7 @@ export function AppSidebar() {
     () => [
       { href: '/payables', icon: ArrowRightLeft, label: 'Payables (Suppliers)' },
       { href: '/transfer', icon: ArrowLeftRight, label: 'Transfers (Cash/Bank)' },
+      { href: '/scheduled-register', icon: ShieldAlert, label: 'Scheduled Register' },
       { href: '/bulk-shelf-update', icon: FolderSync, label: 'Shelf Update (Bulk)' },
     ],
     []

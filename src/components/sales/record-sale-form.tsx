@@ -4,7 +4,8 @@ import * as React from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Printer } from 'lucide-react';
-import { Form } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +37,7 @@ const getDefaultValues = () => ({
   splitPaymentMethod: 'Cash' as const,
   creditApplied: 0,
   extraSales: 0,
+  prescriptionRef: '',
   total: 0,
 });
 
@@ -74,6 +76,16 @@ export function RecordSaleForm({
     }, 0);
   }, [watchItems]);
 
+  // Narcotics/controlled register compliance: any scheduled medicine in the
+  // cart makes a prescription reference mandatory before the sale can commit.
+  const scheduledItems = React.useMemo(() => {
+    const selected = new Set(
+      watchItems.filter((item: any) => item?.itemId).map((item: any) => item.itemId as string)
+    );
+    return items.filter((item) => selected.has(item.id) && item.schedule);
+  }, [watchItems, items]);
+  const hasScheduledItems = scheduledItems.length > 0;
+
   const focusFirstSearch = React.useCallback(() => {
     requestAnimationFrame(() => {
       const firstInput = document.querySelector<HTMLInputElement>('[data-row="0"][data-col="0"]');
@@ -108,6 +120,15 @@ export function RecordSaleForm({
       return;
     }
 
+    if (hasScheduledItems && !data.prescriptionRef?.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Prescription Required',
+        description: `This sale contains scheduled medicines (${scheduledItems.map((i) => i.title).join(', ')}). Enter the prescription reference before confirming.`,
+      });
+      return;
+    }
+
     startTransition(async () => {
       try {
         const saleData = {
@@ -117,6 +138,7 @@ export function RecordSaleForm({
           date: data.date.toISOString(),
           discountType: 'none' as const,
           discountValue: 0,
+          prescriptionRef: data.prescriptionRef?.trim() || undefined,
         };
 
         const result = await addSale(userId, saleData);
@@ -152,6 +174,24 @@ export function RecordSaleForm({
             remove={remove}
             appendRow={handleAddNewRow}
           />
+          {hasScheduledItems && (
+            <FormField
+              control={form.control}
+              name="prescriptionRef"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Prescription Reference (required — scheduled medicines:{' '}
+                    {scheduledItems.map((i) => i.title).join(', ')})
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Rx #, doctor & date on prescription" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
           <SaleSummaryCard subtotal={subtotal} />
           <div className="flex justify-end gap-2 border-t pt-4">
             {lastSale && !completedSale && (

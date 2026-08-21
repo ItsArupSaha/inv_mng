@@ -7,6 +7,7 @@ export const itemSchema = z.object({
   company: z.string().optional(),
   expiryDate: z.string().optional(),
   location: z.string().optional(),
+  schedule: z.enum(['none', 'narcotic', 'controlled']).default('none'),
   productionPrice: z.coerce.number().min(0, 'Production price must be positive'),
   sellingPrice: z.coerce.number().min(0, 'Selling price must be positive'),
   stock: z.coerce.number().int().min(0, 'Stock must be a non-negative integer'),
