@@ -4,11 +4,12 @@
 // StrictMode double-mounting in development — which streams the whole catalog
 // repeatedly and exhausts Firestore's free-tier daily read quota. This layer
 // deduplicates concurrent loads (in-flight promise sharing) and serves
-// subsequent reads from memory until the TTL lapses or a mutation invalidates
-// the entry. Server-action modules must call the invalidation helpers after
-// any transaction that writes the underlying documents.
+// subsequent reads from memory until the TTL lapses, the entry's version is
+// superseded, or a mutation invalidates it. Server-action modules must call
+// the invalidation helpers after any transaction that writes the underlying
+// documents.
 
-type CacheEntry<T> = { value: T; fetchedAt: number };
+type CacheEntry<T> = { value: T; fetchedAt: number; version?: number };
 
 type CacheStore = {
   entries: Map<string, CacheEntry<unknown>>;
@@ -35,6 +36,19 @@ const epochs = store.epochs;
 
 export const COLLECTION_CACHE_TTL_MS = 5 * 60 * 1000;
 
+export interface CacheOptions {
+  ttlMs?: number;
+  /**
+   * Database-backed version of the underlying data (see catalog-version.ts).
+   * A read whose version differs from the cached entry's refetches even
+   * inside the TTL, which is what makes the cache safe when the app is
+   * served by multiple server instances: a mutation through instance A bumps
+   * the version in Firestore, and instance B notices on its next read
+   * instead of serving stale stock for the rest of the TTL.
+   */
+  version?: number;
+}
+
 function key(cacheName: string, userId: string): string {
   return `${cacheName}:${userId}`;
 }
@@ -43,23 +57,26 @@ export async function cachedCollection<T>(
   cacheName: string,
   userId: string,
   fetcher: () => Promise<T>,
-  ttlMs: number = COLLECTION_CACHE_TTL_MS
+  options: CacheOptions = {}
 ): Promise<T> {
   const cacheKey = key(cacheName, userId);
+  const ttlMs = options.ttlMs ?? COLLECTION_CACHE_TTL_MS;
   const hit = entries.get(cacheKey) as CacheEntry<T> | undefined;
-  if (hit && Date.now() - hit.fetchedAt < ttlMs) {
+  const fresh = hit && Date.now() - hit.fetchedAt < ttlMs;
+  const versionOk = options.version === undefined || hit?.version === options.version;
+  if (hit && fresh && versionOk) {
     return hit.value;
   }
 
   const pending = inFlight.get(cacheKey) as Promise<T> | undefined;
-  if (pending) return pending;
+  if (pending && versionOk) return pending;
 
   const epoch = epochs.get(cacheKey) ?? 0;
   const load = fetcher()
     .then((value) => {
       inFlight.delete(cacheKey);
       if ((epochs.get(cacheKey) ?? 0) === epoch) {
-        entries.set(cacheKey, { value, fetchedAt: Date.now() });
+        entries.set(cacheKey, { value, fetchedAt: Date.now(), version: options.version });
       }
       return value;
     })

@@ -6,10 +6,25 @@ import type {
   invalidateLedgerCaches as invalidateLedgerCachesType,
 } from '../collection-cache';
 
-// The cache is a module-level singleton; each test gets a fresh instance so
-// entries from one test can never satisfy reads in another.
+// The cache is a process-wide singleton (state lives on globalThis so every
+// module instance shares it); each test clears that shared store so entries
+// from one test can never satisfy reads in another.
 async function freshCache() {
-  vi.resetModules();
+  const globalStore = globalThis as typeof globalThis & {
+    __pharmoraCollectionCache?: {
+      entries: Map<string, unknown>;
+      inFlight: Map<string, unknown>;
+      epochs: Map<string, number>;
+    };
+  };
+  const store = (globalStore.__pharmoraCollectionCache ??= {
+    entries: new Map(),
+    inFlight: new Map(),
+    epochs: new Map(),
+  });
+  store.entries.clear();
+  store.inFlight.clear();
+  store.epochs.clear();
   const module = await import('../collection-cache');
   return {
     cachedCollection: module.cachedCollection as typeof cachedCollectionType,
@@ -106,5 +121,16 @@ describe('collection-cache', () => {
     expect(await cache.cachedCollection('transactions:Payable', 'u1', async () => 't2')).toBe('t2');
     // Non-ledger caches survive
     expect(await cache.cachedCollection('items', 'u1', async () => 'changed')).toBe('i');
+  });
+
+  it('refetches when the caller-supplied version changes, even inside the TTL', async () => {
+    const cache = await freshCache();
+    const fetcher = vi.fn().mockResolvedValue('v1-data');
+    expect(await cache.cachedCollection('items', 'u1', fetcher, { version: 3 })).toBe('v1-data');
+    // Same version → cache hit
+    await cache.cachedCollection('items', 'u1', fetcher, { version: 3 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    // Different version (another server instance saw the bump) → refetch
+    expect(await cache.cachedCollection('items', 'u1', async () => 'v2-data', { version: 4 })).toBe('v2-data');
   });
 });

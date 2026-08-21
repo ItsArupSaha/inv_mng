@@ -24,10 +24,17 @@ import { isNonSalableCategory, resolveIsSalable } from '../item-flags';
 import { sumBatchQuantities, distributeStockDelta } from '../batch-allocation';
 import { batchesCollectionRef, batchDocRef, fetchItemBatches } from './batch-utils';
 import { cachedCollection, invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
+import { invalidateItemsCatalog as invalidateItemsCatalogImpl, readCatalogVersion } from './catalog-version';
+
+
 
 // --- Items Actions ---
 export async function getItems(userId: string): Promise<Item[]> {
   if (!db || !userId) return [];
+  // The catalog version (one cheap read of the user doc) makes this cache
+  // multi-instance safe: mutations bump it in Firestore, so a version change
+  // forces a refetch here even inside the TTL.
+  const version = await readCatalogVersion(userId);
   return cachedCollection('items', userId, async () => {
     const itemsCollection = collection(db!, 'users', userId, 'items');
     const snapshot = await getDocs(query(itemsCollection, orderBy('title')));
@@ -59,7 +66,7 @@ export async function getItems(userId: string): Promise<Item[]> {
     }
 
     return items;
-  });
+  }, { version });
 }
 
 export async function getItemsPaginated({ userId, pageLimit = 10, lastVisibleId }: { userId: string, pageLimit?: number, lastVisibleId?: string }): Promise<{ items: Item[], hasMore: boolean }> {
@@ -111,7 +118,7 @@ export async function addItem(userId: string, data: Omit<Item, 'id'>) {
     isSalable: salable,
     sellingPrice: salable ? data.sellingPrice : 0,
   });
-  invalidateCollectionCache('items', userId);
+  await invalidateItemsCatalogImpl(userId);
   invalidateLedgerCaches(userId);
   revalidatePath('/items');
   return { id: newDocRef.id, ...data, isSalable: salable };
@@ -149,7 +156,7 @@ export async function updateItem(userId: string, id: string, data: Omit<Item, 'i
       }
     }
   }
-  invalidateCollectionCache('items', userId);
+  await invalidateItemsCatalogImpl(userId);
   invalidateLedgerCaches(userId);
   revalidatePath('/items');
 }
@@ -158,7 +165,7 @@ export async function deleteItem(userId: string, id: string) {
   if (!db || !userId) return;
   const itemRef = doc(db, 'users', userId, 'items', id);
   await deleteDoc(itemRef);
-  invalidateCollectionCache('items', userId);
+  await invalidateItemsCatalogImpl(userId);
   invalidateLedgerCaches(userId);
   revalidatePath('/items');
 }
@@ -167,7 +174,7 @@ export async function ignoreItemWarning(userId: string, id: string, ignore: bool
   if (!db || !userId) return;
   const itemRef = doc(db, 'users', userId, 'items', id);
   await updateDoc(itemRef, { ignoredWarning: ignore });
-  invalidateCollectionCache('items', userId);
+  await invalidateItemsCatalogImpl(userId);
   revalidatePath('/items');
   revalidatePath('/stock-warnings');
 }
@@ -199,7 +206,7 @@ export async function bulkUpdateItemLocationByCompany(
     }
 
     await Promise.all(batchPromises);
-    invalidateCollectionCache('items', userId);
+    await invalidateItemsCatalogImpl(userId);
     revalidatePath('/items');
     return { success: true, updatedCount: batchPromises.length };
   } catch (error: any) {
@@ -221,7 +228,7 @@ export async function resetAllIgnoredWarnings(userId: string) {
     });
     await Promise.all(batchPromises);
 
-    invalidateCollectionCache('items', userId);
+    await invalidateItemsCatalogImpl(userId);
     revalidatePath('/items');
     revalidatePath('/stock-warnings');
     return { success: true, count: snapshot.size };

@@ -10,7 +10,8 @@ import {
   where
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
-import { invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
+import { invalidateLedgerCaches } from './collection-cache';
+import { invalidateItemsCatalog } from './catalog-version';
 import { db } from '../firebase';
 import type { Item, Metadata, Purchase } from '../types';
 import { earlierExpiry } from '../batch-allocation';
@@ -192,7 +193,7 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
           return { success: true, purchase: { id: newPurchaseRef.id, ...purchaseData, date: purchaseDate.toISOString(), dueDate: data.dueDate } };
       });
 
-      invalidateCollectionCache('items', userId);
+      await invalidateItemsCatalog(userId);
       invalidateLedgerCaches(userId);
       revalidatePath('/purchases');
       revalidatePath('/items');
