@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import type { Sale, Item, Purchase, Customer } from '../types';
+import type { Sale, Item, Purchase } from '../types';
 
 export function toNum(v: unknown, fallback = 0): number {
     if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -152,44 +152,4 @@ export function calculateStockAndAssets(
         .reduce((sum: number, item: any) => sum + toNum(item.cost) * toNum(item.quantity), 0) + assetItemsValue;
 
     return { stockValue, officeAssetsValue };
-}
-
-export function calculateReceivables(
-  allCustomers: Customer[],
-  filteredSales: Sale[],
-  paidTransactionsUpToCutoff: any[],
-  filteredReturns: any[]
-) {
-    let receivables = allCustomers.reduce(
-        (sum: number, customer: any) => sum + toNum(customer.openingBalance),
-        0
-    );
-
-    filteredSales.forEach((sale: any) => {
-        receivables += toNum(sale.creditApplied);
-
-        const total = toNum(sale.total);
-        const amountPaid = toNum(sale.amountPaid);
-        if (sale.paymentMethod === 'Due') {
-            receivables += total;
-        } else if (sale.paymentMethod === 'Split') {
-            const due = total - amountPaid;
-            receivables += due;
-        }
-    });
-
-    paidTransactionsUpToCutoff.forEach((t: any) => {
-        if (t.type === 'Receivable') {
-            const description = t.description || '';
-            if (description.startsWith('Payment from customer')) {
-                receivables -= toNum(t.amount);
-            }
-        }
-    });
-
-    filteredReturns.forEach((ret: any) => {
-        receivables -= toNum(ret.totalReturnValue);
-    });
-
-    return receivables;
 }

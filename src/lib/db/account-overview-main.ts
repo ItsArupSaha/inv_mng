@@ -2,18 +2,15 @@
 
 import { Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { getCustomers } from './customers';
 import { getExpenses } from './expenses';
 import { getItems } from './items';
 import { getPurchases } from './purchases';
 import { getSales } from './sales';
-import { getSalesReturns } from './sales-returns';
 import { getSecurityDeposits } from './security';
 import {
   toNum,
   calculateCashAndBank,
   calculateStockAndAssets,
-  calculateReceivables,
 } from './account-overview-helpers';
 import { getRawCapital, getRawDonations, getRawTransactions, getRawTransfers } from './ledger-docs';
 
@@ -30,17 +27,15 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
     // version and every master refetches on the next read.
     const cutoffTimestamp = asOfDate ? Timestamp.fromDate(asOfDate) : undefined;
 
-    const [allItems, allSales, allExpenses, allTransactions, allPurchases, allCapital, allCustomers, allTransfers, allDonations, allReturns, allSecurityDeposits] = await Promise.all([
+    const [allItems, allSales, allExpenses, allTransactions, allPurchases, allCapital, allTransfers, allDonations, allSecurityDeposits] = await Promise.all([
         getItems(userId),
         getSales(userId),
         getExpenses(userId),
         getRawTransactions(userId),
         getPurchases(userId),
         getRawCapital(userId),
-        getCustomers(userId),
         getRawTransfers(userId),
         getRawDonations(userId),
-        getSalesReturns(userId),
         getSecurityDeposits(userId),
     ]);
 
@@ -66,7 +61,6 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
     const filteredTransfers = allTransfers.filter((transfer: any) => isBeforeOrOnCutoff(transfer.date));
     const filteredPurchases = allPurchases.filter((purchase: any) => isBeforeOrOnCutoff(purchase.date));
     const filteredTransactions = allTransactions.filter((t: any) => isBeforeOrOnCutoff(t.dueDate));
-    const filteredReturns = allReturns.filter((ret: any) => isBeforeOrOnCutoff(ret.date));
 
     const paidTransactionsUpToCutoff = filteredTransactions.filter((t: any) => t.status === 'Paid');
 
@@ -190,13 +184,6 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         isBeforeOrOnCutoff
     );
 
-    const receivables = calculateReceivables(
-        allCustomers,
-        filteredSales,
-        paidTransactionsUpToCutoff,
-        filteredReturns
-    );
-
     // Include payables that were outstanding as-of the cutoff date.
     // This covers: currently-Pending payables, AND payables that were Paid AFTER the cutoff
     // (i.e. they were a real liability on that historical date even though settled later).
@@ -210,7 +197,7 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
     });
     const payables = pendingPayables.reduce((sum: number, t: any) => sum + toNum(t.amount), 0);
 
-    const totalAssets = cash + bank + receivables + stockValue + officeAssetsValue + securityDepositsValue;
+    const totalAssets = cash + bank + stockValue + officeAssetsValue + securityDepositsValue;
     const equity = totalAssets - payables;
 
     const totalCapital = filteredCapital.reduce((sum, cap) => sum + toNum(cap.amount), 0);
@@ -233,7 +220,6 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         stockValue,
         officeAssetsValue,
         securityDepositsValue,
-        receivables,
         totalAssets,
         payables,
         equity,

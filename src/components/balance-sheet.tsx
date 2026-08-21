@@ -5,7 +5,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { getAccountOverview, getCapitalHistory, getSecurityDeposits } from '@/lib/actions';
 import type { Capital, SecurityDeposit } from '@/lib/types';
 import { exportBalanceSheetPdf } from './balance-sheet/balance-sheet-pdf';
-import { BalanceSheetKpis } from './balance-sheet/balance-sheet-kpis';
 import { BalanceSheetTableCard } from './balance-sheet/balance-sheet-table-card';
 import { BalanceSheetTabsAndDialogs } from './balance-sheet/balance-sheet-tabs-and-dialogs';
 
@@ -73,11 +72,6 @@ export default function BalanceSheet({ userId }: BalanceSheetProps) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in-50">
-      {/* KPI Overview Cards */}
-      {!isLoading && current && (
-        <BalanceSheetKpis current={current} formatCurrency={formatCurrency} />
-      )}
-
       {/* Main Balance Sheet Table Card */}
       <BalanceSheetTableCard
         current={current}

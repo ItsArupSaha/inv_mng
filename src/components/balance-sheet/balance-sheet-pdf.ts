@@ -5,7 +5,6 @@ import autoTable from 'jspdf-autotable';
 interface BalanceSheetPdfData {
     cash: number;
     bank: number;
-    receivables: number;
     stockValue: number;
     officeAssetsValue: number;
     securityDepositsValue: number;
@@ -72,7 +71,6 @@ export function exportBalanceSheetPdf(
     const assetsBody = [
         ['Cash', formatCurrencyForPdf(current.cash)],
         ['Bank', formatCurrencyForPdf(current.bank)],
-        ['Customer Dues (Receivables)', formatCurrencyForPdf(current.receivables)],
         ['Stock Value', formatCurrencyForPdf(current.stockValue)],
         ['Office Assets', formatCurrencyForPdf(current.officeAssetsValue)],
         ['Security Deposit (Refundable)', formatCurrencyForPdf(current.securityDepositsValue)],
