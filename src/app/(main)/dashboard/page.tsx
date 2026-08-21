@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { getDashboardStats } from '@/lib/db/dashboard';
-import { getItems } from '@/lib/actions';
+import { countExpiringItems } from '@/lib/db/item-alerts';
 import { ArrowRightLeft, DollarSign, Settings, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
@@ -29,11 +29,7 @@ export default function DashboardPage() {
         setIsLoading(false);
       });
       // Fetch expiring medicines count
-      getItems(user.uid).then(items => {
-        const now = new Date();
-        const oneMonthFromNow = new Date();
-        oneMonthFromNow.setDate(now.getDate() + 30);
-        const count = items.filter(item => item.expiryDate && new Date(item.expiryDate) <= oneMonthFromNow && item.stock > 0).length;
+      countExpiringItems(user.uid, 30).then(count => {
         setAlertCount(count);
       }).catch(err => console.error("Failed to fetch alert count for dashboard:", err));
     }

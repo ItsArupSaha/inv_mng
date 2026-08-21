@@ -14,6 +14,7 @@ import {
   startAfter
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
+import { invalidateCollectionCache } from './collection-cache';
 import { db } from '../firebase';
 import type { Item, Metadata, SalesReturn } from '../types';
 import { docToSalesReturn } from './utils';
@@ -127,6 +128,8 @@ export async function addSalesReturn(
         return { success: true, salesReturn: salesReturnForClient };
       });
 
+      invalidateCollectionCache('items', userId);
+      invalidateCollectionCache('customers', userId);
       revalidatePath('/sales-returns');
       revalidatePath('/dashboard');
       revalidatePath('/items');

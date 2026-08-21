@@ -66,31 +66,3 @@ export async function receivePurchaseBatch(
     }));
   }
 }
-
-/**
- * Removes a purchase line's quantity from the batch(es) this purchase
- * received (matched by batch number), flooring at zero — used when a
- * purchase is edited and old lines must be taken back out.
- */
-export async function withdrawPurchaseBatch(
-  userId: string,
-  transaction: Transaction,
-  itemId: string,
-  purchaseId: string,
-  line: PurchaseItem
-): Promise<void> {
-  const batchNo = (line.batchNo || '').trim() || `AUTO-${purchaseId}`;
-  const quantity = Number(line.quantity) || 0;
-  if (quantity <= 0) return;
-
-  const snapshot = await getDocs(query(batchesCollectionRef(userId, itemId)));
-  const target = snapshot.docs.find(d => (d.data().batchNo || '') === batchNo);
-  if (!target) return;
-
-  const remaining = Math.max(0, (Number(target.data().quantity) || 0) - quantity);
-  if (remaining === 0 && (Number(target.data().initialQuantity) || 0) > 0) {
-    transaction.delete(target.ref);
-  } else {
-    transaction.update(target.ref, { quantity: remaining });
-  }
-}

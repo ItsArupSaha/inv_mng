@@ -23,41 +23,43 @@ import type { Item } from '../types';
 import { isNonSalableCategory, resolveIsSalable } from '../item-flags';
 import { sumBatchQuantities, distributeStockDelta } from '../batch-allocation';
 import { batchesCollectionRef, batchDocRef, fetchItemBatches } from './batch-utils';
+import { cachedCollection, invalidateCollectionCache } from './collection-cache';
 
 // --- Items Actions ---
 export async function getItems(userId: string): Promise<Item[]> {
   if (!db || !userId) return [];
-  const itemsCollection = collection(db, 'users', userId, 'items');
-  const snapshot = await getDocs(query(itemsCollection, orderBy('title')));
-  const items = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Item));
+  return cachedCollection('items', userId, async () => {
+    const itemsCollection = collection(db!, 'users', userId, 'items');
+    const snapshot = await getDocs(query(itemsCollection, orderBy('title')));
+    const items = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Item));
 
-  // Auto-migrate legacy docs: backfill isSalable (from category) and force
-  // non-salable items to a zero selling price.
-  const legacyItems = items.filter(item => {
-    const nonSalable = isNonSalableCategory(item.categoryName);
-    const missingFlag = typeof item.isSalable !== 'boolean';
-    return (nonSalable && missingFlag) || (nonSalable && item.sellingPrice !== 0);
-  });
-
-  if (legacyItems.length > 0) {
-    Promise.all(legacyItems.map(async (item) => {
-      try {
-        const itemRef = doc(db!, 'users', userId, 'items', item.id);
-        await updateDoc(itemRef, { isSalable: false, sellingPrice: 0 });
-        item.isSalable = false;
-        item.sellingPrice = 0;
-      } catch (e) {
-        console.error(`Failed to auto-migrate item ${item.id}:`, e);
-      }
-    })).then(() => {
-      revalidatePath('/items');
+    // Auto-migrate legacy docs: backfill isSalable (from category) and force
+    // non-salable items to a zero selling price.
+    const legacyItems = items.filter(item => {
+      const nonSalable = isNonSalableCategory(item.categoryName);
+      const missingFlag = typeof item.isSalable !== 'boolean';
+      return (nonSalable && missingFlag) || (nonSalable && item.sellingPrice !== 0);
     });
-  }
 
-  return items;
+    if (legacyItems.length > 0) {
+      await Promise.all(legacyItems.map(async (item) => {
+        try {
+          const itemRef = doc(db!, 'users', userId, 'items', item.id);
+          await updateDoc(itemRef, { isSalable: false, sellingPrice: 0 });
+          item.isSalable = false;
+          item.sellingPrice = 0;
+        } catch (e) {
+          console.error(`Failed to auto-migrate item ${item.id}:`, e);
+        }
+      }));
+      revalidatePath('/items');
+    }
+
+    return items;
+  });
 }
 
 export async function getItemsPaginated({ userId, pageLimit = 10, lastVisibleId }: { userId: string, pageLimit?: number, lastVisibleId?: string }): Promise<{ items: Item[], hasMore: boolean }> {
@@ -109,6 +111,7 @@ export async function addItem(userId: string, data: Omit<Item, 'id'>) {
     isSalable: salable,
     sellingPrice: salable ? data.sellingPrice : 0,
   });
+  invalidateCollectionCache('items', userId);
   revalidatePath('/items');
   return { id: newDocRef.id, ...data, isSalable: salable };
 }
@@ -145,6 +148,7 @@ export async function updateItem(userId: string, id: string, data: Omit<Item, 'i
       }
     }
   }
+  invalidateCollectionCache('items', userId);
   revalidatePath('/items');
 }
 
@@ -152,6 +156,7 @@ export async function deleteItem(userId: string, id: string) {
   if (!db || !userId) return;
   const itemRef = doc(db, 'users', userId, 'items', id);
   await deleteDoc(itemRef);
+  invalidateCollectionCache('items', userId);
   revalidatePath('/items');
 }
 
@@ -159,6 +164,7 @@ export async function ignoreItemWarning(userId: string, id: string, ignore: bool
   if (!db || !userId) return;
   const itemRef = doc(db, 'users', userId, 'items', id);
   await updateDoc(itemRef, { ignoredWarning: ignore });
+  invalidateCollectionCache('items', userId);
   revalidatePath('/items');
   revalidatePath('/stock-warnings');
 }
@@ -190,6 +196,7 @@ export async function bulkUpdateItemLocationByCompany(
     }
 
     await Promise.all(batchPromises);
+    invalidateCollectionCache('items', userId);
     revalidatePath('/items');
     return { success: true, updatedCount: batchPromises.length };
   } catch (error: any) {
@@ -211,6 +218,7 @@ export async function resetAllIgnoredWarnings(userId: string) {
     });
     await Promise.all(batchPromises);
 
+    invalidateCollectionCache('items', userId);
     revalidatePath('/items');
     revalidatePath('/stock-warnings');
     return { success: true, count: snapshot.size };

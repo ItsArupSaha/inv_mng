@@ -19,13 +19,16 @@ import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Customer, CustomerWithDue } from '../types';
 import { docToCustomer } from './utils';
+import { cachedCollection, invalidateCollectionCache } from './collection-cache';
 
 // --- Customers Actions ---
 export async function getCustomers(userId: string): Promise<Customer[]> {
     if (!db || !userId) return [];
-    const customersCollection = collection(db, 'users', userId, 'customers');
-    const snapshot = await getDocs(query(customersCollection, orderBy('name')));
-    return snapshot.docs.map(docToCustomer);
+    return cachedCollection('customers', userId, async () => {
+        const customersCollection = collection(db!, 'users', userId, 'customers');
+        const snapshot = await getDocs(query(customersCollection, orderBy('name')));
+        return snapshot.docs.map(docToCustomer);
+    });
 }
 
 export async function getCustomersPaginated({ userId, pageLimit = 5, lastVisibleId }: { userId: string, pageLimit?: number, lastVisibleId?: string }): Promise<{ customers: Customer[], hasMore: boolean }> {
@@ -133,6 +136,7 @@ export async function addCustomer(userId: string, data: Omit<Customer, 'id' | 'd
 
     const dataWithDue = { ...data, dueBalance: data.openingBalance || 0 };
     const newDocRef = await addDoc(customersCollection, dataWithDue);
+    invalidateCollectionCache('customers', userId);
     revalidatePath('/customers');
     return { id: newDocRef.id, ...dataWithDue };
 }
@@ -141,6 +145,7 @@ export async function updateCustomer(userId: string, id: string, data: Omit<Cust
     if (!db || !userId) return;
     const customerRef = doc(db, 'users', userId, 'customers', id);
     await updateDoc(customerRef, data);
+    invalidateCollectionCache('customers', userId);
     revalidatePath('/customers');
     revalidatePath('/receivables');
     revalidatePath(`/customers/${id}`);
@@ -150,6 +155,7 @@ export async function deleteCustomer(userId: string, id: string) {
     if (!db || !userId) return;
     const customerRef = doc(db, 'users', userId, 'customers', id);
     await deleteDoc(customerRef);
+    invalidateCollectionCache('customers', userId);
     revalidatePath('/customers');
     revalidatePath('/receivables');
 }

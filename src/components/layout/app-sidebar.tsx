@@ -33,7 +33,7 @@ import {
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/use-auth';
-import { getItems } from '@/lib/actions';
+import { countExpiringItems, countLowStockSalableItems } from '@/lib/db/item-alerts';
 import { APP_NAME } from '@/lib/app-info';
 import { ProfileButton } from './profile-button';
 
@@ -45,20 +45,15 @@ export function AppSidebar() {
 
   const refreshCounts = React.useCallback(() => {
     if (!user) return;
-    getItems(user.uid)
-      .then((items) => {
-        const ninetyDaysFromNow = new Date();
-        ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
-
-        const expCount = items.filter(
-          (item) => item.expiryDate && new Date(item.expiryDate) <= ninetyDaysFromNow && item.stock > 0
-        ).length;
+    Promise.all([
+      countExpiringItems(user.uid, 90),
+      countLowStockSalableItems(user.uid),
+    ])
+      .then(([expCount, stockCount]) => {
         setAlertCount(expCount);
-
-        const stockCount = items.filter((item) => item.isSalable !== false && item.stock < 1).length;
         setStockWarningCount(stockCount);
       })
-      .catch((err) => console.error('Failed to fetch alert count for sidebar:', err));
+      .catch((err) => console.error('Failed to fetch badge counts for sidebar:', err));
   }, [user]);
 
   // Fetch badge counts once on login and when the tab regains focus,

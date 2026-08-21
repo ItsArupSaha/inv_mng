@@ -1,19 +1,60 @@
-
 'use server';
 
-import { collection, doc, getDocs, query, Timestamp, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, Timestamp, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCustomersWithDueBalance } from './customers';
 import { getExpensesForMonth } from './expenses';
-import { docToItem, docToSale, docToSalesReturn, isOperatingExpense } from './utils';
+import { docToSale, docToSalesReturn, isOperatingExpense } from './utils';
+import type { Sale, SalesReturn } from '../types';
+
+// Profit is computed from the frozen `costAtSale` on FEFO batch allocations
+// (phase 2 schema). Only lines lacking allocations — sales recorded before the
+// migration — fall back to the item's current production price, fetched per
+// referenced item id so the catalog is never streamed whole.
+
+function saleFrozenCost(sale: Sale, legacyCosts: Map<string, number>): number {
+  return sale.items.reduce((total, line) => {
+    if (line.batches?.length) {
+      return total + line.batches.reduce((sum, batch) => sum + batch.costAtSale * batch.quantity, 0);
+    }
+    return total + (legacyCosts.get(line.itemId) ?? 0) * line.quantity;
+  }, 0);
+}
+
+function returnCost(saleReturn: SalesReturn, legacyCosts: Map<string, number>): number {
+  return saleReturn.items.reduce((sum, line) => sum + (legacyCosts.get(line.itemId) ?? 0) * line.quantity, 0);
+}
+
+async function fetchLegacyItemCosts(
+  userId: string,
+  sales: Sale[],
+  returns: SalesReturn[]
+): Promise<Map<string, number>> {
+  const ids = new Set<string>();
+  for (const sale of sales) {
+    for (const line of sale.items) {
+      if (!line.batches?.length) ids.add(line.itemId);
+    }
+  }
+  for (const saleReturn of returns) {
+    for (const line of saleReturn.items) ids.add(line.itemId);
+  }
+
+  const costs = new Map<string, number>();
+  await Promise.all(
+    [...ids].map(async (itemId) => {
+      const snapshot = await getDoc(doc(db!, 'users', userId, 'items', itemId));
+      if (snapshot.exists()) {
+        costs.set(itemId, snapshot.data().productionPrice ?? 0);
+      }
+    })
+  );
+  return costs;
+}
 
 export async function getDashboardStats(userId: string, offsetMinutes?: number) {
     if (!db || !userId) {
-        // Return a default structure if no user or DB
         return {
-            totalItemsInStock: 0,
-            totalItemTitles: 0,
-            itemsByCategory: {},
             monthlySalesValue: 0,
             monthlySalesCount: 0,
             monthlyExpenses: 0,
@@ -24,10 +65,8 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
     }
 
     const userRef = doc(db, 'users', userId);
-    const itemsCollection = collection(userRef, 'items');
     const salesCollection = collection(userRef, 'sales');
     const returnsCollection = collection(userRef, 'sales_returns');
-    const expensesCollection = collection(userRef, 'expenses');
 
     const now = new Date();
     const year = now.getFullYear();
@@ -53,7 +92,7 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
         where('date', '>=', Timestamp.fromDate(startDate)),
         where('date', '<=', Timestamp.fromDate(endDate))
     );
-    
+
     const returnsQuery = query(
         returnsCollection,
         where('date', '>=', Timestamp.fromDate(startDate)),
@@ -61,7 +100,7 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
     );
 
     // Wrap snapshot fetching in try/catch to handle cases where collections don't exist yet for new users.
-    const safeGetDocs = async (q: any) => {
+    const safeGetDocs = async (q: ReturnType<typeof query>) => {
         try {
             return await getDocs(q);
         } catch (error) {
@@ -71,70 +110,35 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
     };
 
     const [
-        itemsSnapshot, 
         salesSnapshot, 
-        returnsSnapshot,
+        returnsSnapshot, 
         customersWithDue
     ] = await Promise.all([
-        safeGetDocs(query(itemsCollection)),
         safeGetDocs(salesQuery),
         safeGetDocs(returnsQuery),
         getCustomersWithDueBalance(userId)
     ]);
 
-    const items = itemsSnapshot.docs.map(docToItem);
     const salesThisMonth = salesSnapshot.docs.map(docToSale);
     const returnsThisMonth = returnsSnapshot.docs.map(docToSalesReturn);
     const expensesThisMonth = await getExpensesForMonth(userId, year, month, offsetMinutes);
+    const legacyCosts = await fetchLegacyItemCosts(userId, salesThisMonth, returnsThisMonth);
 
-    const totalItemsInStock = items.reduce((sum, item) => sum + item.stock, 0);
-    const totalItemTitles = items.length;
-    
-    // Group items by category
-    const itemsByCategory = items.reduce((acc, item) => {
-        const category = item.categoryName || 'Uncategorized';
-        if (!acc[category]) {
-            acc[category] = {
-                count: 0,
-                stock: 0,
-                titles: []
-            };
-        }
-        acc[category].count += 1;
-        acc[category].stock += item.stock;
-        acc[category].titles.push(item.title);
-        return acc;
-    }, {} as Record<string, { count: number; stock: number; titles: string[] }>);
-    
     const monthlySalesValue = salesThisMonth.reduce((sum, sale) => sum + sale.total, 0);
     const monthlySalesCount = salesThisMonth.length;
-    
+
     const operatingExpensesThisMonth = expensesThisMonth.filter((expense: any) => isOperatingExpense(expense.description));
     const monthlyExpenses = operatingExpensesThisMonth.reduce((sum: number, expense: any) => sum + expense.amount, 0);
 
-    const grossProfitThisMonth = salesThisMonth.reduce((totalProfit, sale) => {
-        const totalProductionCost = sale.items.reduce((acc, saleItem) => {
-            const inventoryItem = items.find(i => i.id === saleItem.itemId);
-            if (inventoryItem) {
-                return acc + (inventoryItem.productionPrice * saleItem.quantity);
-            }
-            return acc;
-        }, 0);
-        const saleProfit = sale.total - totalProductionCost;
-        return totalProfit + saleProfit;
-    }, 0);
+    const grossProfitThisMonth = salesThisMonth.reduce(
+        (totalProfit, sale) => totalProfit + (sale.total - saleFrozenCost(sale, legacyCosts)),
+        0
+    );
 
-    const totalReturnCost = returnsThisMonth.reduce((totalCost, saleReturn) => {
-        const returnCost = saleReturn.items.reduce((currentReturnCost, item) => {
-            const inventoryItem = items.find(i => i.id === item.itemId);
-            if (inventoryItem) {
-                const itemCost = inventoryItem.productionPrice * item.quantity;
-                return currentReturnCost + itemCost;
-            }
-            return currentReturnCost;
-        }, 0);
-        return totalCost + returnCost;
-    }, 0);
+    const totalReturnCost = returnsThisMonth.reduce(
+        (totalCost, saleReturn) => totalCost + returnCost(saleReturn, legacyCosts),
+        0
+    );
 
     const netProfit = grossProfitThisMonth - monthlyExpenses - totalReturnCost;
 
@@ -142,9 +146,6 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
     const pendingReceivablesCount = customersWithDue.length;
 
     return {
-        totalItemsInStock,
-        totalItemTitles,
-        itemsByCategory,
         monthlySalesValue,
         monthlySalesCount,
         monthlyExpenses,

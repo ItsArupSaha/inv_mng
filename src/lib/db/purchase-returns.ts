@@ -23,6 +23,7 @@ import {
   type RefundLineInput
 } from '../purchase-return-math';
 import { ledgerDocMatchesPurchase } from '../supplier-ledger';
+import { invalidateCollectionCache } from './collection-cache';
 
 export async function getPurchaseReturns(userId: string): Promise<PurchaseReturn[]> {
   if (!db || !userId) return [];
@@ -97,9 +98,8 @@ export async function addPurchaseReturn(userId: string, data: CreatePurchaseRetu
     }
 
     const supplierPurchaseIds = new Set(
-      (await getDocs(purchasesCollection)).docs
+      (await getDocs(query(purchasesCollection, where('supplier', '==', purchase.supplier)))).docs
         .map(d => d.data() as Purchase)
-        .filter(p => p.supplier === purchase.supplier)
         .map(p => p.purchaseId)
     );
     const payablesSnap = await getDocs(query(
@@ -281,6 +281,7 @@ export async function addPurchaseReturn(userId: string, data: CreatePurchaseRetu
       return { success: true as const, purchaseReturn: purchaseReturnForClient };
     });
 
+    invalidateCollectionCache('items', userId);
     revalidatePath('/purchases');
     revalidatePath('/payables');
     revalidatePath('/expenses');

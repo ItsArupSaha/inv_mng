@@ -10,14 +10,16 @@ import {
   runTransaction,
   where,
   type CollectionReference,
+  type DocumentReference,
   type Transaction
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Metadata, Purchase, PurchaseItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
-import { earlierExpiry, sumBatchQuantities } from '../batch-allocation';
-import { batchesCollectionRef, receivePurchaseBatch, withdrawPurchaseBatch } from './batch-utils';
+import { earlierExpiry } from '../batch-allocation';
+import { BatchWriteLedger } from './batch-ledger';
+import { invalidateCollectionCache } from './collection-cache';
 import {
   computePurchaseTotals,
   planPurchaseSettlements,
@@ -88,23 +90,28 @@ export async function updatePurchase(
 
       const oldPurchase = oldPurchaseSnap.data() as Purchase;
       const purchaseId = oldPurchase.purchaseId;
-      const isPurchaseLedgerDoc = makePurchaseLedgerMatcher(purchaseId, [
-        oldPurchase.supplier,
-        data.supplier,
-      ]);
 
-      // Query related expenses and payables
-      const expensesCollection = collection(userRef, 'expenses');
-      const expensesSnap = await getDocs(expensesCollection);
-      const relatedExpenseRefs = expensesSnap.docs
+      // Ledger docs stamped with purchaseId are matched with an equality query
+      // (single-field, auto-indexed). The legacy description matcher runs only
+      // when that finds nothing, so old pre-stamping docs still reconcile
+      // without streaming whole collections on every edit.
+      const matchLedgerDocs = async (
+        col: ReturnType<typeof collection>
+      ): Promise<DocumentReference[]> => {
+        const byId = await getDocs(query(col, where('purchaseId', '==', purchaseId)));
+        if (!byId.empty) return byId.docs.map(d => d.ref);
+        const isPurchaseLedgerDoc = makePurchaseLedgerMatcher(purchaseId, [
+          oldPurchase.supplier,
+          data.supplier,
+        ]);
+        const legacy = await getDocs(col);
+        return legacy.docs
           .filter(docSnap => isPurchaseLedgerDoc(docSnap.data()))
           .map(docSnap => docSnap.ref);
+      };
 
-      const transactionsCollection = collection(userRef, 'transactions');
-      const transactionsSnap = await getDocs(transactionsCollection);
-      const relatedTransactionRefs = transactionsSnap.docs
-          .filter(docSnap => isPurchaseLedgerDoc(docSnap.data()))
-          .map(docSnap => docSnap.ref);
+      const relatedExpenseRefs = await matchLedgerDocs(collection(userRef, 'expenses'));
+      const relatedTransactionRefs = await matchLedgerDocs(collection(userRef, 'transactions'));
 
       // Find all items affected by either old or new purchase, keyed by title + expiry
       const itemsCollection = collection(userRef, 'items');
@@ -138,6 +145,7 @@ export async function updatePurchase(
       const result = await runTransaction(db, async (transaction) => {
           const metadataRef = doc(userRef, 'metadata', 'counters');
           const metadataDoc = await transaction.get(metadataRef);
+          const batchLedger = new BatchWriteLedger(userId, transaction);
 
           // Get current state of each item inside the transaction to prevent race conditions
           const currentItemDataMap: Record<string, any> = {};
@@ -179,10 +187,9 @@ export async function updatePurchase(
               // this item, batch quantities become the stock source of truth.
               let batchesWereActive = false;
               if (itemRef) {
-                  const preBatches = await getDocs(query(batchesCollectionRef(userId, itemRef.id)));
-                  batchesWereActive = !preBatches.empty;
+                  batchesWereActive = await batchLedger.hasCommittedBatches(itemRef.id);
                   for (const oldLine of oldLines) {
-                      await withdrawPurchaseBatch(userId, transaction, itemRef.id, purchaseId, oldLine);
+                      await batchLedger.withdraw(itemRef.id, purchaseId, oldLine);
                   }
               }
 
@@ -207,20 +214,11 @@ export async function updatePurchase(
                   }
 
                   for (const newLine of newLines) {
-                      await receivePurchaseBatch(
-                          userId,
-                          transaction,
-                          itemRef.id,
-                          purchaseId,
-                          newLine,
-                          newLine.cost * factor
-                      );
+                      await batchLedger.receive(itemRef.id, purchaseId, newLine, newLine.cost * factor);
                   }
 
                   if (batchesWereActive) {
-                      const after = await getDocs(query(batchesCollectionRef(userId, itemRef.id)));
-                      const batchTotal = sumBatchQuantities(after.docs.map(d => d.data() as { quantity: number }));
-                      updateData.stock = batchTotal;
+                      updateData.stock = await batchLedger.totalQuantity(itemRef.id);
                   }
 
                   transaction.update(itemRef, updateData);
@@ -249,17 +247,13 @@ export async function updatePurchase(
                   transaction.set(newItemRef, newItemData);
 
                   for (const newLine of newLines) {
-                      await receivePurchaseBatch(
-                          userId,
-                          transaction,
-                          newItemRef.id,
-                          purchaseId,
-                          newLine,
-                          newLine.cost * factor
-                      );
+                      await batchLedger.receive(newItemRef.id, purchaseId, newLine, newLine.cost * factor);
                   }
               }
           }
+
+          // Apply every staged batch mutation exactly once per doc.
+          batchLedger.flush();
 
           // Delete old expenses and transactions
           relatedExpenseRefs.forEach(ref => transaction.delete(ref));
@@ -296,7 +290,7 @@ export async function updatePurchase(
               nextExpenseNumber,
           });
           for (const write of settlement.writes) {
-              applySettlementWrite(transaction, write, expensesCollection, transactionsCollection, new Date(data.dueDate));
+              applySettlementWrite(transaction, write, collection(userRef, 'expenses'), collection(userRef, 'transactions'), new Date(data.dueDate));
           }
 
           if (settlement.lastExpenseNumber > nextExpenseNumber) {
@@ -306,6 +300,7 @@ export async function updatePurchase(
           return { success: true };
       });
 
+      invalidateCollectionCache('items', userId);
       revalidatePath('/purchases');
       revalidatePath('/items');
       revalidatePath('/payables');

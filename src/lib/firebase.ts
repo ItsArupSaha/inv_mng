@@ -1,7 +1,7 @@
 
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
-import { Auth, getAuth } from 'firebase/auth';
-import { Firestore, getFirestore } from 'firebase/firestore';
+import { Auth, connectAuthEmulator, getAuth } from 'firebase/auth';
+import { Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -34,6 +34,13 @@ if (!firebaseConfig.projectId || firebaseConfig.projectId.includes('your-project
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     db = getFirestore(app);
     auth = getAuth(app);
+
+    // Dev/test isolation: NEXT_PUBLIC_USE_FIREBASE_EMULATOR=1 routes all Auth and
+    // Firestore traffic to the local emulator suite instead of the production project.
+    if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === '1') {
+        connectFirestoreEmulator(db, '127.0.0.1', 8080);
+        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    }
 }
 
 export { app, auth, db };

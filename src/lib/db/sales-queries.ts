@@ -16,6 +16,8 @@ import { db } from '../firebase';
 import type { Sale } from '../types';
 import { isFuzzyMatch } from '../search-utils';
 import { docToSale } from './utils';
+import { getItems } from './items';
+import { getCustomers } from './customers';
 
 // --- Sales Actions ---
 export async function getSales(userId: string): Promise<Sale[]> {
@@ -116,28 +118,24 @@ export async function searchSales(userId: string, searchTerm: string): Promise<S
   const searchLower = searchTerm.toLowerCase();
 
   // 1. Fuzzy-match customers by name
-  const customersCollection = collection(db, 'users', userId, 'customers');
-  const customersSnapshot = await getDocs(customersCollection);
-  const matchingCustomerIds = customersSnapshot.docs
-    .filter(doc => {
-      const name = (doc.data().name || '').toLowerCase();
-      return name.includes(searchLower) || isFuzzyMatch(doc.data().name, searchLower);
+  const allCustomers = await getCustomers(userId);
+  const matchingCustomerIds = allCustomers
+    .filter(customer => {
+      const name = (customer.name || '').toLowerCase();
+      return name.includes(searchLower) || isFuzzyMatch(customer.name, searchLower);
     })
-    .map(doc => doc.id);
+    .map(customer => customer.id);
 
   // 2. Fuzzy-match medicines so sales can be found by item name/typo
-  const itemsSnapshot = await getDocs(collection(db, 'users', userId, 'items'));
+  const allItems = await getItems(userId);
   const matchingItemIds = new Set(
-    itemsSnapshot.docs
-      .filter(doc => {
-        const data = doc.data();
-        return (
-          isFuzzyMatch(data.title, searchLower) ||
-          isFuzzyMatch(data.medicineGroup, searchLower) ||
-          isFuzzyMatch(data.company, searchLower)
-        );
-      })
-      .map(doc => doc.id)
+    allItems
+      .filter(item => (
+        isFuzzyMatch(item.title, searchLower) ||
+        isFuzzyMatch(item.medicineGroup, searchLower) ||
+        isFuzzyMatch(item.company, searchLower)
+      ))
+      .map(item => item.id)
   );
 
   // 3. Fetch all sales to perform in-memory filtering
