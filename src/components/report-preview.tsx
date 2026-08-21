@@ -32,7 +32,14 @@ export default function ReportPreview({ reportData, reportType, dateLabel }: Rep
       ? (reportData as DailyReportAnalysis).dailyActivity
       : (reportData as ReportAnalysis).monthlyActivity;
 
-  const { salesBreakdown, cashFlow, netResult, purchases, topSellers } = reportData;
+  const { salesBreakdown, cashFlow, netResult, purchases, topSellers } = reportData ?? ({} as Partial<ReportAnalysis>);
+
+  // A report payload that doesn't match the selected type (e.g. a daily
+  // analysis rendered while the monthly branch is active) must never reach
+  // the tables — every child reads fields like activity.totalSales directly.
+  if (!activity || !netResult || !salesBreakdown || !cashFlow) {
+    return null;
+  }
 
   const handleDownload = () => {
     generateReportPdf({ reportData, reportType, dateLabel, authUser });

@@ -30,6 +30,10 @@ export function generateReportPdf({
       ? (reportData as DailyReportAnalysis).dailyActivity
       : (reportData as ReportAnalysis).monthlyActivity;
 
+  // Mismatched payload/type has nothing printable; the preview already
+  // refuses to render it.
+  if (!activity) return;
+
   const { salesBreakdown, cashFlow, netResult, purchases, topSellers } = reportData;
 
   // Left side header
