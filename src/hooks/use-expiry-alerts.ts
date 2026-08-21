@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { deleteItem, getCategories, getItems } from '@/lib/actions';
 import type { Category, Item } from '@/lib/types';
+import { expiryFilterLabel, summarizeExpiryTiers } from '@/lib/expiry-stats';
 import { isFuzzyMatch } from '@/lib/search-utils';
 import { useExpiryExport } from './use-expiry-export';
 
@@ -67,6 +68,9 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allItems]);
 
+  // Taka-at-risk snapshot across all tiers, independent of the active filter
+  const expirySummary = React.useMemo(() => summarizeExpiryTiers(allItems), [allItems]);
+
   const handleEditItem = (item: Item) => {
     setEditingItem(item);
     setIsItemDialogOpen(true);
@@ -102,8 +106,9 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(now.getDate() + 90);
 
-    // Initial filter for items with expiry dates
-    let result = allItems.filter(item => item.expiryDate);
+    // Initial filter: dated items that still have stock on the shelf — an
+    // expired medicine with zero stock is history, not a warning.
+    let result = allItems.filter(item => item.expiryDate && (Number(item.stock) || 0) > 0);
 
     // Status / Timeframe filter
     if (selectedStatusFilter === 'expired') {
@@ -198,10 +203,12 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
 
   // Call the expiry reports sub-hook
   const expiryExport = useExpiryExport({ authUser });
+  const reportTitle = expiryFilterLabel(selectedStatusFilter);
 
   return {
     categories,
     companies,
+    expirySummary,
     isInitialLoading,
     isItemDialogOpen,
     setIsItemDialogOpen,
@@ -227,7 +234,7 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     displayedItems,
     hasMore,
     handleLoadMore,
-    handlePdf: () => expiryExport.handlePdf(filteredAndSortedItems),
-    handleXlsx: () => expiryExport.handleXlsx(filteredAndSortedItems),
+    handlePdf: () => expiryExport.handlePdf(filteredAndSortedItems, reportTitle),
+    handleXlsx: () => expiryExport.handleXlsx(filteredAndSortedItems, reportTitle),
   };
 }

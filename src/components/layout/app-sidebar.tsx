@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   ArrowLeftRight,
@@ -15,6 +16,7 @@ import {
   AlertTriangle,
   ShieldAlert,
   FolderSync,
+  Users,
 } from 'lucide-react';
 
 import {
@@ -32,6 +34,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/use-auth';
 import { getItems } from '@/lib/actions';
+import { APP_NAME } from '@/lib/app-info';
 import { ProfileButton } from './profile-button';
 
 export function AppSidebar() {
@@ -48,7 +51,7 @@ export function AppSidebar() {
         ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
 
         const expCount = items.filter(
-          (item) => item.expiryDate && new Date(item.expiryDate) <= ninetyDaysFromNow
+          (item) => item.expiryDate && new Date(item.expiryDate) <= ninetyDaysFromNow && item.stock > 0
         ).length;
         setAlertCount(expCount);
 
@@ -72,6 +75,7 @@ export function AppSidebar() {
       { href: '/items', icon: Package, label: 'Medicines / Stocks' },
       { href: '/expenses', icon: CreditCard, label: 'Expense' },
       { href: '/purchases', icon: ShoppingBag, label: 'Purchase' },
+      { href: '/suppliers', icon: Users, label: 'Supplier Ledger' },
       { href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true },
       { href: '/stock-warnings', icon: ShieldAlert, label: 'Stock Warnings', stockBadge: true },
       { href: '/reports', icon: FileText, label: 'Reports' },
@@ -123,12 +127,17 @@ export function AppSidebar() {
     <Sidebar className="border-r bg-card/60 backdrop-blur-md">
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Store className="h-6 w-6 text-primary-foreground" />
-          </div>
+          <Image
+            src="/logo.png"
+            alt="Pharmora"
+            width={144}
+            height={96}
+            priority
+            className="h-12 w-auto object-contain shrink-0"
+          />
           <div className="flex flex-col truncate">
             <h1 className="font-headline text-lg font-bold text-foreground truncate">
-              {authUser?.companyName || 'Smart Stock'}
+              {authUser?.companyName || APP_NAME}
             </h1>
             <p className="text-xs text-muted-foreground capitalize">Pharmacy Management</p>
           </div>

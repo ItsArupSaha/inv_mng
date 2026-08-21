@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Item } from '@/lib/types';
+import { itemStockValue } from '@/lib/expiry-stats';
 import { cn } from '@/lib/utils';
 
 interface ItemsTableProps {
@@ -24,6 +25,7 @@ interface ItemsTableProps {
   onEdit: (item: Item) => void;
   onDelete: (id: string) => void;
   isPending: boolean;
+  showStockValue?: boolean;
 }
 
 export function ItemsTable({
@@ -32,6 +34,7 @@ export function ItemsTable({
   onEdit,
   onDelete,
   isPending,
+  showStockValue = false,
 }: ItemsTableProps) {
   // Pharmacy column labels
   const titleHeader = 'Medicine Name';
@@ -51,6 +54,7 @@ export function ItemsTable({
             <TableHead className="hidden sm:table-cell">Expiry Date</TableHead>
             <TableHead className="hidden lg:table-cell">{locationHeader}</TableHead>
             <TableHead className="text-right hidden sm:table-cell">Prod. Cost</TableHead>
+            {showStockValue && <TableHead className="text-right hidden sm:table-cell">Value (Cost)</TableHead>}
             <TableHead className="text-right">Selling Price</TableHead>
             <TableHead className="text-right">Stock</TableHead>
             <TableHead className="text-right w-[120px]">Actions</TableHead>
@@ -104,6 +108,11 @@ export function ItemsTable({
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">{item.location || '-'}</TableCell>
                   <TableCell className="text-right hidden sm:table-cell">৳{item.productionPrice.toFixed(2)}</TableCell>
+                  {showStockValue && (
+                    <TableCell className="text-right hidden sm:table-cell font-medium">
+                      ৳{itemStockValue(item).toFixed(2)}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">৳{item.sellingPrice.toFixed(2)}</TableCell>
                   <TableCell className="text-right">{item.stock}</TableCell>
                   <TableCell className="text-right">
@@ -119,7 +128,7 @@ export function ItemsTable({
             })
           ) : (
             <TableRow>
-              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={showStockValue ? 11 : 10} className="h-24 text-center text-muted-foreground">
                 No items found matching your filters.
               </TableCell>
             </TableRow>

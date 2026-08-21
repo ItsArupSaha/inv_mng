@@ -23,7 +23,7 @@ export default function CustomerStatementPDF({ customer, sales, items }: Custome
     if (!authUser) return;
     const doc = new jsPDF();
     
-    const companyName = authUser.companyName || 'Bookstore';
+    const companyName = authUser.companyName || 'Pharmacy';
     const companyAddress = authUser.address || '';
     const companyPhone = authUser.phone || '';
     

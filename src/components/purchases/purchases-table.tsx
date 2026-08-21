@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
-import { Edit } from 'lucide-react';
+import { Edit, Undo2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,14 @@ interface PurchasesTableProps {
   purchases: Purchase[];
   isInitialLoading: boolean;
   onEdit?: (purchase: Purchase) => void;
+  onReturn?: (purchase: Purchase) => void;
 }
 
 export function PurchasesTable({
   purchases,
   isInitialLoading,
   onEdit,
+  onReturn,
 }: PurchasesTableProps) {
   return (
     <div className="border rounded-md overflow-x-auto w-full">
@@ -63,9 +65,14 @@ export function PurchasesTable({
               <TableCell className="text-right text-muted-foreground hidden sm:table-cell">{purchase.discountAmount ? `৳${purchase.discountAmount.toFixed(2)}` : '-'}</TableCell>
               <TableCell className="text-right font-bold">৳{(purchase.totalAmount + (purchase.vatAmount || 0) - (purchase.discountAmount || 0)).toFixed(2)}</TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="icon" onClick={() => onEdit?.(purchase)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="icon" onClick={() => onEdit?.(purchase)} title="Edit purchase">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => onReturn?.(purchase)} title="Return to supplier">
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           )) : (

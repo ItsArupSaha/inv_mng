@@ -33,7 +33,7 @@ export default function DashboardPage() {
         const now = new Date();
         const oneMonthFromNow = new Date();
         oneMonthFromNow.setDate(now.getDate() + 30);
-        const count = items.filter(item => item.expiryDate && new Date(item.expiryDate) <= oneMonthFromNow).length;
+        const count = items.filter(item => item.expiryDate && new Date(item.expiryDate) <= oneMonthFromNow && item.stock > 0).length;
         setAlertCount(count);
       }).catch(err => console.error("Failed to fetch alert count for dashboard:", err));
     }

@@ -27,7 +27,7 @@ export function CustomerTransactionsTable({
           <div>
             <CardTitle className="font-headline text-2xl">Transaction History</CardTitle>
             <CardDescription>
-              All transactions between {customerName} and your bookstore
+              All transactions between {customerName} and your pharmacy
             </CardDescription>
           </div>
           <Button variant="outline" size="sm">

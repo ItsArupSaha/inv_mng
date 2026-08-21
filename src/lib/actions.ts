@@ -10,6 +10,8 @@ export * from './db/database';
 export * from './db/expenses';
 export * from './db/items';
 export * from './db/purchases';
+export * from './db/purchase-returns';
+export * from './db/supplier-queries';
 export * from './db/reports';
 export * from './db/sales';
 export * from './db/sales-returns';

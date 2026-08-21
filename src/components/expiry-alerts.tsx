@@ -9,6 +9,7 @@ import { AddItemDialog } from './items/add-item-dialog';
 import { AddCategoryDialog } from './items/add-category-dialog';
 import { ItemsTable } from './items/items-table';
 import { ExpiryFiltersHeader } from './expiry/expiry-filters-header';
+import { ExpirySummaryCards } from './expiry/expiry-summary-cards';
 import { useExpiryAlerts } from '@/hooks/use-expiry-alerts';
 
 interface ExpiryAlertsProps {
@@ -19,6 +20,7 @@ export default function ExpiryAlerts({ userId }: ExpiryAlertsProps) {
   const {
     categories,
     companies,
+    expirySummary,
     isInitialLoading,
     isItemDialogOpen,
     setIsItemDialogOpen,
@@ -80,6 +82,9 @@ export default function ExpiryAlerts({ userId }: ExpiryAlertsProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {/* Taka-at-risk snapshot per tier */}
+        <ExpirySummaryCards summary={expirySummary} isLoading={isInitialLoading} />
+
         {/* Controls Header */}
         <ExpiryFiltersHeader
           searchQuery={searchQuery}
@@ -100,6 +105,7 @@ export default function ExpiryAlerts({ userId }: ExpiryAlertsProps) {
           onEdit={handleEditItem}
           onDelete={handleDeleteItem}
           isPending={isPending}
+          showStockValue
         />
 
         {hasMore && (

@@ -9,7 +9,6 @@ interface ReportActivityTableProps {
     totalExtraSales?: number;
     totalProfit: number;
     receivedPaymentsFromDues: number;
-    totalDonations: number;
     totalExpenses: number;
   };
   formatCurrency: (amount: number) => string;
@@ -43,10 +42,6 @@ export function ReportActivityTable({ activity, formatCurrency, title = 'Monthly
           <TableRow>
             <TableCell>Received Payments from Dues</TableCell>
             <TableCell className="text-right">{formatCurrency(activity.receivedPaymentsFromDues)}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell>Total Donations</TableCell>
-            <TableCell className="text-right text-primary">{formatCurrency(activity.totalDonations)}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Total Expenses</TableCell>

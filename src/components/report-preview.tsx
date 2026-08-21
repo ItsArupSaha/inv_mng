@@ -7,6 +7,8 @@ import type { ReportAnalysis, DailyReportAnalysis } from '@/lib/report-generator
 import { Download } from 'lucide-react';
 import { ReportActivityTable } from './reports/report-activity-table';
 import { ReportCashflowOverview } from './reports/report-cashflow-overview';
+import { ReportPurchasesTable } from './reports/report-purchases-table';
+import { ReportTopSellers } from './reports/report-top-sellers';
 import { generateReportPdf } from './reports/report-pdf-generator';
 
 interface ReportPreviewProps {
@@ -30,7 +32,7 @@ export default function ReportPreview({ reportData, reportType, dateLabel }: Rep
       ? (reportData as DailyReportAnalysis).dailyActivity
       : (reportData as ReportAnalysis).monthlyActivity;
 
-  const { salesBreakdown, cashFlow, netResult } = reportData;
+  const { salesBreakdown, cashFlow, netResult, purchases, topSellers } = reportData;
 
   const handleDownload = () => {
     generateReportPdf({ reportData, reportType, dateLabel, authUser });
@@ -58,6 +60,7 @@ export default function ReportPreview({ reportData, reportType, dateLabel }: Rep
               formatCurrency={formatCurrency}
               title={reportType === 'daily' ? 'Daily Activity' : 'Monthly Activity'}
             />
+            <ReportPurchasesTable purchases={purchases} formatCurrency={formatCurrency} />
           </div>
           <div className="space-y-6">
             <div>
@@ -76,6 +79,8 @@ export default function ReportPreview({ reportData, reportType, dateLabel }: Rep
             />
           </div>
         </div>
+
+        <ReportTopSellers topSellers={topSellers} formatCurrency={formatCurrency} />
       </CardContent>
     </Card>
   );

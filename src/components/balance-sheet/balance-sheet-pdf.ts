@@ -42,7 +42,7 @@ export function exportBalanceSheetPdf(
     // Left side header
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text(authUser.companyName || 'Store', 14, 20);
+    doc.text(authUser.companyName || 'Pharmacy', 14, 20);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(authUser.address || '', 14, 26);

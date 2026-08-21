@@ -50,7 +50,7 @@ export function DownloadSaleMemo({ sale, customer, items, user }: DownloadSaleMe
     }
 
     const doc = new jsPDF();
-    const companyName = user.companyName || 'Bookstore';
+    const companyName = user.companyName || 'Pharmacy';
     const address = user.address || '';
     const phone = user.phone || '';
 

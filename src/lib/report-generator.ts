@@ -1,41 +1,53 @@
-import type { Expense, Item, Sale, Transaction } from './types';
-import { isOperatingExpense } from './db/utils';
+import type { Expense, Item, Purchase, Sale, SaleItem, Transaction } from './types';
+import { isOperatingExpense, isSupplierPaymentExpense } from './db/utils';
 
-// Donation entries have no creation UI anymore; reports keep the slot so
-// historical ledgers still render if any old docs exist.
-type Donation = { amount: number; paymentMethod?: 'Cash' | 'Bank' };
+export interface PurchaseActivitySummary {
+  totalPurchased: number; // invoice final amounts bought in the period
+  paidToSuppliers: number; // net money out to suppliers (payments minus refunds)
+  newSupplierDue: number; // due added by new purchases (Due/Split remainders)
+}
 
-export interface ReportAnalysis {
-  monthlyActivity: {
-    totalSales: number;
-    totalExtraSales?: number;
-    profitFromPaidSales: number;
-    profitFromDuePayments: number;
-    receivedPaymentsFromDues: number;
-    totalProfit: number;
-    totalExpenses: number;
-    totalDonations: number;
-  };
-  salesBreakdown: {
-    paid: number;
-    due: number;
-  };
+export interface TopSellerRow {
+  itemTitle: string;
+  quantity: number;
+  revenue: number;
+  profit: number;
+}
+
+interface ActivityStats {
+  totalSales: number;
+  totalExtraSales?: number;
+  profitFromPaidSales: number;
+  profitFromDuePayments: number;
+  receivedPaymentsFromDues: number;
+  totalProfit: number;
+  totalExpenses: number;
+}
+
+interface CoreStats {
+  totalSales: number;
+  totalExtraSales: number;
+  profitFromPaidSales: number;
+  profitFromDuePayments: number;
+  receivedPaymentsFromDues: number;
+  totalProfit: number;
+  totalExpenses: number;
+  salesBreakdown: { paid: number; due: number };
   cashFlow: {
     sales: { cash: number; bank: number };
     duePayments: { cash: number; bank: number };
-    donations: { cash: number; bank: number };
     expenses: { cash: number; bank: number };
   };
-  netResult: {
-    netProfitOrLoss: number;
-  };
+  netProfitOrLoss: number;
+  purchases: PurchaseActivitySummary;
+  topSellers: TopSellerRow[];
 }
 
 export interface ReportInput {
   salesData: Sale[];
   expensesData: Expense[];
-  donationsData: Donation[];
   itemsData: Item[];
+  purchasesData: Purchase[];
   month: string;
   year: string;
   transactionsData: Transaction[];
@@ -44,24 +56,79 @@ export interface ReportInput {
 interface ReportStatsInput {
   salesData: Sale[];
   expensesData: Expense[];
-  donationsData: Donation[];
   itemsData: Item[];
+  purchasesData: Purchase[];
   transactionsData: Transaction[];
 }
 
-export function calculateReportStats(input: ReportStatsInput) {
-  const { salesData, expensesData, donationsData, itemsData, transactionsData } = input;
+function purchaseFinalAmount(purchase: Purchase): number {
+  return (
+    (Number(purchase.totalAmount) || 0) +
+    (Number(purchase.vatAmount) || 0) -
+    (Number(purchase.discountAmount) || 0)
+  );
+}
 
-  const calculateSaleProfit = (sale: Sale): number => {
-    const totalProductionCost = sale.items.reduce((acc, saleItem) => {
-        const itemData = itemsData.find(i => i.id === saleItem.itemId);
-        if (itemData) {
-            return acc + (itemData.productionPrice * saleItem.quantity);
-        }
-        return acc;
-    }, 0);
-    return sale.total - totalProductionCost;
-  };
+/**
+ * Cost of a sold line. Sales recorded since batch tracking freeze the real
+ * per-unit cost at sale time; older sales fall back to the item's current
+ * cost, which is the best available estimate for them.
+ */
+function saleLineCost(saleItem: SaleItem, itemsData: Item[]): number {
+  if (saleItem.batches?.length) {
+    return saleItem.batches.reduce(
+      (sum, alloc) => sum + alloc.quantity * (Number(alloc.costAtSale) || 0),
+      0
+    );
+  }
+  const item = itemsData.find(i => i.id === saleItem.itemId);
+  const unitCost = item ? Number(item.productionPrice) || 0 : 0;
+  return unitCost * saleItem.quantity;
+}
+
+function buildPurchaseSummary(purchases: Purchase[], expenses: Expense[]): PurchaseActivitySummary {
+  const totalPurchased = purchases.reduce((sum, p) => sum + purchaseFinalAmount(p), 0);
+
+  const paidToSuppliers = expenses.reduce((sum, expense) => {
+    if (!isSupplierPaymentExpense(expense.description)) return sum;
+    return sum + (Number(expense.amount) || 0); // supplier refunds are negative
+  }, 0);
+
+  const newSupplierDue = purchases.reduce((sum, p) => {
+    const finalAmount = purchaseFinalAmount(p);
+    if (p.paymentMethod === 'Due') return sum + finalAmount;
+    if (p.paymentMethod === 'Split') return sum + Math.max(0, finalAmount - (Number(p.amountPaid) || 0));
+    return sum;
+  }, 0);
+
+  return { totalPurchased, paidToSuppliers, newSupplierDue };
+}
+
+function buildTopSellers(sales: Sale[], itemsData: Item[], limit = 10): TopSellerRow[] {
+  const byItem = new Map<string, TopSellerRow>();
+  for (const sale of sales) {
+    for (const saleItem of sale.items) {
+      const row = byItem.get(saleItem.itemId) || {
+        itemTitle: itemsData.find(i => i.id === saleItem.itemId)?.title || 'Unknown item',
+        quantity: 0,
+        revenue: 0,
+        profit: 0,
+      };
+      const cost = saleLineCost(saleItem, itemsData);
+      row.quantity += Number(saleItem.quantity) || 0;
+      row.revenue += (Number(saleItem.price) || 0) * (Number(saleItem.quantity) || 0);
+      row.profit += (Number(saleItem.price) || 0) * (Number(saleItem.quantity) || 0) - cost;
+      byItem.set(saleItem.itemId, row);
+    }
+  }
+  return Array.from(byItem.values()).sort((a, b) => b.revenue - a.revenue).slice(0, limit);
+}
+
+function calculateCoreStats(input: ReportStatsInput): CoreStats {
+  const { salesData, expensesData, itemsData, purchasesData, transactionsData } = input;
+
+  const calculateSaleProfit = (sale: Sale): number =>
+    sale.total - sale.items.reduce((acc, saleItem) => acc + saleLineCost(saleItem, itemsData), 0);
 
   const profitFromPaidSales = salesData
     .filter(sale => sale.paymentMethod === 'Cash' || sale.paymentMethod === 'Bank' || sale.paymentMethod === 'Split')
@@ -123,8 +190,7 @@ export function calculateReportStats(input: ReportStatsInput) {
   const duePayments = transactionsData
     .filter(t => t.type === 'Receivable' && t.status === 'Paid' && t.description?.startsWith('Payment from customer'));
 
-  const receivedPaymentsFromDues = duePayments
-    .reduce((total, payment) => total + payment.amount, 0);
+  const receivedPaymentsFromDues = duePayments.reduce((total, payment) => total + payment.amount, 0);
 
   const duePaymentsCashBank = duePayments.reduce(
     (acc, t) => {
@@ -152,29 +218,7 @@ export function calculateReportStats(input: ReportStatsInput) {
     { cash: 0, bank: 0 }
   );
 
-  const totalDonations = donationsData.reduce((sum, donation) => sum + donation.amount, 0);
-  const donationsCashBank = donationsData.reduce(
-    (acc, donation) => {
-      if (donation.paymentMethod === 'Cash') {
-        acc.cash += donation.amount;
-      } else if (donation.paymentMethod === 'Bank') {
-        acc.bank += donation.amount;
-      }
-      return acc;
-    },
-    { cash: 0, bank: 0 }
-  );
-
   const totalProfit = profitFromPaidSales + profitFromDuePayments;
-
-  const cashFlow = {
-    sales: salesCashBank,
-    duePayments: duePaymentsCashBank,
-    donations: donationsCashBank,
-    expenses: expensesCashBank,
-  };
-
-  const netProfitOrLoss = totalProfit + totalDonations - totalExpenses;
 
   return {
     totalSales,
@@ -184,50 +228,51 @@ export function calculateReportStats(input: ReportStatsInput) {
     receivedPaymentsFromDues,
     totalProfit,
     totalExpenses,
-    totalDonations,
     salesBreakdown,
-    cashFlow,
-    netProfitOrLoss,
+    cashFlow: {
+      sales: salesCashBank,
+      duePayments: duePaymentsCashBank,
+      expenses: expensesCashBank,
+    },
+    netProfitOrLoss: totalProfit - totalExpenses,
+    purchases: buildPurchaseSummary(purchasesData, expensesData),
+    topSellers: buildTopSellers(salesData, itemsData),
   };
 }
 
-export interface DailyReportAnalysis {
-  dailyActivity: {
-    totalSales: number;
-    totalExtraSales?: number;
-    profitFromPaidSales: number;
-    profitFromDuePayments: number;
-    receivedPaymentsFromDues: number;
-    totalProfit: number;
-    totalExpenses: number;
-    totalDonations: number;
-  };
-  salesBreakdown: {
-    paid: number;
-    due: number;
-  };
-  cashFlow: {
-    sales: { cash: number; bank: number };
-    duePayments: { cash: number; bank: number };
-    donations: { cash: number; bank: number };
-    expenses: { cash: number; bank: number };
-  };
-  netResult: {
-    netProfitOrLoss: number;
-  };
+export interface ReportAnalysis {
+  monthlyActivity: ActivityStats;
+  salesBreakdown: { paid: number; due: number };
+  cashFlow: CoreStats['cashFlow'];
+  purchases: PurchaseActivitySummary;
+  topSellers: TopSellerRow[];
+  netResult: { netProfitOrLoss: number };
 }
 
 export interface DailyReportInput {
   salesData: Sale[];
   expensesData: Expense[];
-  donationsData: Donation[];
   itemsData: Item[];
+  purchasesData: Purchase[];
   date: string;
   transactionsData: Transaction[];
 }
 
+export interface DailyReportAnalysis {
+  dailyActivity: ActivityStats;
+  salesBreakdown: { paid: number; due: number };
+  cashFlow: CoreStats['cashFlow'];
+  purchases: PurchaseActivitySummary;
+  topSellers: TopSellerRow[];
+  netResult: { netProfitOrLoss: number };
+}
+
+export function calculateReportStats(input: ReportStatsInput): CoreStats {
+  return calculateCoreStats(input);
+}
+
 export function generateDailyReport(input: DailyReportInput): DailyReportAnalysis {
-  const stats = calculateReportStats(input);
+  const stats = calculateCoreStats(input);
   return {
     dailyActivity: {
       totalSales: stats.totalSales,
@@ -237,18 +282,17 @@ export function generateDailyReport(input: DailyReportInput): DailyReportAnalysi
       receivedPaymentsFromDues: stats.receivedPaymentsFromDues,
       totalProfit: stats.totalProfit,
       totalExpenses: stats.totalExpenses,
-      totalDonations: stats.totalDonations,
     },
     salesBreakdown: stats.salesBreakdown,
     cashFlow: stats.cashFlow,
-    netResult: {
-      netProfitOrLoss: stats.netProfitOrLoss,
-    },
+    purchases: stats.purchases,
+    topSellers: stats.topSellers,
+    netResult: { netProfitOrLoss: stats.netProfitOrLoss },
   };
 }
 
 export function generateMonthlyReport(input: ReportInput): ReportAnalysis {
-  const stats = calculateReportStats(input);
+  const stats = calculateCoreStats(input);
   return {
     monthlyActivity: {
       totalSales: stats.totalSales,
@@ -258,12 +302,11 @@ export function generateMonthlyReport(input: ReportInput): ReportAnalysis {
       receivedPaymentsFromDues: stats.receivedPaymentsFromDues,
       totalProfit: stats.totalProfit,
       totalExpenses: stats.totalExpenses,
-      totalDonations: stats.totalDonations,
     },
     salesBreakdown: stats.salesBreakdown,
     cashFlow: stats.cashFlow,
-    netResult: {
-      netProfitOrLoss: stats.netProfitOrLoss,
-    },
+    purchases: stats.purchases,
+    topSellers: stats.topSellers,
+    netResult: { netProfitOrLoss: stats.netProfitOrLoss },
   };
 }

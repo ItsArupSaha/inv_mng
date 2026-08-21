@@ -4,6 +4,9 @@ import type { Purchase } from '../types';
 import {
   getPurchases as getPurchasesImpl,
   getPurchasesPaginated as getPurchasesPaginatedImpl,
+  getPurchasesForDateRange as getPurchasesForDateRangeImpl,
+  getPurchasesForMonth as getPurchasesForMonthImpl,
+  getPurchasesForDay as getPurchasesForDayImpl,
 } from './purchase-queries';
 import { addPurchase as addPurchaseImpl } from './purchase-create';
 import { updatePurchase as updatePurchaseImpl } from './purchase-update';
@@ -18,6 +21,18 @@ export async function getPurchasesPaginated(params: {
   lastVisibleId?: string;
 }): Promise<{ purchases: Purchase[]; hasMore: boolean }> {
   return getPurchasesPaginatedImpl(params);
+}
+
+export async function getPurchasesForDateRange(userId: string, startDate: Date, endDate: Date): Promise<Purchase[]> {
+  return getPurchasesForDateRangeImpl(userId, startDate, endDate);
+}
+
+export async function getPurchasesForMonth(userId: string, year: number, month: number, offsetMinutes?: number): Promise<Purchase[]> {
+  return getPurchasesForMonthImpl(userId, year, month, offsetMinutes);
+}
+
+export async function getPurchasesForDay(userId: string, dateString: string, offsetMinutes?: number): Promise<Purchase[]> {
+  return getPurchasesForDayImpl(userId, dateString, offsetMinutes);
 }
 
 export async function addPurchase(

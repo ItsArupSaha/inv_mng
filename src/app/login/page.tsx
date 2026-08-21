@@ -3,8 +3,10 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Store } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
+import { APP_NAME } from '@/lib/app-info';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
@@ -80,11 +82,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm">
             <div className="flex flex-col items-center text-center mb-8">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary mb-4">
-                    <Store className="h-7 w-7 text-primary-foreground" />
-                </div>
-                <h1 className="font-headline text-3xl font-semibold text-primary">Smart Stock</h1>
-                <p className="text-muted-foreground mt-2">Sign in to access your store</p>
+                <Image src="/logo.png" alt="Pharmora" width={96} height={64} priority className="h-16 w-auto mb-4" />
+                <h1 className="font-headline text-3xl font-semibold text-primary">{APP_NAME}</h1>
+                <p className="text-muted-foreground mt-2">Sign in to your pharmacy</p>
             </div>
             <Button 
                 onClick={handleSignIn} 

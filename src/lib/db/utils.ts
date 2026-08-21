@@ -68,5 +68,20 @@ export function isOperatingExpense(description: string): boolean {
   if (desc.startsWith('Paid Payable:')) return false;
   if (desc.startsWith('Asset Purchase:')) return false;
   if (desc.startsWith('Customer Refund:')) return false;
+  if (desc.startsWith('Supplier Refund:')) return false;
   return true;
+}
+
+/**
+ * True for every expense doc that moves money to/from a supplier: purchase
+ * payments, payable settlements, and supplier refunds (negative amounts).
+ */
+export function isSupplierPaymentExpense(description: string): boolean {
+  const desc = description || '';
+  return (
+    desc.startsWith('Payment for Purchase') ||
+    desc.startsWith('Partial payment for Purchase') ||
+    desc.startsWith('Paid Payable:') ||
+    desc.startsWith('Supplier Refund:')
+  );
 }

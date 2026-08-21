@@ -10,6 +10,7 @@ import { getCategories, getPurchasesPaginated } from '@/lib/actions';
 import type { Category, Purchase } from '@/lib/types';
 import { PurchasesTable } from './purchases/purchases-table';
 import { RecordPurchaseDialog } from './purchases/record-purchase-dialog';
+import { PurchaseReturnDialog } from './purchases/purchase-return-dialog';
 import { AddCategoryDialog } from './items/add-category-dialog';
 import { DownloadPurchasesDialog } from './purchases/download-purchases-dialog';
 
@@ -28,6 +29,7 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
   const { toast } = useToast();
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [editingPurchase, setEditingPurchase] = React.useState<Purchase | null>(null);
+  const [returningPurchase, setReturningPurchase] = React.useState<Purchase | null>(null);
 
   const loadInitialData = React.useCallback(async () => {
     setIsInitialLoading(true);
@@ -100,6 +102,7 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
               setEditingPurchase(purchase);
               setIsDialogOpen(true);
             }}
+            onReturn={(purchase) => setReturningPurchase(purchase)}
           />
           {hasMore && (
             <div className="flex justify-center mt-4">
@@ -122,6 +125,15 @@ export default function PurchaseManagement({ userId }: PurchaseManagementProps) 
         editingPurchase={editingPurchase}
         onSuccess={loadInitialData}
         onAddCategoryClick={() => setIsCategoryDialogOpen(true)}
+      />
+
+      <PurchaseReturnDialog
+        userId={userId}
+        purchase={returningPurchase}
+        onOpenChange={(open) => {
+          if (!open) setReturningPurchase(null);
+        }}
+        onSuccess={loadInitialData}
       />
 
       <AddCategoryDialog

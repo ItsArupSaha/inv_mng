@@ -30,12 +30,12 @@ export function generateReportPdf({
       ? (reportData as DailyReportAnalysis).dailyActivity
       : (reportData as ReportAnalysis).monthlyActivity;
 
-  const { salesBreakdown, cashFlow, netResult } = reportData;
+  const { salesBreakdown, cashFlow, netResult, purchases, topSellers } = reportData;
 
   // Left side header
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(authUser.companyName || 'Bookstore', 14, 20);
+  doc.text(authUser.companyName || 'Pharmacy', 14, 20);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(authUser.address || '', 14, 26);
@@ -76,7 +76,6 @@ export function generateReportPdf({
   activityBody.push(
     ['Total Profit', formatCurrencyForPdf(activity.totalProfit)],
     ['Received Payments from Dues', formatCurrencyForPdf(activity.receivedPaymentsFromDues)],
-    ['Total Donations', formatCurrencyForPdf(activity.totalDonations)],
     ['Total Expenses', `(${formatCurrencyForPdf(activity.totalExpenses)})`]
   );
 
@@ -106,14 +105,29 @@ export function generateReportPdf({
 
   finalY = (doc as any).lastAutoTable.finalY + 10;
 
+  // Purchases Summary Table
+  const purchasesBody = [
+    ['Total Purchased', formatCurrencyForPdf(purchases.totalPurchased)],
+    ['Paid to Suppliers', `(${formatCurrencyForPdf(Math.max(0, purchases.paidToSuppliers))})`],
+    ['New Supplier Due', `(${formatCurrencyForPdf(purchases.newSupplierDue)})`],
+  ];
+
+  autoTable(doc, {
+    startY: finalY,
+    head: [['Purchases (Stock Inflow)', 'Amount']],
+    body: purchasesBody,
+    theme: 'striped',
+    headStyles: { fillColor: '#306754' },
+  });
+
+  finalY = (doc as any).lastAutoTable.finalY + 10;
+
   // Cash Flow Summary Table
   const cashFlowBody = [
     ['Sales - Cash', formatCurrencyForPdf(cashFlow.sales.cash)],
     ['Sales - Bank', formatCurrencyForPdf(cashFlow.sales.bank)],
     ['Due Payments - Cash', formatCurrencyForPdf(cashFlow.duePayments.cash)],
     ['Due Payments - Bank', formatCurrencyForPdf(cashFlow.duePayments.bank)],
-    ['Donations - Cash', formatCurrencyForPdf(cashFlow.donations.cash)],
-    ['Donations - Bank', formatCurrencyForPdf(cashFlow.donations.bank)],
     ['Expenses - Cash', `(${formatCurrencyForPdf(cashFlow.expenses.cash)})`],
     ['Expenses - Bank', `(${formatCurrencyForPdf(cashFlow.expenses.bank)})`],
   ];
@@ -127,6 +141,24 @@ export function generateReportPdf({
   });
 
   finalY = (doc as any).lastAutoTable.finalY + 10;
+
+  // Top Sellers Table
+  if (topSellers.length > 0) {
+    autoTable(doc, {
+      startY: finalY,
+      head: [['Top Selling Medicines', 'Qty', 'Revenue', 'Profit']],
+      body: topSellers.map(row => [
+        row.itemTitle,
+        String(row.quantity),
+        formatCurrencyForPdf(row.revenue),
+        formatCurrencyForPdf(row.profit),
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: '#306754' },
+    });
+
+    finalY = (doc as any).lastAutoTable.finalY + 10;
+  }
 
   // Net Result
   doc.setFontSize(12);

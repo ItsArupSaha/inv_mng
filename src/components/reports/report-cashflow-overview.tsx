@@ -10,7 +10,6 @@ interface ReportCashflowOverviewProps {
   cashFlow: {
     sales: { cash: number; bank: number };
     duePayments: { cash: number; bank: number };
-    donations: { cash: number; bank: number };
     expenses: { cash: number; bank: number };
   };
   formatCurrency: (amount: number) => string;
@@ -58,18 +57,6 @@ export function ReportCashflowOverview({
           <div className="flex justify-between text-sm">
             <span>Bank</span>
             <span className="font-semibold">{formatCurrency(cashFlow.duePayments.bank)}</span>
-          </div>
-        </div>
-
-        <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
-          <p className="text-xs text-muted-foreground mb-1">Donations</p>
-          <div className="flex justify-between text-sm">
-            <span>Cash</span>
-            <span className="font-semibold">{formatCurrency(cashFlow.donations.cash)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span>Bank</span>
-            <span className="font-semibold">{formatCurrency(cashFlow.donations.bank)}</span>
           </div>
         </div>
 

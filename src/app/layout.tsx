@@ -4,11 +4,16 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppWithAuthProvider } from './auth-wrapper';
+import { APP_NAME, APP_TAGLINE } from '@/lib/app-info';
 
 
 export const metadata: Metadata = {
-  title: 'Smart Stock - Inventory Management',
-  description: 'Sleek, smart, and easy inventory management for any business.',
+  title: {
+    default: `${APP_NAME} — Pharmacy Management`,
+    template: `%s | ${APP_NAME}`,
+  },
+  description: APP_TAGLINE,
+  applicationName: APP_NAME,
 };
 
 export default function RootLayout({

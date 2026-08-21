@@ -6,8 +6,10 @@ import { useToast } from '@/hooks/use-toast';
 import {
   getExpensesForMonth,
   getItems,
+  getPurchasesForMonth,
   getSalesForMonth,
   getTransactionsForMonth,
+  getPurchasesForDay,
   getSalesForDay,
   getExpensesForDay,
   getTransactionsForDay,
@@ -76,17 +78,18 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
           const localDate = new Date(date.getTime() - offset * 60 * 1000);
           const dateString = localDate.toISOString().split('T')[0];
 
-          const [salesForDay, expensesForDay, transactionsForDay] = await Promise.all([
+          const [salesForDay, expensesForDay, transactionsForDay, purchasesForDay] = await Promise.all([
             getSalesForDay(userId, dateString, offset),
             getExpensesForDay(userId, dateString, offset),
             getTransactionsForDay(userId, dateString, offset),
+            getPurchasesForDay(userId, dateString, offset),
           ]);
 
           const input = {
             salesData: salesForDay,
             expensesData: expensesForDay,
-            donationsData: [],
             itemsData: dataSource.items,
+            purchasesData: purchasesForDay,
             date: dateString,
             transactionsData: transactionsForDay,
           };
@@ -97,17 +100,18 @@ export function useReportGenerator({ userId }: UseReportGeneratorProps) {
           const selectedMonth = parseInt(month, 10);
           const selectedYear = parseInt(year, 10);
 
-          const [salesForMonth, expensesForMonth, transactionsForMonth] = await Promise.all([
+          const [salesForMonth, expensesForMonth, transactionsForMonth, purchasesForMonth] = await Promise.all([
             getSalesForMonth(userId, selectedYear, selectedMonth, offset),
             getExpensesForMonth(userId, selectedYear, selectedMonth, offset),
             getTransactionsForMonth(userId, selectedYear, selectedMonth, offset),
+            getPurchasesForMonth(userId, selectedYear, selectedMonth, offset),
           ]);
 
           const input = {
             salesData: salesForMonth,
             expensesData: expensesForMonth,
-            donationsData: [],
             itemsData: dataSource.items,
+            purchasesData: purchasesForMonth,
             month: new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long' }),
             year: year,
             transactionsData: transactionsForMonth,

@@ -37,7 +37,7 @@ export async function generateSaleMemoPdf({
   }
 
   const doc = new jsPDF();
-  const companyName = user.companyName || 'Bookstore';
+  const companyName = user.companyName || 'Pharmacy';
   const address = user.address || '';
   const phone = user.phone || '';
   const getItemTitle = (itemId: string) => items.find((i) => i.id === itemId)?.title || 'Unknown Item';
