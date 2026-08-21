@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
-import { Edit, Undo2 } from 'lucide-react';
+import { Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -12,14 +12,12 @@ interface PurchasesTableProps {
   purchases: Purchase[];
   isInitialLoading: boolean;
   onEdit?: (purchase: Purchase) => void;
-  onReturn?: (purchase: Purchase) => void;
 }
 
 export function PurchasesTable({
   purchases,
   isInitialLoading,
   onEdit,
-  onReturn,
 }: PurchasesTableProps) {
   return (
     <div className="border rounded-md overflow-x-auto w-full">
@@ -68,9 +66,6 @@ export function PurchasesTable({
                 <div className="flex justify-end">
                   <Button variant="ghost" size="icon" onClick={() => onEdit?.(purchase)} title="Edit purchase">
                     <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => onReturn?.(purchase)} title="Return to supplier">
-                    <Undo2 className="h-4 w-4" />
                   </Button>
                 </div>
               </TableCell>

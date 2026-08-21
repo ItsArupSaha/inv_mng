@@ -36,7 +36,6 @@ function makeExpense(overrides: Partial<Expense>): Expense {
     id: 'exp-1',
     expenseId: 'EXP-0001',
     date: '2026-08-01T00:00:00.000Z',
-    name: '',
     description: 'Shop rent',
     amount: 100,
     paymentMethod: 'Cash',

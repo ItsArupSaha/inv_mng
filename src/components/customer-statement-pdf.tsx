@@ -74,7 +74,7 @@ export default function CustomerStatementPDF({ customer, sales, items }: Custome
       head: [['Date', 'Description', 'Payment Method', 'Amount']],
       body: tableData,
       theme: 'striped',
-      headStyles: { fillColor: [79, 70, 229] }, // #4F46E5 Indigo
+      headStyles: { fillColor: [0, 102, 204] }, // #0066CC Indigo
       didParseCell: function (data) {
         if (data.column.dataKey === 1) { // Description column
           data.cell.styles.cellWidth = 'auto';

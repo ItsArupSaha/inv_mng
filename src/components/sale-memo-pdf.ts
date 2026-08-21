@@ -139,7 +139,7 @@ export async function generateSaleMemoPdf({
     head: [['Description', 'Qty', 'Unit Price', 'Total']],
     body: tableData,
     theme: 'striped',
-    headStyles: { fillColor: [79, 70, 229] }, // #4F46E5 Indigo
+    headStyles: { fillColor: [0, 102, 204] }, // #0066CC Indigo
     footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
     foot: footContent as any,
   });

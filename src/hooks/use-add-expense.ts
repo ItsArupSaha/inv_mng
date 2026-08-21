@@ -29,7 +29,6 @@ export function useAddExpense({
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      name: '',
       description: '',
       amount: 0,
       date: new Date(),
@@ -41,7 +40,6 @@ export function useAddExpense({
     if (isOpen) {
       if (editingExpense) {
         form.reset({
-          name: editingExpense.name || '',
           description: editingExpense.description || '',
           amount: editingExpense.amount || 0,
           date: new Date(editingExpense.date),
@@ -49,8 +47,7 @@ export function useAddExpense({
         });
       } else {
         form.reset({
-          name: '',
-          description: '',
+              description: '',
           amount: 0,
           date: new Date(),
           paymentMethod: 'Cash',

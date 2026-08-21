@@ -135,24 +135,6 @@ export type PurchaseItem = {
     sellingPrice?: number;
 };
 
-export type PurchaseReturnItem = {
-    lineIndex: number; // index into the source purchase's items array
-    itemName: string;
-    quantity: number;
-    cost: number; // invoice cost per unit on the purchase line
-};
-
-export type PurchaseReturn = {
-    id: string;
-    returnId: string; // The auto-generated ID like PRT-0001
-    date: string;
-    purchaseDocId: string; // Firestore doc id of the source purchase
-    purchaseId: string; // The human ID like PUR-0001
-    supplier: string;
-    items: PurchaseReturnItem[];
-    totalReturnValue: number;
-    refundMethod: 'Cash' | 'Bank' | 'Due';
-};
 
 export type Purchase = {
     id: string;
@@ -175,7 +157,6 @@ export type Expense = {
   id: string;
   expenseId: string; // The auto-generated ID like EXP-0001
   date: string; // Changed to string for serialization
-  name: string;
   description: string;
   amount: number;
   paymentMethod?: 'Cash' | 'Bank';
@@ -233,7 +214,6 @@ export type Metadata = {
   lastSaleNumber: number;
   lastReturnNumber: number;
   lastExpenseNumber: number;
-  lastPurchaseReturnNumber?: number;
 }
 
 export type PackageItem = {

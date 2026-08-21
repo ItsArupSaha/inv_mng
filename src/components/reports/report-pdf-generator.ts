@@ -88,7 +88,7 @@ export function generateReportPdf({
     head: [[reportType === 'daily' ? 'Daily Activity' : 'Monthly Activity', 'Amount']],
     body: activityBody,
     theme: 'striped',
-    headStyles: { fillColor: '#306754' },
+    headStyles: { fillColor: '#0066CC' },
   });
 
   let finalY = (doc as any).lastAutoTable.finalY + 10;
@@ -104,7 +104,7 @@ export function generateReportPdf({
     head: [['Sales Breakdown', 'Amount']],
     body: salesBreakdownBody,
     theme: 'striped',
-    headStyles: { fillColor: '#306754' },
+    headStyles: { fillColor: '#0066CC' },
   });
 
   finalY = (doc as any).lastAutoTable.finalY + 10;
@@ -121,7 +121,7 @@ export function generateReportPdf({
     head: [['Purchases (Stock Inflow)', 'Amount']],
     body: purchasesBody,
     theme: 'striped',
-    headStyles: { fillColor: '#306754' },
+    headStyles: { fillColor: '#0066CC' },
   });
 
   finalY = (doc as any).lastAutoTable.finalY + 10;
@@ -141,7 +141,7 @@ export function generateReportPdf({
     head: [['Cash Flow Summary', 'Amount']],
     body: cashFlowBody,
     theme: 'striped',
-    headStyles: { fillColor: '#306754' },
+    headStyles: { fillColor: '#0066CC' },
   });
 
   finalY = (doc as any).lastAutoTable.finalY + 10;
@@ -156,7 +156,7 @@ export function generateReportPdf({
     14,
     finalY + 15
   );
-  const netColor = netResult.netProfitOrLoss >= 0 ? '#306754' : '#E53E3E';
+  const netColor = netResult.netProfitOrLoss >= 0 ? '#0066CC' : '#E53E3E';
   doc.setTextColor(netColor);
   doc.text(formatCurrencyForPdf(netResult.netProfitOrLoss), 200, finalY + 15, {
     align: 'right',

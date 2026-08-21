@@ -67,11 +67,10 @@ export async function downloadExpensesPdf(userId: string, dateRange: DateRange |
 
   autoTable(doc, {
     startY: 60,
-    head: [['Date', 'Expense ID', 'Name', 'Description', 'Method', 'Amount']],
+    head: [['Date', 'Expense ID', 'Description', 'Method', 'Amount']],
     body: filteredExpenses.map(e => [
       format(new Date(e.date), 'yyyy-MM-dd'),
       e.expenseId || 'N/A',
-      e.name || '',
       e.description || '',
       e.paymentMethod || '',
       `BDT ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(e.amount)}`
@@ -98,7 +97,6 @@ export async function downloadExpensesXlsx(userId: string, dateRange: DateRange 
   const dataToExport = filteredExpenses.map(e => ({
     'Date': format(new Date(e.date), 'yyyy-MM-dd'),
     'Expense ID': e.expenseId || 'N/A',
-    'Name': e.name,
     'Description': e.description,
     'Method': e.paymentMethod,
     'Amount': e.amount,

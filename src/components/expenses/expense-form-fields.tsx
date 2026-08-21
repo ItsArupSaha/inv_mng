@@ -21,19 +21,6 @@ export function ExpenseFormFields({ form }: ExpenseFormFieldsProps) {
     <div className="space-y-4 py-4 px-4">
       <FormField
         control={form.control}
-        name="name"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Name</FormLabel>
-            <FormControl>
-              <Input placeholder="e.g., John Doe" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
         name="description"
         render={({ field }) => (
           <FormItem>

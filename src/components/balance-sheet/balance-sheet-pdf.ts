@@ -84,7 +84,7 @@ export function exportBalanceSheetPdf(
             [{ content: 'Total Assets', styles: { fontStyle: 'bold' } }, { content: formatCurrencyForPdf(current.totalAssets), styles: { fontStyle: 'bold' } }],
         ],
         theme: 'striped',
-        headStyles: { fillColor: '#4F46E5', fontStyle: 'bold' },
+        headStyles: { fillColor: '#0066CC', fontStyle: 'bold' },
         footStyles: { fillColor: '#F1F5F9', textColor: '#000000', fontStyle: 'bold' },
         columnStyles: { 1: { halign: 'right' } },
     });
@@ -95,7 +95,7 @@ export function exportBalanceSheetPdf(
     const liabilitiesBody = [
         ['Payables', formatCurrencyForPdf(current.payables)],
         [{ content: 'Total Liabilities', styles: { fontStyle: 'bold' as const } }, { content: formatCurrencyForPdf(current.payables), styles: { fontStyle: 'bold' as const } }],
-        [{ content: 'Owner\'s Equity', styles: { fontStyle: 'bold' as const, textColor: '#4F46E5' } }, ''],
+        [{ content: 'Owner\'s Equity', styles: { fontStyle: 'bold' as const, textColor: '#0066CC' } }, ''],
         ['  Capital Contributed', formatCurrencyForPdf(current.totalCapital)],
         ['  Retained Earnings (Profit/Loss)', formatCurrencyForPdf(current.retainedEarnings)],
         [{ content: 'Total Owner\'s Equity / Net Worth', styles: { fontStyle: 'bold' as const } }, { content: formatCurrencyForPdf(current.equity), styles: { fontStyle: 'bold' as const } }],
@@ -106,7 +106,7 @@ export function exportBalanceSheetPdf(
         head: [['Liabilities & Equity', 'Amount']],
         body: liabilitiesBody,
         theme: 'striped',
-        headStyles: { fillColor: '#4F46E5', fontStyle: 'bold' as const },
+        headStyles: { fillColor: '#0066CC', fontStyle: 'bold' as const },
         columnStyles: { 1: { halign: 'right' } },
     });
 

@@ -69,8 +69,7 @@ export default function ExpensesManagement({ userId }: ExpensesManagementProps) 
               <TableHeader>
                 <TableRow>
                   <TableHead className="hidden sm:table-cell">Expense ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden sm:table-cell">Description</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="hidden sm:table-cell">Method</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
@@ -93,8 +92,7 @@ export default function ExpensesManagement({ userId }: ExpensesManagementProps) 
                 ) : expenses.length > 0 ? expenses.map((expense) => (
                   <TableRow key={expense.id}>
                     <TableCell className="font-mono hidden sm:table-cell">{expense.expenseId || 'N/A'}</TableCell>
-                    <TableCell className="font-medium">{expense.name}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{expense.description}</TableCell>
+                    <TableCell className="font-medium">{expense.description}</TableCell>
                     <TableCell>{format(new Date(expense.date), 'PPP')}</TableCell>
                     <TableCell className="hidden sm:table-cell">{expense.paymentMethod}</TableCell>
                     <TableCell className="text-right">৳{expense.amount.toFixed(2)}</TableCell>
@@ -109,7 +107,7 @@ export default function ExpensesManagement({ userId }: ExpensesManagementProps) 
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">No expenses recorded.</TableCell>
+                    <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">No expenses recorded.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
