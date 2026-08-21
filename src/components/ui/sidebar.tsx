@@ -209,10 +209,10 @@ const Sidebar = React.forwardRef<
             side={side}
           >
             <VisuallyHidden.Root asChild>
-                <SheetTitle>Main Menu</SheetTitle>
+              <SheetTitle>Main Menu</SheetTitle>
             </VisuallyHidden.Root>
-             <VisuallyHidden.Root asChild>
-                <SheetDescription>The main navigation menu for the application.</SheetDescription>
+            <VisuallyHidden.Root asChild>
+              <SheetDescription>The main navigation menu for the application.</SheetDescription>
             </VisuallyHidden.Root>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
@@ -622,7 +622,7 @@ const SidebarMenuAction = React.forwardRef<
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
         className
       )}
       {...props}

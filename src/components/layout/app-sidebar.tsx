@@ -125,21 +125,23 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r bg-card/60 backdrop-blur-md">
-      <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-3">
+      <SidebarHeader className="p-2 border-b">
+        <div className="flex items-center gap-2">
           <Image
             src="/logo.png"
             alt="Pharmora"
-            width={144}
-            height={96}
+            width={300}
+            height={300}
             priority
-            className="h-12 w-auto object-contain shrink-0"
+            className="h-28 w-28 object-contain shrink-0 drop-shadow-sm"
           />
-          <div className="flex flex-col truncate">
-            <h1 className="font-headline text-lg font-bold text-foreground truncate">
+          <div className="flex min-w-0 flex-1 flex-col justify-center pr-1">
+            <h1
+              className="font-headline text-lg sm:text-xl font-bold text-foreground leading-tight break-words whitespace-normal"
+              title={authUser?.companyName || APP_NAME}
+            >
               {authUser?.companyName || APP_NAME}
             </h1>
-            <p className="text-xs text-muted-foreground capitalize">Pharmacy Management</p>
           </div>
         </div>
       </SidebarHeader>
