@@ -13,6 +13,8 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { cachedCollection } from './collection-cache';
+import { readLedgerVersion } from './data-version';
 import type { Sale } from '../types';
 import { isFuzzyMatch } from '../search-utils';
 import { docToSale } from './utils';
@@ -25,6 +27,17 @@ export async function getSales(userId: string): Promise<Sale[]> {
   const salesCollection = collection(db, 'users', userId, 'sales');
   const snapshot = await getDocs(query(salesCollection, orderBy('date', 'desc')));
   return snapshot.docs.map(docToSale);
+}
+
+/**
+ * Master sales list, ledger-version guarded: one fetch per data change, then
+ * served from memory. Search, closing stock, and the overview all share it,
+ * so none of them re-scans the whole history on every call.
+ */
+export async function getSalesMaster(userId: string): Promise<Sale[]> {
+  if (!db || !userId) return [];
+  const version = await readLedgerVersion(userId);
+  return cachedCollection('sales-master', userId, () => getSales(userId), { version });
 }
 
 export async function getSalesPaginated({ userId, pageLimit = 5, lastVisibleId }: { userId: string, pageLimit?: number, lastVisibleId?: string }): Promise<{ sales: Sale[], hasMore: boolean }> {
@@ -138,10 +151,9 @@ export async function searchSales(userId: string, searchTerm: string): Promise<S
       .map(item => item.id)
   );
 
-  // 3. Fetch all sales to perform in-memory filtering
-  const salesCollection = collection(db, 'users', userId, 'sales');
-  const salesSnapshot = await getDocs(query(salesCollection, orderBy('date', 'desc')));
-  const allSales = salesSnapshot.docs.map(docToSale);
+  // 3. Filter the version-guarded master list — repeated searches cost zero
+  //    reads; the list refetches only when a ledger mutation actually changed it.
+  const allSales = await getSalesMaster(userId);
 
   // 4. Filter: sale id, customer name, or any line item's medicine
   return allSales.filter(sale => {

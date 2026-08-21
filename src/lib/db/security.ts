@@ -3,7 +3,8 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
-import { invalidateLedgerCaches } from './collection-cache';
+import { invalidateAppData, readLedgerVersion } from './data-version';
+import { cachedCollection } from './collection-cache';
 import type { SecurityDeposit } from '../types';
 
 /**
@@ -11,8 +12,10 @@ import type { SecurityDeposit } from '../types';
  */
 export async function getSecurityDeposits(userId: string): Promise<SecurityDeposit[]> {
   if (!db || !userId) return [];
-  try {
-    const securityCollection = collection(db, 'users', userId, 'security_deposits');
+  const version = await readLedgerVersion(userId);
+  return cachedCollection('ledger-master:deposits', userId, async () => {
+    try {
+    const securityCollection = collection(db!, 'users', userId, 'security_deposits');
     const snapshot = await getDocs(query(securityCollection, orderBy('date', 'desc')));
     return snapshot.docs.map(doc => {
       const data = doc.data();
@@ -51,10 +54,11 @@ export async function getSecurityDeposits(userId: string): Promise<SecurityDepos
         refundPaymentMethod: data.refundPaymentMethod,
       } as SecurityDeposit;
     });
-  } catch (error) {
-    console.error('Error fetching security deposits:', error);
-    return [];
-  }
+    } catch (error) {
+      console.error('Error fetching security deposits:', error);
+      return [];
+    }
+  }, { version });
 }
 
 /**
@@ -80,7 +84,7 @@ export async function addSecurityDeposit(
       notes: data.notes || '',
     });
 
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, { scope: 'ledger' });
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {
@@ -126,7 +130,7 @@ export async function updateSecurityDeposit(
 
     await updateDoc(docRef, updateData);
 
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, { scope: 'ledger' });
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {
@@ -144,7 +148,7 @@ export async function deleteSecurityDeposit(userId: string, id: string): Promise
     const docRef = doc(db, 'users', userId, 'security_deposits', id);
     await deleteDoc(docRef);
 
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, { scope: 'ledger' });
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import type { Sale } from '../types';
 import {
-  getSales as getSalesImpl,
+  getSalesMaster,
   getSalesPaginated as getSalesPaginatedImpl,
   getSalesForCustomer as getSalesForCustomerImpl,
   getSalesForMonth as getSalesForMonthImpl,
@@ -16,7 +16,7 @@ import {
 } from './sales-actions';
 
 export async function getSales(userId: string): Promise<Sale[]> {
-  return getSalesImpl(userId);
+  return getSalesMaster(userId);
 }
 
 export async function getSalesPaginated(params: {

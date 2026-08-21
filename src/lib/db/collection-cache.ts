@@ -39,7 +39,7 @@ export const COLLECTION_CACHE_TTL_MS = 5 * 60 * 1000;
 export interface CacheOptions {
   ttlMs?: number;
   /**
-   * Database-backed version of the underlying data (see catalog-version.ts).
+   * Database-backed version of the underlying data (see data-version.ts).
    * A read whose version differs from the cached entry's refetches even
    * inside the TTL, which is what makes the cache safe when the app is
    * served by multiple server instances: a mutation through instance A bumps
@@ -96,6 +96,27 @@ export function invalidateCollectionCache(cacheName: string, userId: string): vo
 }
 
 /**
+ * Patches a cached collection entry in place and stamps it with the version
+ * the mutation just wrote. Strictly fail-safe: applied only when an entry
+ * already exists and is still fresh — otherwise it's a no-op and the next
+ * read does a full, honest refetch. The mutator must be idempotent (an
+ * upsert/remove by id) so a race with a concurrent refetch cannot corrupt
+ * the value.
+ */
+export function patchCachedCollection<T>(
+  cacheName: string,
+  userId: string,
+  version: number,
+  mutate: (value: T) => T
+): boolean {
+  const cacheKey = key(cacheName, userId);
+  const hit = entries.get(cacheKey) as CacheEntry<T> | undefined;
+  if (!hit || Date.now() - hit.fetchedAt >= COLLECTION_CACHE_TTL_MS) return false;
+  entries.set(cacheKey, { value: mutate(hit.value), fetchedAt: hit.fetchedAt, version });
+  return true;
+}
+
+/**
  * Clears every cache whose name starts with `prefix` for the user — for
  * families like `transactions:Receivable` / `transactions:Payable` or
  * per-timezone/per-date dashboard keys that can't be enumerated at the call
@@ -114,14 +135,4 @@ export function invalidateCollectionCacheFamily(prefix: string, userId: string):
     inFlight.delete(cacheKey);
     epochs.set(cacheKey, (epochs.get(cacheKey) ?? 0) + 1);
   }
-}
-
-// Financial aggregates (dashboard stats, Business Overview, transaction
-// listings) all derive from the ledger collections, so any ledger write must
-// evict the whole family. Mutations call this single helper instead of
-// tracking each key individually.
-export function invalidateLedgerCaches(userId: string): void {
-  invalidateCollectionCacheFamily('dashboard-stats', userId);
-  invalidateCollectionCacheFamily('account-overview', userId);
-  invalidateCollectionCacheFamily('transactions', userId);
 }

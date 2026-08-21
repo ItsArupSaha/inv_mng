@@ -22,11 +22,14 @@ import {
   refundCustomerOverpayment as refundCustomerOverpaymentImpl,
 } from './transaction-actions';
 import { cachedCollection } from './collection-cache';
+import { readLedgerVersion } from './data-version';
 
 export async function getTransactions(userId: string, type: 'Receivable' | 'Payable'): Promise<Transaction[]> {
-  // Cached per type; every ledger mutation evicts the whole `transactions`
-  // family via invalidateLedgerCaches.
-  return cachedCollection(`transactions:${type}`, userId, () => getTransactionsImpl(userId, type));
+  if (!userId) return [];
+  const version = await readLedgerVersion(userId);
+  // Cached per type and guarded by the ledger version: mutations evict the
+  // family locally, and the version check covers other server instances.
+  return cachedCollection(`transactions:${type}`, userId, () => getTransactionsImpl(userId, type), { version });
 }
 
 export async function getTransactionsPaginated(params: {

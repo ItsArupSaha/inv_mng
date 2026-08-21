@@ -19,8 +19,7 @@ import type { Metadata, Purchase, PurchaseItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
 import { earlierExpiry } from '../batch-allocation';
 import { BatchWriteLedger } from './batch-ledger';
-import { invalidateLedgerCaches } from './collection-cache';
-import { invalidateItemsCatalog } from './catalog-version';
+import { invalidateAppData } from './data-version';
 import {
   computePurchaseTotals,
   planPurchaseSettlements,
@@ -301,8 +300,7 @@ export async function updatePurchase(
           return { success: true };
       });
 
-      await invalidateItemsCatalog(userId);
-      invalidateLedgerCaches(userId);
+      await invalidateAppData(userId);
       revalidatePath('/purchases');
       revalidatePath('/items');
       revalidatePath('/payables');

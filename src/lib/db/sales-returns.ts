@@ -14,8 +14,8 @@ import {
   startAfter
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
-import { invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
-import { invalidateItemsCatalog } from './catalog-version';
+import { invalidateAppData, readLedgerVersion } from './data-version';
+import { cachedCollection } from './collection-cache';
 import { db } from '../firebase';
 import type { Item, Metadata, SalesReturn } from '../types';
 import { docToSalesReturn } from './utils';
@@ -23,9 +23,12 @@ import { docToSalesReturn } from './utils';
 // --- Sales Returns Actions ---
 export async function getSalesReturns(userId: string): Promise<SalesReturn[]> {
     if (!db || !userId) return [];
-    const returnsCollection = collection(db, 'users', userId, 'sales_returns');
-    const snapshot = await getDocs(query(returnsCollection, orderBy('date', 'desc')));
-    return snapshot.docs.map(docToSalesReturn);
+    const version = await readLedgerVersion(userId);
+    return cachedCollection('sales-returns-master', userId, async () => {
+        const returnsCollection = collection(db!, 'users', userId, 'sales_returns');
+        const snapshot = await getDocs(query(returnsCollection, orderBy('date', 'desc')));
+        return snapshot.docs.map(docToSalesReturn);
+    }, { version });
 }
 
 export async function getSalesReturnsPaginated({ userId, pageLimit = 5, lastVisibleId }: { userId: string, pageLimit?: number, lastVisibleId?: string }): Promise<{ returns: SalesReturn[], hasMore: boolean }> {
@@ -129,9 +132,7 @@ export async function addSalesReturn(
         return { success: true, salesReturn: salesReturnForClient };
       });
 
-      await invalidateItemsCatalog(userId);
-      invalidateCollectionCache('customers', userId);
-      invalidateLedgerCaches(userId);
+      await invalidateAppData(userId);
       revalidatePath('/sales-returns');
       revalidatePath('/dashboard');
       revalidatePath('/items');

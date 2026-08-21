@@ -23,8 +23,8 @@ import type { Item } from '../types';
 import { isNonSalableCategory, resolveIsSalable } from '../item-flags';
 import { sumBatchQuantities, distributeStockDelta } from '../batch-allocation';
 import { batchesCollectionRef, batchDocRef, fetchItemBatches } from './batch-utils';
-import { cachedCollection, invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
-import { invalidateItemsCatalog as invalidateItemsCatalogImpl, readCatalogVersion } from './catalog-version';
+import { cachedCollection, invalidateCollectionCache } from './collection-cache';
+import { invalidateAppData, readCatalogVersion } from './data-version';
 
 
 
@@ -118,8 +118,7 @@ export async function addItem(userId: string, data: Omit<Item, 'id'>) {
     isSalable: salable,
     sellingPrice: salable ? data.sellingPrice : 0,
   });
-  await invalidateItemsCatalogImpl(userId);
-  invalidateLedgerCaches(userId);
+  await invalidateAppData(userId);
   revalidatePath('/items');
   return { id: newDocRef.id, ...data, isSalable: salable };
 }
@@ -156,8 +155,7 @@ export async function updateItem(userId: string, id: string, data: Omit<Item, 'i
       }
     }
   }
-  await invalidateItemsCatalogImpl(userId);
-  invalidateLedgerCaches(userId);
+  await invalidateAppData(userId);
   revalidatePath('/items');
 }
 
@@ -165,8 +163,7 @@ export async function deleteItem(userId: string, id: string) {
   if (!db || !userId) return;
   const itemRef = doc(db, 'users', userId, 'items', id);
   await deleteDoc(itemRef);
-  await invalidateItemsCatalogImpl(userId);
-  invalidateLedgerCaches(userId);
+  await invalidateAppData(userId);
   revalidatePath('/items');
 }
 
@@ -174,7 +171,7 @@ export async function ignoreItemWarning(userId: string, id: string, ignore: bool
   if (!db || !userId) return;
   const itemRef = doc(db, 'users', userId, 'items', id);
   await updateDoc(itemRef, { ignoredWarning: ignore });
-  await invalidateItemsCatalogImpl(userId);
+  await invalidateAppData(userId);
   revalidatePath('/items');
   revalidatePath('/stock-warnings');
 }
@@ -206,7 +203,7 @@ export async function bulkUpdateItemLocationByCompany(
     }
 
     await Promise.all(batchPromises);
-    await invalidateItemsCatalogImpl(userId);
+    await invalidateAppData(userId);
     revalidatePath('/items');
     return { success: true, updatedCount: batchPromises.length };
   } catch (error: any) {
@@ -228,7 +225,7 @@ export async function resetAllIgnoredWarnings(userId: string) {
     });
     await Promise.all(batchPromises);
 
-    await invalidateItemsCatalogImpl(userId);
+    await invalidateAppData(userId);
     revalidatePath('/items');
     revalidatePath('/stock-warnings');
     return { success: true, count: snapshot.size };

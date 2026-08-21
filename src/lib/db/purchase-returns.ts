@@ -23,8 +23,7 @@ import {
   type RefundLineInput
 } from '../purchase-return-math';
 import { ledgerDocMatchesPurchase } from '../supplier-ledger';
-import { invalidateLedgerCaches } from './collection-cache';
-import { invalidateItemsCatalog } from './catalog-version';
+import { invalidateAppData } from './data-version';
 
 export async function getPurchaseReturns(userId: string): Promise<PurchaseReturn[]> {
   if (!db || !userId) return [];
@@ -282,8 +281,7 @@ export async function addPurchaseReturn(userId: string, data: CreatePurchaseRetu
       return { success: true as const, purchaseReturn: purchaseReturnForClient };
     });
 
-    await invalidateItemsCatalog(userId);
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId);
     revalidatePath('/purchases');
     revalidatePath('/payables');
     revalidatePath('/expenses');

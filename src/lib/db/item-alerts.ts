@@ -4,7 +4,7 @@ import { getItems } from './items';
 import { countItemAlerts } from '../item-alert-math';
 
 // Alert counts derive from the version-guarded catalog cache (see
-// collection-cache.ts / catalog-version.ts): one cheap version read when the
+// collection-cache.ts / data-version.ts): one cheap version read when the
 // cache is current, a fresh catalog fetch only after real stock mutations.
 // Querying Firestore directly with `where('expiryDate', '<=', cutoff)` or
 // `where('stock', '<', 1)` instead returns every expired / out-of-stock

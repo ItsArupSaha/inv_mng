@@ -3,8 +3,8 @@ import type {
   cachedCollection as cachedCollectionType,
   invalidateCollectionCache as invalidateCollectionCacheType,
   invalidateCollectionCacheFamily as invalidateCollectionCacheFamilyType,
-  invalidateLedgerCaches as invalidateLedgerCachesType,
 } from '../collection-cache';
+import type { invalidateAppData as invalidateAppDataType } from '../data-version';
 
 // The cache is a process-wide singleton (state lives on globalThis so every
 // module instance shares it); each test clears that shared store so entries
@@ -30,7 +30,8 @@ async function freshCache() {
     cachedCollection: module.cachedCollection as typeof cachedCollectionType,
     invalidateCollectionCache: module.invalidateCollectionCache as typeof invalidateCollectionCacheType,
     invalidateCollectionCacheFamily: module.invalidateCollectionCacheFamily as typeof invalidateCollectionCacheFamilyType,
-    invalidateLedgerCaches: module.invalidateLedgerCaches as typeof invalidateLedgerCachesType,
+    patchCachedCollection: module.patchCachedCollection.bind(null) as typeof module.patchCachedCollection,
+    invalidateAppData: (await import('../data-version')).invalidateAppData as typeof invalidateAppDataType,
   };
 }
 
@@ -107,20 +108,37 @@ describe('collection-cache', () => {
     expect(await cache.cachedCollection('transactions:Receivable', 'u2', async () => 'untouched')).toBe('r2');
   });
 
-  it('invalidateLedgerCaches evicts dashboard, overview and transaction families', async () => {
+  it('invalidateAppData evicts ledger families and keeps catalog-only caches when scoped', async () => {
     const cache = await freshCache();
-    await cache.cachedCollection('dashboard-stats:360', 'u1', async () => 'd');
-    await cache.cachedCollection('account-overview:all-time', 'u1', async () => 'o');
+    await cache.cachedCollection('sales-master', 'u1', async () => 's');
     await cache.cachedCollection('transactions:Payable', 'u1', async () => 't');
+    await cache.cachedCollection('dashboard-stats:360', 'u1', async () => 'd');
     await cache.cachedCollection('items', 'u1', async () => 'i');
 
-    cache.invalidateLedgerCaches('u1');
+    await cache.invalidateAppData('u1', { scope: 'ledger' });
 
-    expect(await cache.cachedCollection('dashboard-stats:360', 'u1', async () => 'd2')).toBe('d2');
-    expect(await cache.cachedCollection('account-overview:all-time', 'u1', async () => 'o2')).toBe('o2');
+    expect(await cache.cachedCollection('sales-master', 'u1', async () => 's2')).toBe('s2');
     expect(await cache.cachedCollection('transactions:Payable', 'u1', async () => 't2')).toBe('t2');
-    // Non-ledger caches survive
+    expect(await cache.cachedCollection('dashboard-stats:360', 'u1', async () => 'd2')).toBe('d2');
+    // Catalog caches survive a ledger-only invalidation
     expect(await cache.cachedCollection('items', 'u1', async () => 'changed')).toBe('i');
+  });
+
+  it('patchCachedCollection patches a fresh entry in place and no-ops otherwise', async () => {
+    const cache = await freshCache();
+    await cache.cachedCollection('sales-master', 'u1', async () => ['a', 'b'], { version: 5 });
+
+    const patched = cache.patchCachedCollection<string[]>('sales-master', 'u1', 6, (v) => [...v, 'c']);
+    expect(patched).toBe(true);
+    // Same value served with no fetcher call, now stamped with the new version
+    expect(await cache.cachedCollection('sales-master', 'u1', async () => ['x'], { version: 6 })).toEqual(['a', 'b', 'c']);
+
+    // Missing entry → no-op, returns false
+    expect(cache.patchCachedCollection<string[]>('sales-master', 'u2', 6, (v) => v)).toBe(false);
+
+    // Stale entry (past TTL) → no-op
+    vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+    expect(cache.patchCachedCollection<string[]>('sales-master', 'u1', 7, (v) => [...v, 'd'])).toBe(false);
   });
 
   it('refetches when the caller-supplied version changes, even inside the TTL', async () => {

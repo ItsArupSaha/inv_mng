@@ -3,7 +3,7 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
-import { invalidateLedgerCaches } from './collection-cache';
+import { invalidateAppData } from './data-version';
 import type { Capital } from '../types';
 
 /**
@@ -64,7 +64,7 @@ export async function addCapitalAdjustment(
     });
 
     // Revalidate paths to refresh cache
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, { scope: 'ledger' });
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {
@@ -94,7 +94,7 @@ export async function updateCapitalAdjustment(
     }
     await updateDoc(capitalDocRef, updateData);
 
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, { scope: 'ledger' });
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {
@@ -112,7 +112,7 @@ export async function deleteCapitalAdjustment(userId: string, id: string): Promi
     const capitalDocRef = doc(db, 'users', userId, 'capital', id);
     await deleteDoc(capitalDocRef);
 
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, { scope: 'ledger' });
     revalidatePath('/dashboard');
     revalidatePath('/balance-sheet');
   } catch (error) {

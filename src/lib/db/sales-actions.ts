@@ -11,8 +11,7 @@ import {
   where
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';import { db } from '../firebase';
-import { invalidateCollectionCache, invalidateLedgerCaches } from './collection-cache';
-import { invalidateItemsCatalog } from './catalog-version';
+import { invalidateAppData } from './data-version';
 import type { Item, ItemBatch, Metadata, Sale, SaleItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
 import { allocateFEFO, sumBatchQuantities } from '../batch-allocation';
@@ -358,9 +357,9 @@ export async function addSale(
       return { success: true, sale: saleForClient };
     });
 
-    await invalidateItemsCatalog(userId);
-    invalidateCollectionCache('customers', userId);
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, {
+      salesMasterPatch: { kind: 'upsert', sale: result.sale },
+    });
     revalidatePath('/sales');
     revalidatePath('/dashboard');
     revalidatePath('/items');
@@ -443,9 +442,9 @@ export async function deleteSale(userId: string, saleId: string): Promise<{ succ
       transaction.delete(saleRef);
     });
 
-    await invalidateItemsCatalog(userId);
-    invalidateCollectionCache('customers', userId);
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, {
+      salesMasterPatch: { kind: 'remove', saleId: saleId },
+    });
     revalidatePath('/sales');
     revalidatePath('/items');
     revalidatePath('/dashboard');
@@ -652,9 +651,9 @@ export async function updateSale(
       return { success: true, sale: saleForClient };
     });
 
-    await invalidateItemsCatalog(userId);
-    invalidateCollectionCache('customers', userId);
-    invalidateLedgerCaches(userId);
+    await invalidateAppData(userId, {
+      salesMasterPatch: result.sale ? { kind: 'upsert', sale: result.sale } : undefined,
+    });
     revalidatePath('/sales');
     revalidatePath('/dashboard');
     revalidatePath('/items');

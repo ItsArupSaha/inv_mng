@@ -15,7 +15,8 @@ import {
 import { db } from '../firebase';
 import { getExpensesForMonth } from './expenses';
 import { docToSale, docToSalesReturn, isOperatingExpense } from './utils';
-import { cachedCollection, invalidateLedgerCaches } from './collection-cache';
+import { cachedCollection } from './collection-cache';
+import { readLedgerVersion } from './data-version';
 import type { Sale, SalesReturn } from '../types';
 
 // Profit is computed from the frozen `costAtSale` on FEFO batch allocations
@@ -75,9 +76,11 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
         };
     }
 
-    // Cached per timezone offset: the dashboard is re-requested on every visit
-    // but its inputs only change on ledger mutations, which invalidate this
-    // family via invalidateLedgerCaches.
+    // Cached per timezone offset and guarded by the ledger version: the
+    // dashboard is re-requested on every visit but its inputs only change on
+    // ledger mutations, which bump the version both locally and for other
+    // server instances.
+    const version = await readLedgerVersion(userId);
     const database = db;
     return cachedCollection(`dashboard-stats:${offsetMinutes ?? 'utc'}`, userId, async () => {
 
@@ -175,5 +178,5 @@ export async function getDashboardStats(userId: string, offsetMinutes?: number) 
         receivablesAmount,
         pendingReceivablesCount,
     };
-    });
+}, { version });
 }

@@ -1,6 +1,6 @@
 'use server';
 
-import { Timestamp, collection, getDocs } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCustomers } from './customers';
 import { getExpenses } from './expenses';
@@ -15,7 +15,7 @@ import {
   calculateStockAndAssets,
   calculateReceivables,
 } from './account-overview-helpers';
-import { cachedCollection } from './collection-cache';
+import { getRawCapital, getRawDonations, getRawTransactions, getRawTransfers } from './ledger-docs';
 
 
 export async function getAccountOverview(userId: string, asOfDate?: Date) {
@@ -23,31 +23,26 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         throw new Error("Database not connected");
     }
 
-    const database = db;
-    // The overview joins eleven collections; caching it (keyed by the as-of
-    // date the caller picked) keeps repeat visits from re-streaming the whole
-    // ledger. Any ledger mutation evicts the family via invalidateLedgerCaches.
-    return cachedCollection(`account-overview:${asOfDate ? asOfDate.toISOString().slice(0, 10) : 'all-time'}`, userId, async () => {
+    // Every input below is a ledger-version-guarded cached master, so this
+    // join runs on warm data after the first read per data change. Computing
+    // per as-of-date on every call (instead of caching per date) is what makes
+    // flipping dates free while staying live: any mutation bumps the ledger
+    // version and every master refetches on the next read.
     const cutoffTimestamp = asOfDate ? Timestamp.fromDate(asOfDate) : undefined;
 
-    const [allItems, allSales, allExpenses, allTransactionsData, allPurchases, capitalData, allCustomers, transfersData, donationsData, allReturns, allSecurityDeposits] = await Promise.all([
+    const [allItems, allSales, allExpenses, allTransactions, allPurchases, allCapital, allCustomers, allTransfers, allDonations, allReturns, allSecurityDeposits] = await Promise.all([
         getItems(userId),
         getSales(userId),
         getExpenses(userId),
-        getDocs(collection(database, 'users', userId, 'transactions')),
+        getRawTransactions(userId),
         getPurchases(userId),
-        getDocs(collection(database, 'users', userId, 'capital')),
+        getRawCapital(userId),
         getCustomers(userId),
-        getDocs(collection(database, 'users', userId, 'transfers')),
-        getDocs(collection(database, 'users', userId, 'donations')),
+        getRawTransfers(userId),
+        getRawDonations(userId),
         getSalesReturns(userId),
         getSecurityDeposits(userId),
     ]);
-
-    const allTransactions = allTransactionsData.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as any));
-    const allCapital = capitalData.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as any));
-    const allDonations = donationsData.docs.map(doc => doc.data());
-    const allTransfers = transfersData.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as any));
 
     const isBeforeOrOnCutoff = (date: any): boolean => {
         if (!asOfDate) return true;
@@ -101,7 +96,7 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         );
         if (!trace) return null;
         if (trace.dueDate instanceof Timestamp) return trace.dueDate.toDate();
-        return trace.dueDate ? new Date(trace.dueDate) : null;
+        return trace.dueDate ? new Date(trace.dueDate as string | number | Date) : null;
     };
 
     /**
@@ -250,6 +245,5 @@ export async function getAccountOverview(userId: string, asOfDate?: Date) {
         totalExpenses,
         totalStockCount,
     };
-    });
 }
 

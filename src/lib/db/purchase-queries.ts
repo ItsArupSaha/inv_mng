@@ -15,13 +15,18 @@ import {
 import { db } from '../firebase';
 import type { Purchase } from '../types';
 import { docToPurchase } from './utils';
+import { cachedCollection } from './collection-cache';
+import { readLedgerVersion } from './data-version';
 
 // --- Purchases Actions ---
 export async function getPurchases(userId: string): Promise<Purchase[]> {
     if (!db || !userId) return [];
-    const purchasesCollection = collection(db, 'users', userId, 'purchases');
-    const snapshot = await getDocs(query(purchasesCollection, orderBy('date', 'desc')));
-    return snapshot.docs.map(docToPurchase);
+    const version = await readLedgerVersion(userId);
+    return cachedCollection('purchases-master', userId, async () => {
+        const purchasesCollection = collection(db!, 'users', userId, 'purchases');
+        const snapshot = await getDocs(query(purchasesCollection, orderBy('date', 'desc')));
+        return snapshot.docs.map(docToPurchase);
+    }, { version });
 }
 
 export async function getPurchasesForDateRange(userId: string, startDate: Date, endDate: Date): Promise<Purchase[]> {
