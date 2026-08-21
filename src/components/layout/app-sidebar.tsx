@@ -130,10 +130,10 @@ export function AppSidebar() {
           <Image
             src="/logo.png"
             alt="Pharmora"
-            width={300}
-            height={300}
+            width={200}
+            height={200}
             priority
-            className="h-28 w-28 object-contain shrink-0 drop-shadow-sm"
+            className="h-24 w-24 object-contain shrink-0 drop-shadow-sm"
           />
           <div className="flex min-w-0 flex-1 flex-col justify-center pr-1">
             <h1
