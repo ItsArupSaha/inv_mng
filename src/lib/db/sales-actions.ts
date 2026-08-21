@@ -252,15 +252,6 @@ export async function addSale(
       if (!resolveIsSalable(itemData)) {
         return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
       }
-      // Narcotics register compliance: server-side guard so scheduled
-      // medicines can never be committed without a prescription reference,
-      // even if the POS validation is bypassed.
-      if (itemData.schedule && !data.prescriptionRef?.trim()) {
-        return {
-          success: false,
-          error: `A prescription reference is required for the scheduled medicine "${itemData.title}".`,
-        };
-      }
     }
 
     const result = await runTransaction(db, async (transaction) => {
@@ -311,9 +302,6 @@ export async function addSale(
       if (data.paymentMethod !== 'Split') {
         delete cleanedData.amountPaid;
         delete cleanedData.splitPaymentMethod;
-      }
-      if (!data.prescriptionRef?.trim()) {
-        delete cleanedData.prescriptionRef;
       }
 
       const saleDataToSave: Omit<Sale, 'id'> & { date: Timestamp, creditApplied?: number } = {
@@ -511,19 +499,6 @@ export async function updateSale(
       if (!resolveIsSalable(itemData)) {
         return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
       }
-      // Scheduled-medicine guard; edits keep the reference already recorded on
-      // the original sale when the dialog doesn't resend it.
-      if (
-        itemData.schedule &&
-        data.items.some((line) => line.itemId === snap.id) &&
-        !data.prescriptionRef?.trim() &&
-        !oldSale.prescriptionRef?.trim()
-      ) {
-        return {
-          success: false,
-          error: `A prescription reference is required for the scheduled medicine "${itemData.title}".`,
-        };
-      }
     }
 
     const result = await runTransaction(db, async (transaction) => {
@@ -652,16 +627,6 @@ export async function updateSale(
       if (data.paymentMethod !== 'Split') {
         delete cleanedData.amountPaid;
         delete cleanedData.splitPaymentMethod;
-      }
-      // Preserve the recorded prescription reference when the edit dialog
-      // doesn't resend it; strip it entirely when neither source has one so
-      // Firestore never receives an undefined field value.
-      if (data.prescriptionRef?.trim()) {
-        cleanedData.prescriptionRef = data.prescriptionRef.trim();
-      } else if (oldSale.prescriptionRef?.trim()) {
-        cleanedData.prescriptionRef = oldSale.prescriptionRef;
-      } else {
-        delete cleanedData.prescriptionRef;
       }
 
       const updatedSaleData: Omit<Sale, 'id'> & { date: Timestamp; creditApplied?: number } = {

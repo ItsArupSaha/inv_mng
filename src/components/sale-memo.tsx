@@ -78,11 +78,6 @@ export function SaleMemo({ sale, customer, items, user, onNewSale }: SaleMemoPro
                   {status === 'Paid' ? 'PAID' : sale.paymentMethod}
                 </span>
               </p>
-              {sale.prescriptionRef && (
-                <p>
-                  <span className="font-semibold">Prescription Ref:</span> {sale.prescriptionRef}
-                </p>
-              )}
             </div>
           </div>
 

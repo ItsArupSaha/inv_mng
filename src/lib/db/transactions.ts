@@ -1,13 +1,12 @@
 'use server';
 
-import type { Transaction, Transfer } from '../types';
+import type { Transaction } from '../types';
 import {
   getTransactions as getTransactionsImpl,
   getTransactionsPaginated as getTransactionsPaginatedImpl,
   getPaidReceivablesForDateRange as getPaidReceivablesForDateRangeImpl,
   getTransactionsForCustomer as getTransactionsForCustomerImpl,
   getSaleTransaction as getSaleTransactionImpl,
-  getTransfersPaginated as getTransfersPaginatedImpl,
   getTransactionsForMonth as getTransactionsForMonthImpl,
   getTransactionsForDay as getTransactionsForDayImpl,
   getPaidPayables as getPaidPayablesImpl,
@@ -16,7 +15,6 @@ import {
 
 import {
   addTransaction as addTransactionImpl,
-  recordTransfer as recordTransferImpl,
   updateTransactionStatus as updateTransactionStatusImpl,
   deleteTransaction as deleteTransactionImpl,
   addPayment as addPaymentImpl,
@@ -57,14 +55,6 @@ export async function getSaleTransaction(userId: string, saleId: string): Promis
   return getSaleTransactionImpl(userId, saleId);
 }
 
-export async function getTransfersPaginated(params: {
-  userId: string;
-  pageLimit?: number;
-  lastVisibleId?: string;
-}): Promise<{ transfers: Transfer[]; hasMore: boolean }> {
-  return getTransfersPaginatedImpl(params);
-}
-
 export async function getTransactionsForMonth(userId: string, year: number, month: number, offsetMinutes?: number): Promise<Transaction[]> {
   return getTransactionsForMonthImpl(userId, year, month, offsetMinutes);
 }
@@ -86,18 +76,6 @@ export async function addTransaction(
   data: Omit<Transaction, 'id' | 'dueDate' | 'status'> & { dueDate: Date }
 ): Promise<Transaction> {
   return addTransactionImpl(userId, data);
-}
-
-export async function recordTransfer(
-  userId: string,
-  data: {
-    amount: number;
-    from: 'Cash' | 'Bank';
-    to: 'Cash' | 'Bank';
-    date: Date;
-  }
-) {
-  return recordTransferImpl(userId, data);
 }
 
 export async function updateTransactionStatus(

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
-  ArrowLeftRight,
   ArrowRightLeft,
   Store,
   CreditCard,
@@ -16,7 +15,6 @@ import {
   AlertTriangle,
   ShieldAlert,
   FolderSync,
-  Users,
 } from 'lucide-react';
 
 import {
@@ -76,7 +74,6 @@ export function AppSidebar() {
       { href: '/items', icon: Package, label: 'Medicines / Stocks' },
       { href: '/expenses', icon: CreditCard, label: 'Expense' },
       { href: '/purchases', icon: ShoppingBag, label: 'Purchase' },
-      { href: '/suppliers', icon: Users, label: 'Supplier Ledger' },
       { href: '/expiry-alerts', icon: AlertTriangle, label: 'Expiry Alerts', badge: true },
       { href: '/stock-warnings', icon: ShieldAlert, label: 'Stock Warnings', stockBadge: true },
       { href: '/reports', icon: FileText, label: 'Reports' },
@@ -88,8 +85,6 @@ export function AppSidebar() {
   const otherItems = React.useMemo(
     () => [
       { href: '/payables', icon: ArrowRightLeft, label: 'Payables (Suppliers)' },
-      { href: '/transfer', icon: ArrowLeftRight, label: 'Transfers (Cash/Bank)' },
-      { href: '/scheduled-register', icon: ShieldAlert, label: 'Scheduled Register' },
       { href: '/bulk-shelf-update', icon: FolderSync, label: 'Shelf Update (Bulk)' },
     ],
     []

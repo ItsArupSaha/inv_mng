@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { deleteItem, getCategories, getItems } from '@/lib/actions';
 import type { Category, Item } from '@/lib/types';
-import { expiryFilterLabel, summarizeExpiryTiers } from '@/lib/expiry-stats';
+import { expiryFilterLabel } from '@/lib/expiry-stats';
 import { isFuzzyMatch } from '@/lib/search-utils';
 import { useExpiryExport } from './use-expiry-export';
 
@@ -67,9 +67,6 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allItems]);
-
-  // Taka-at-risk snapshot across all tiers, independent of the active filter
-  const expirySummary = React.useMemo(() => summarizeExpiryTiers(allItems), [allItems]);
 
   const handleEditItem = (item: Item) => {
     setEditingItem(item);
@@ -208,7 +205,6 @@ export function useExpiryAlerts({ userId }: UseExpiryAlertsProps) {
   return {
     categories,
     companies,
-    expirySummary,
     isInitialLoading,
     isItemDialogOpen,
     setIsItemDialogOpen,

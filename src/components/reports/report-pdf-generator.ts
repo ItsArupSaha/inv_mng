@@ -34,7 +34,7 @@ export function generateReportPdf({
   // refuses to render it.
   if (!activity) return;
 
-  const { salesBreakdown, cashFlow, netResult, purchases, topSellers } = reportData;
+  const { salesBreakdown, cashFlow, netResult, purchases } = reportData;
 
   // Left side header
   doc.setFontSize(16);
@@ -145,24 +145,6 @@ export function generateReportPdf({
   });
 
   finalY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Top Sellers Table
-  if (topSellers.length > 0) {
-    autoTable(doc, {
-      startY: finalY,
-      head: [['Top Selling Medicines', 'Qty', 'Revenue', 'Profit']],
-      body: topSellers.map(row => [
-        row.itemTitle,
-        String(row.quantity),
-        formatCurrencyForPdf(row.revenue),
-        formatCurrencyForPdf(row.profit),
-      ]),
-      theme: 'striped',
-      headStyles: { fillColor: '#306754' },
-    });
-
-    finalY = (doc as any).lastAutoTable.finalY + 10;
-  }
 
   // Net Result
   doc.setFontSize(12);

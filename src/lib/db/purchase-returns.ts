@@ -287,7 +287,6 @@ export async function addPurchaseReturn(userId: string, data: CreatePurchaseRetu
     revalidatePath('/purchases');
     revalidatePath('/payables');
     revalidatePath('/expenses');
-    revalidatePath('/suppliers');
     revalidatePath('/reports');
     return result;
   } catch (e) {

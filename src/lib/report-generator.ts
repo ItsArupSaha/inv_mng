@@ -7,13 +7,6 @@ export interface PurchaseActivitySummary {
   newSupplierDue: number; // due added by new purchases (Due/Split remainders)
 }
 
-export interface TopSellerRow {
-  itemTitle: string;
-  quantity: number;
-  revenue: number;
-  profit: number;
-}
-
 interface ActivityStats {
   totalSales: number;
   totalExtraSales?: number;
@@ -40,7 +33,6 @@ interface CoreStats {
   };
   netProfitOrLoss: number;
   purchases: PurchaseActivitySummary;
-  topSellers: TopSellerRow[];
 }
 
 export interface ReportInput {
@@ -102,26 +94,6 @@ function buildPurchaseSummary(purchases: Purchase[], expenses: Expense[]): Purch
   }, 0);
 
   return { totalPurchased, paidToSuppliers, newSupplierDue };
-}
-
-function buildTopSellers(sales: Sale[], itemsData: Item[], limit = 10): TopSellerRow[] {
-  const byItem = new Map<string, TopSellerRow>();
-  for (const sale of sales) {
-    for (const saleItem of sale.items) {
-      const row = byItem.get(saleItem.itemId) || {
-        itemTitle: itemsData.find(i => i.id === saleItem.itemId)?.title || 'Unknown item',
-        quantity: 0,
-        revenue: 0,
-        profit: 0,
-      };
-      const cost = saleLineCost(saleItem, itemsData);
-      row.quantity += Number(saleItem.quantity) || 0;
-      row.revenue += (Number(saleItem.price) || 0) * (Number(saleItem.quantity) || 0);
-      row.profit += (Number(saleItem.price) || 0) * (Number(saleItem.quantity) || 0) - cost;
-      byItem.set(saleItem.itemId, row);
-    }
-  }
-  return Array.from(byItem.values()).sort((a, b) => b.revenue - a.revenue).slice(0, limit);
 }
 
 function calculateCoreStats(input: ReportStatsInput): CoreStats {
@@ -236,7 +208,6 @@ function calculateCoreStats(input: ReportStatsInput): CoreStats {
     },
     netProfitOrLoss: totalProfit - totalExpenses,
     purchases: buildPurchaseSummary(purchasesData, expensesData),
-    topSellers: buildTopSellers(salesData, itemsData),
   };
 }
 
@@ -245,7 +216,6 @@ export interface ReportAnalysis {
   salesBreakdown: { paid: number; due: number };
   cashFlow: CoreStats['cashFlow'];
   purchases: PurchaseActivitySummary;
-  topSellers: TopSellerRow[];
   netResult: { netProfitOrLoss: number };
 }
 
@@ -263,7 +233,6 @@ export interface DailyReportAnalysis {
   salesBreakdown: { paid: number; due: number };
   cashFlow: CoreStats['cashFlow'];
   purchases: PurchaseActivitySummary;
-  topSellers: TopSellerRow[];
   netResult: { netProfitOrLoss: number };
 }
 
@@ -286,7 +255,6 @@ export function generateDailyReport(input: DailyReportInput): DailyReportAnalysi
     salesBreakdown: stats.salesBreakdown,
     cashFlow: stats.cashFlow,
     purchases: stats.purchases,
-    topSellers: stats.topSellers,
     netResult: { netProfitOrLoss: stats.netProfitOrLoss },
   };
 }
@@ -306,7 +274,6 @@ export function generateMonthlyReport(input: ReportInput): ReportAnalysis {
     salesBreakdown: stats.salesBreakdown,
     cashFlow: stats.cashFlow,
     purchases: stats.purchases,
-    topSellers: stats.topSellers,
     netResult: { netProfitOrLoss: stats.netProfitOrLoss },
   };
 }

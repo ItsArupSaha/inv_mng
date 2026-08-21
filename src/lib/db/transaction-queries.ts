@@ -13,9 +13,9 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { Transaction, Transfer } from '../types';
+import type { Transaction } from '../types';
 import { getCustomerById } from './customers';
-import { docToTransaction, docToTransfer } from './utils';
+import { docToTransaction } from './utils';
 
 // --- Transactions (Receivables/Payables) Actions ---
 export async function getTransactions(userId: string, type: 'Receivable' | 'Payable'): Promise<Transaction[]> {
@@ -146,37 +146,6 @@ export async function getSaleTransaction(userId: string, saleId: string): Promis
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
   return docToTransaction(snapshot.docs[0]);
-}
-
-export async function getTransfersPaginated({ userId, pageLimit = 5, lastVisibleId }: { userId: string, pageLimit?: number, lastVisibleId?: string }): Promise<{ transfers: Transfer[], hasMore: boolean }> {
-  if (!db || !userId) return { transfers: [], hasMore: false };
-
-  const transfersCollection = collection(db, 'users', userId, 'transfers');
-  let q = query(
-    transfersCollection,
-    orderBy('date', 'desc'),
-    limit(pageLimit)
-  );
-
-  if (lastVisibleId) {
-    const lastVisibleDoc = await getDoc(doc(transfersCollection, lastVisibleId));
-    if (lastVisibleDoc.exists()) {
-      q = query(q, startAfter(lastVisibleDoc));
-    }
-  }
-
-  const snapshot = await getDocs(q);
-  const transfers = snapshot.docs.map(docToTransfer);
-
-  const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-  let hasMore = false;
-  if (lastDoc) {
-    const nextQuery = query(transfersCollection, orderBy('date', 'desc'), startAfter(lastDoc), limit(1));
-    const nextSnapshot = await getDocs(nextQuery);
-    hasMore = !nextSnapshot.empty;
-  }
-
-  return { transfers, hasMore };
 }
 
 export async function getTransactionsForDateRange(userId: string, startDate: Date, endDate: Date): Promise<Transaction[]> {

@@ -32,34 +32,6 @@ export async function addTransaction(userId: string, data: Omit<Transaction, 'id
   return { ...transactionData, id: newDocRef.id, dueDate: data.dueDate.toISOString() };
 }
 
-export async function recordTransfer(
-  userId: string,
-  data: {
-    amount: number;
-    from: 'Cash' | 'Bank';
-    to: 'Cash' | 'Bank';
-    date: Date
-  }
-) {
-  if (!db || !userId) throw new Error("Database not connected");
-  if (data.from === data.to) throw new Error("Source and destination cannot be the same.");
-
-  const transfersCollection = collection(db, 'users', userId, 'transfers');
-
-  const transferData = {
-    amount: data.amount,
-    from: data.from,
-    to: data.to,
-    date: Timestamp.fromDate(data.date),
-    description: `Transfer from ${data.from} to ${data.to}`
-  };
-
-  await addDoc(transfersCollection, transferData);
-
-  invalidateLedgerCaches(userId);
-  revalidatePath('/dashboard');
-}
-
 export async function updateTransactionStatus(userId: string, id: string, status: 'Pending' | 'Paid', type: 'Receivable' | 'Payable') {
   if (!db || !userId) return;
   const transRef = doc(db, 'users', userId, 'transactions', id);

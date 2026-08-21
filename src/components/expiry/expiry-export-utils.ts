@@ -5,7 +5,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import type { Item } from '@/lib/types';
-import { itemStockValue } from '@/lib/expiry-stats';
 
 interface ExportUser {
   companyName?: string | null;
@@ -36,23 +35,15 @@ export function handleDownloadPdf(filteredAndSortedItems: Item[], authUser: Expo
   doc.text(`Generated on: ${dateString}`, 105, 51, { align: 'center' });
   doc.setTextColor(0);
 
-  const totalValue = filteredAndSortedItems.reduce((sum, item) => sum + itemStockValue(item), 0);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`Stock value at risk: ৳${totalValue.toFixed(2)}`, 105, 56, { align: 'center' });
-  doc.setTextColor(0);
-
   autoTable(doc, {
-    startY: 62,
-    head: [['Title', 'Group (Generic)', 'Company', 'Expiry Date', 'Stock', 'Cost (TK)', 'Value (TK)']],
+    startY: 58,
+    head: [['Title', 'Group (Generic)', 'Company', 'Expiry Date', 'Stock']],
     body: filteredAndSortedItems.map(item => [
       item.title,
       item.medicineGroup || '-',
       item.company || '-',
       item.expiryDate || '-',
       item.stock,
-      item.productionPrice.toFixed(2),
-      itemStockValue(item).toFixed(2),
     ]),
   });
 
@@ -68,9 +59,6 @@ export function handleDownloadXlsx(filteredAndSortedItems: Item[], reportTitle: 
     Company: item.company || '-',
     'Expiry Date': item.expiryDate || '-',
     Stock: item.stock,
-    'Production Cost': item.productionPrice,
-    'Stock Value (Cost)': itemStockValue(item),
-    'Selling Price': item.sellingPrice,
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(dataToExport);

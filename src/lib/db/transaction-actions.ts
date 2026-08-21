@@ -3,7 +3,6 @@
 import type { Transaction } from '../types';
 import {
   addTransaction as addTransactionImpl,
-  recordTransfer as recordTransferImpl,
   updateTransactionStatus as updateTransactionStatusImpl,
   deleteTransaction as deleteTransactionImpl,
 } from './transaction-actions-basic';
@@ -19,18 +18,6 @@ export async function addTransaction(
   data: Omit<Transaction, 'id' | 'dueDate' | 'status'> & { dueDate: Date }
 ): Promise<Transaction> {
   return addTransactionImpl(userId, data);
-}
-
-export async function recordTransfer(
-  userId: string,
-  data: {
-    amount: number;
-    from: 'Cash' | 'Bank';
-    to: 'Cash' | 'Bank';
-    date: Date;
-  }
-) {
-  return recordTransferImpl(userId, data);
 }
 
 export async function updateTransactionStatus(

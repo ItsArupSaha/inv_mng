@@ -8,7 +8,6 @@ import { Download } from 'lucide-react';
 import { ReportActivityTable } from './reports/report-activity-table';
 import { ReportCashflowOverview } from './reports/report-cashflow-overview';
 import { ReportPurchasesTable } from './reports/report-purchases-table';
-import { ReportTopSellers } from './reports/report-top-sellers';
 import { generateReportPdf } from './reports/report-pdf-generator';
 
 interface ReportPreviewProps {
@@ -32,7 +31,7 @@ export default function ReportPreview({ reportData, reportType, dateLabel }: Rep
       ? (reportData as DailyReportAnalysis).dailyActivity
       : (reportData as ReportAnalysis).monthlyActivity;
 
-  const { salesBreakdown, cashFlow, netResult, purchases, topSellers } = reportData ?? ({} as Partial<ReportAnalysis>);
+  const { salesBreakdown, cashFlow, netResult, purchases } = reportData ?? ({} as Partial<ReportAnalysis>);
 
   // A report payload that doesn't match the selected type (e.g. a daily
   // analysis rendered while the monthly branch is active) must never reach
@@ -86,8 +85,6 @@ export default function ReportPreview({ reportData, reportType, dateLabel }: Rep
             />
           </div>
         </div>
-
-        <ReportTopSellers topSellers={topSellers} formatCurrency={formatCurrency} />
       </CardContent>
     </Card>
   );

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Expense, Item, Purchase, Sale, Transaction } from '../types';
 import { calculateReportStats, generateDailyReport } from '../report-generator';
-import { itemStockValue, summarizeExpiryTiers } from '../expiry-stats';
 
 function makeItem(overrides: Partial<Item>): Item {
   return {
@@ -82,7 +81,6 @@ describe('report profit with frozen batch costs', () => {
 
     // 15 revenue − 10 frozen cost, not 15 − 20 current cost
     expect(stats.profitFromPaidSales).toBe(5);
-    expect(stats.topSellers[0].profit).toBe(5);
   });
 
   it('falls back to current item cost for sales recorded before batch tracking', () => {
@@ -101,38 +99,6 @@ describe('report profit with frozen batch costs', () => {
     });
 
     expect(stats.profitFromPaidSales).toBeCloseTo(2.5, 6);
-  });
-
-  it('aggregates top sellers by item with quantity, revenue, and profit', () => {
-    const napa = makeItem({ id: 'item-1', title: 'Napa', productionPrice: 1 });
-    const seclo = makeItem({ id: 'item-2', title: 'Seclo', productionPrice: 2 });
-    const sales = [
-      makeSale({
-        id: 's1', total: 30,
-        items: [
-          { itemId: 'item-1', quantity: 10, price: 1.5 },
-          { itemId: 'item-2', quantity: 5, price: 3 },
-        ],
-      }),
-      makeSale({
-        id: 's2', total: 15,
-        items: [{ itemId: 'item-1', quantity: 10, price: 1.5 }],
-      }),
-    ];
-
-    const stats = calculateReportStats({
-      salesData: sales,
-      expensesData: [],
-      itemsData: [napa, seclo],
-      purchasesData: [],
-      transactionsData: [],
-    });
-
-    expect(stats.topSellers).toHaveLength(2);
-    const napaRow = stats.topSellers.find(r => r.itemTitle === 'Napa');
-    expect(napaRow?.quantity).toBe(20);
-    expect(napaRow?.revenue).toBe(30);
-    expect(napaRow?.profit).toBe(10);
   });
 });
 
@@ -169,7 +135,7 @@ describe('report purchase summary', () => {
 });
 
 describe('daily report shape', () => {
-  it('exposes purchases and top sellers and drops the donations slot', () => {
+  it('exposes purchases and drops the donations and top-sellers slots', () => {
     const report = generateDailyReport({
       salesData: [],
       expensesData: [],
@@ -180,36 +146,8 @@ describe('daily report shape', () => {
     });
 
     expect(report.purchases).toEqual({ totalPurchased: 0, paidToSuppliers: 0, newSupplierDue: 0 });
-    expect(report.topSellers).toEqual([]);
+    expect(report).not.toHaveProperty('topSellers');
     expect(report).not.toHaveProperty('dailyActivity.totalDonations');
     expect(report.cashFlow).not.toHaveProperty('donations');
-  });
-});
-
-describe('expiry tiers', () => {
-  const now = new Date('2026-08-19T00:00:00.000Z');
-
-  function daysFromNow(days: number): string {
-    const d = new Date(now);
-    d.setDate(now.getDate() + days);
-    return d.toISOString().slice(0, 10);
-  }
-
-  it('bands items into exclusive tiers by money at risk and skips zero stock', () => {
-    const items = [
-      makeItem({ id: 'a', expiryDate: daysFromNow(-5), stock: 10, productionPrice: 2 }),   // expired ৳20
-      makeItem({ id: 'b', expiryDate: daysFromNow(10), stock: 100, productionPrice: 1 }), // 30d ৳100
-      makeItem({ id: 'c', expiryDate: daysFromNow(45), stock: 50, productionPrice: 2 }),  // 60d ৳100
-      makeItem({ id: 'd', expiryDate: daysFromNow(75), stock: 20, productionPrice: 5 }),  // 90d ৳100
-      makeItem({ id: 'e', expiryDate: daysFromNow(2), stock: 0, productionPrice: 9 }),    // zero stock, ignored
-      makeItem({ id: 'f', expiryDate: daysFromNow(200), stock: 5, productionPrice: 9 }),  // beyond 90d, ignored
-    ];
-
-    const summary = summarizeExpiryTiers(items, now);
-    expect(summary.expired).toEqual({ count: 1, value: 20 });
-    expect(summary.within30d).toEqual({ count: 1, value: 100 });
-    expect(summary.within60d).toEqual({ count: 1, value: 100 });
-    expect(summary.within90d).toEqual({ count: 1, value: 100 });
-    expect(itemStockValue(items[0])).toBe(20);
   });
 });

@@ -20,7 +20,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       { href: '/reports', label: 'Reports' },
       { href: '/balance-sheet', label: 'Business Overview' },
       { href: '/payables', label: 'Payables (Suppliers)' },
-      { href: '/transfer', label: 'Transfers (Cash/Bank)' },
       { href: '/bulk-shelf-update', label: 'Shelf Update (Bulk)' },
     ].find((item) => pathname.startsWith(item.href));
 

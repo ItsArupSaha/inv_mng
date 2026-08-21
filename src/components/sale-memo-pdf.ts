@@ -79,13 +79,6 @@ export async function generateSaleMemoPdf({
   doc.text(format(new Date(sale.date), 'PPP'), 165, infoY + 5);
   doc.text(currentPaymentMethod, 165, infoY + 10);
 
-  if (sale.prescriptionRef) {
-    doc.setFont('helvetica', 'bold');
-    doc.text('Prescription Ref:', 140, infoY + 15);
-    doc.setFont('helvetica', 'normal');
-    doc.text(sale.prescriptionRef, 165, infoY + 15);
-  }
-
   // Table
   const tableData = sale.items.map((item) => [
     getItemTitle(item.itemId),
