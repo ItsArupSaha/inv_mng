@@ -44,7 +44,7 @@ export function SalePaymentSection() {
             render={({ field }) => (
               <FormItem className={cn("w-1/2", watchDiscountType === 'none' && 'hidden')}>
                 <FormControl>
-                  <Input type="number" placeholder="0" {...field} />
+                  <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -87,7 +87,7 @@ export function SalePaymentSection() {
               <FormItem className="flex-1">
                 <FormLabel>Amount Paid Now</FormLabel>
                 <FormControl>
-                  <Input type="number" step="0.01" placeholder="Enter amount paid" {...field} />
+                  <Input type="number" step="0.01" placeholder="Enter amount paid" {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

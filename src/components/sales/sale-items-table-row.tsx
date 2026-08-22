@@ -33,7 +33,9 @@ export function SaleItemsTableRow({
   const watchItemId = watchItems[index]?.itemId;
   const selectedItem = items.find((i) => i.id === watchItemId);
   const qty = Number(watchItems[index]?.quantity) || 0;
-  const price = Number(watchItems[index]?.price) || 0;
+  const price = watchItems[index]?.price !== undefined && watchItems[index]?.price !== ''
+    ? Number(watchItems[index]?.price)
+    : (Number(selectedItem?.sellingPrice) || 0);
   const rowTotal = qty * price;
 
   return (
@@ -63,7 +65,7 @@ export function SaleItemsTableRow({
                         if (value === selectField.value) return;
                         const item = items.find((i) => i.id === value);
                         selectField.onChange(value);
-                        setValue(`items.${index}.price`, item?.sellingPrice || 0, {
+                        setValue(`items.${index}.price`, item ? item.sellingPrice : '', {
                           shouldDirty: true,
                           shouldTouch: true,
                           shouldValidate: true,
@@ -130,8 +132,9 @@ export function SaleItemsTableRow({
                   data-row={index}
                   data-col={1}
                   {...qtyField}
+                  value={qtyField.value ?? ''}
                   disabled={!watchItemId}
-                  onChange={(e) => qtyField.onChange(Number(e.target.value) || '')}
+                  onChange={(e) => qtyField.onChange(e.target.value === '' ? '' : Number(e.target.value))}
                 />
               </FormControl>
             </FormItem>
@@ -144,24 +147,33 @@ export function SaleItemsTableRow({
         <FormField
           control={control}
           name={`items.${index}.price`}
-          render={({ field: priceField }) => (
-            <FormItem className="space-y-0">
-              <FormControl>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  className="w-full h-8 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 text-right font-mono pr-3 py-0.5"
-                  data-row={index}
-                  data-col={2}
-                  {...priceField}
-                  disabled={!watchItemId}
-                  onChange={(e) => priceField.onChange(Number(e.target.value) || '')}
-                />
-              </FormControl>
-            </FormItem>
-          )}
+          render={({ field: priceField }) => {
+            const raw = priceField.value;
+            const displayPrice =
+              raw !== undefined && raw !== '' && raw !== null
+                ? raw
+                : (selectedItem ? selectedItem.sellingPrice : '');
+
+            return (
+              <FormItem className="space-y-0">
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder={selectedItem ? String(selectedItem.sellingPrice) : "0.00"}
+                    className="w-full h-8 rounded-none border-0 shadow-none bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-900/20 focus:bg-background focus:ring-0 focus-visible:ring-0 text-right font-mono pr-3 py-0.5"
+                    data-row={index}
+                    data-col={2}
+                    {...priceField}
+                    value={displayPrice}
+                    disabled={!watchItemId}
+                    onChange={(e) => priceField.onChange(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </FormControl>
+              </FormItem>
+            );
+          }}
         />
       </td>
 

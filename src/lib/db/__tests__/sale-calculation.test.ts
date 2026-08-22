@@ -40,15 +40,31 @@ describe('computeSaleTotals', () => {
     expect(t.totalAfterDiscount).toBe(0);
   });
 
-  it('explicit total override wins when >= 0', () => {
-    const t = computeSaleTotals({ ...base, totalOverride: 210 });
-    expect(t.totalAfterDiscount).toBe(210);
-    expect(t.finalTotal).toBe(210);
+  it('extra sales increases total and profit as pure revenue', () => {
+    const t = computeSaleTotals({ ...base, extraSales: 30 });
+    expect(t.totalAfterDiscount).toBe(250);
+    expect(t.finalTotal).toBe(250);
+    expect(t.totalSaleProfit).toBe(100);
   });
 
-  it('ignores negative total override', () => {
-    const t = computeSaleTotals({ ...base, totalOverride: -5 });
+  it('totalOverride rounds down or customizes total and adjusts profit correctly', () => {
+    const t = computeSaleTotals({ ...base, totalOverride: 200 });
+    expect(t.totalAfterDiscount).toBe(200);
+    expect(t.finalTotal).toBe(200);
+    expect(t.totalSaleProfit).toBe(50); // 200 - 150 cost
+  });
+
+  it('totalOverride rounds up total and increases profit accordingly', () => {
+    const t = computeSaleTotals({ ...base, totalOverride: 230 });
+    expect(t.totalAfterDiscount).toBe(230);
+    expect(t.finalTotal).toBe(230);
+    expect(t.totalSaleProfit).toBe(80); // 230 - 150 cost
+  });
+
+  it('ignores negative totalOverride', () => {
+    const t = computeSaleTotals({ ...base, totalOverride: -10 });
     expect(t.totalAfterDiscount).toBe(220);
+    expect(t.finalTotal).toBe(220);
   });
 
   it('credit applied reduces finalTotal but not recorded total or profit', () => {

@@ -10,11 +10,18 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { invalidateAppData } from './data-version';
+import { getCustomers } from './customers';
 import type { Item, ItemBatch, Metadata, Sale, SaleItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
 import { allocateFEFO, sumBatchQuantities } from '../batch-allocation';
 import { batchDocRef, buildBatchData, fetchItemBatches, newBatchDocRef, type ItemBatchWithId } from './batch-utils';
 import { buildReceivable, computeSaleTotals } from './sale-calculation';
+import {
+  validateAmountPaid,
+  validateCreditApplied,
+  validateDiscount,
+  validateSaleItems,
+} from '../sale-guards';
 import { docToSale } from './utils';
 import type { Transaction } from 'firebase/firestore';
 
@@ -220,9 +227,18 @@ function applyBatchRestores(
   }
 }
 
+export interface DueCustomerInput {
+  name: string;
+  phone: string;
+}
+
 export async function addSale(
   userId: string,
-  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & { creditApplied?: number; total?: number }
+  data: Omit<Sale, 'id' | 'saleId' | 'subtotal' | 'total'> & {
+    creditApplied?: number;
+    total?: number;
+    dueCustomer?: DueCustomerInput;
+  }
 ): Promise<{ success: boolean; error?: string; sale?: Sale }> {
   if (!db || !userId) return { success: false, error: "Database not configured." };
 
@@ -233,13 +249,58 @@ export async function addSale(
     const salesCollection = collection(userRef, 'sales');
     const transactionsCollection = collection(userRef, 'transactions');
     const metadataRef = doc(userRef, 'metadata', 'counters');
-    const customerRef = doc(customersCollection, data.customerId);
     const saleDate = new Date(data.date) || new Date();
+
+    // Due sales carry name+phone instead of a customer id. Resolution order
+    // is the dedup contract: phone digits first (phone = identity), then a
+    // case/spacing-insensitive name match; only a genuinely new person is
+    // created. Cash/Bank sales stay on the walk-in customer.
+    let customerRef = doc(customersCollection, data.customerId);
+    let createCustomerInTx = false;
+    if (data.paymentMethod === 'Due') {
+      const name = (data.dueCustomer?.name || '').trim();
+      const phoneDigits = (data.dueCustomer?.phone || '').replace(/\D/g, '');
+      if (!name || phoneDigits.length < 6 || phoneDigits.length > 15) {
+        return { success: false, error: 'Due sales need a customer name and a valid phone number.' };
+      }
+      const phoneTail = phoneDigits.slice(-10);
+      const nameKey = (v: string) => v.trim().toLowerCase().replace(/\s+/g, ' ');
+      const existing = await getCustomers(userId); // cached, version-guarded
+      const byPhone = existing.find((c) => {
+        const d = (c.phone || '').replace(/\D/g, '');
+        if (d === phoneDigits) return true;
+        // Tolerate country-prefix differences (8801… vs 01…) on 6+ digit numbers.
+        return d.length >= 6 && phoneDigits.length >= 6 &&
+          (d.endsWith(phoneTail) || phoneDigits.endsWith(d.slice(-10)));
+      });
+      const resolved =
+        byPhone ||
+        existing.find((c) => nameKey(c.name) === nameKey(name) && (c.phone || '').replace(/\D/g, '') === phoneDigits);
+      if (resolved) {
+        customerRef = doc(customersCollection, resolved.id);
+      } else {
+        const nameOnly = existing.find((c) => nameKey(c.name) === nameKey(name) && nameKey(c.name) !== 'walk-in customer');
+        if (nameOnly) {
+          customerRef = doc(customersCollection, nameOnly.id);
+        } else {
+          customerRef = doc(customersCollection); // new customer
+          createCustomerInTx = true;
+        }
+      }
+      data.customerId = customerRef.id;
+    }
 
     // 1. Pre-fetch selected item documents
     const selectedItemRefs = data.items.map(item => doc(itemsCollection, item.itemId));
     const selectedItemSnaps = await Promise.all(selectedItemRefs.map(ref => getDoc(ref)));
 
+    // Server-side law (M3): the browser never decides money. Quantities must
+    // be whole and positive, and the price is ALWAYS the item's recorded
+    // selling price — client-sent prices are overwritten before use.
+    const itemsError = validateSaleItems(data.items);
+    if (itemsError) return { success: false, error: itemsError };
+
+    let serverSubtotal = 0;
     for (let i = 0; i < selectedItemSnaps.length; i++) {
       const snap = selectedItemSnaps[i];
       if (!snap.exists()) {
@@ -249,16 +310,63 @@ export async function addSale(
       if (!resolveIsSalable(itemData)) {
         return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
       }
+      const customPrice = (data.items[i] as any).price;
+      const unitPrice =
+        customPrice !== undefined && customPrice !== null && !isNaN(Number(customPrice)) && Number(customPrice) >= 0
+          ? Number(customPrice)
+          : (Number(itemData.sellingPrice) || 0);
+
+      (data.items[i] as SaleItem).price = unitPrice;
+      serverSubtotal += unitPrice * Number(data.items[i].quantity);
     }
+
+    const discountError = validateDiscount(
+      data.discountType === 'percentage'
+        ? { type: 'percentage', value: Number(data.discountValue) || 0 }
+        : data.discountType === 'amount'
+          ? { type: 'amount', value: Number(data.discountValue) || 0 }
+          : { type: 'none' },
+      serverSubtotal
+    );
+    if (discountError) return { success: false, error: discountError };
+
+    const discountTotal = data.discountType === 'percentage'
+      ? serverSubtotal * ((Number(data.discountValue) || 0) / 100)
+      : data.discountType === 'amount' ? (Number(data.discountValue) || 0) : 0;
+    const effectiveBaseTotal = serverSubtotal - Math.min(serverSubtotal, discountTotal) + (Number(data.extraSales) || 0);
+    const payableTotal = data.total !== undefined && !isNaN(Number(data.total)) && Number(data.total) >= 0
+      ? Number(data.total)
+      : effectiveBaseTotal;
+    const paidError = validateAmountPaid(
+      data.paymentMethod === 'Split' ? Number(data.amountPaid) : undefined,
+      payableTotal
+    );
+    if (paidError) return { success: false, error: paidError };
 
     const result = await runTransaction(db, async (transaction) => {
       const metadataDoc = await transaction.get(metadataRef);
       const customerDoc = await transaction.get(customerRef);
       const itemDocs = await Promise.all(selectedItemRefs.map(ref => transaction.get(ref)));
 
-      if (!customerDoc.exists()) {
+      if (createCustomerInTx) {
+        transaction.set(customerRef, {
+          name: (data.dueCustomer?.name || '').trim(),
+          phone: (data.dueCustomer?.phone || '').trim(),
+          address: 'N/A',
+          openingBalance: 0,
+          dueBalance: 0,
+        });
+      } else if (!customerDoc.exists()) {
         throw new Error(`Customer with id ${data.customerId} does not exist!`);
       }
+
+      // Credit can only spend the advance the customer really has (M2 guard).
+      const customerDueForCredit = createCustomerInTx ? 0 : Number(customerDoc.data()?.dueBalance) || 0;
+      const creditError = validateCreditApplied(
+        Number(data.creditApplied) || 0,
+        customerDueForCredit
+      );
+      if (creditError) throw new Error(creditError);
 
       const itemDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
       itemDocs.forEach(docSnap => {
@@ -288,29 +396,36 @@ export async function addSale(
         totalProductionCost,
         discountType: data.discountType,
         discountValue: data.discountValue,
-        totalOverride: data.total,
+        extraSales: Number(data.extraSales) || 0,
+        totalOverride: data.total !== undefined && !isNaN(Number(data.total)) && Number(data.total) >= 0 ? Number(data.total) : undefined,
         creditApplied,
       });
 
       const newSaleRef = doc(salesCollection);
 
-      // Clean up data: only include amountPaid and splitPaymentMethod for Split payments
-      const cleanedData: any = { ...data };
-      if (data.paymentMethod !== 'Split') {
-        delete cleanedData.amountPaid;
-        delete cleanedData.splitPaymentMethod;
-      }
-
-      const saleDataToSave: Omit<Sale, 'id'> & { date: Timestamp, creditApplied?: number } = {
-        ...cleanedData,
+      const saleDataToSave: Omit<Sale, 'id'> & { date: Timestamp; creditApplied?: number } = {
+        customerId: data.customerId,
         saleId,
         items: itemsWithPrices,
         subtotal: calculatedSubtotal,
         total: totalAfterDiscount,
         date: Timestamp.fromDate(saleDate) as any,
-        creditApplied: creditApplied,
+        discountType: data.discountType || 'none',
+        discountValue: Number(data.discountValue) || 0,
         paymentMethod: finalTotal <= 0 ? 'Paid by Credit' : data.paymentMethod,
+        extraSales: Number(data.extraSales) || 0,
       };
+
+      if (creditApplied > 0) {
+        saleDataToSave.creditApplied = creditApplied;
+      }
+      if (data.paymentMethod === 'Split' && data.amountPaid !== undefined) {
+        saleDataToSave.amountPaid = Number(data.amountPaid) || 0;
+        if (data.splitPaymentMethod) {
+          saleDataToSave.splitPaymentMethod = data.splitPaymentMethod;
+        }
+      }
+
       transaction.set(newSaleRef, saleDataToSave);
       transaction.set(metadataRef, { lastSaleNumber: newSaleNumber }, { merge: true });
 
@@ -346,8 +461,8 @@ export async function addSale(
       }
 
       const saleForClient: Sale = {
-        id: newSaleRef.id,
         ...saleDataToSave,
+        id: newSaleRef.id,
         total: totalAfterDiscount,
         date: saleDate.toISOString(),
       };
@@ -473,6 +588,13 @@ export async function updateSale(
     data.items.forEach((item) => allItemIdsToFetch.add(item.itemId));
     oldSale.items.forEach((item) => allItemIdsToFetch.add(item.itemId));
 
+    // Server-side law (M3), same as addSale: whole positive quantities and
+    // prices locked to the item record — the browser's numbers never win.
+    const itemsError = validateSaleItems(data.items);
+    if (itemsError) return { success: false, error: itemsError };
+
+    let serverSubtotal = 0;
+    const priceByItemId = new Map<string, number>();
     const selectedItemRefs = Array.from(allItemIdsToFetch).map((id) => doc(itemsCollection, id));
     const selectedItemSnaps = await Promise.all(selectedItemRefs.map((ref) => getDoc(ref)));
 
@@ -485,7 +607,41 @@ export async function updateSale(
       if (!resolveIsSalable(itemData)) {
         return { success: false, error: `Item "${itemData.title}" is a non-salable asset and cannot be sold.` };
       }
+      priceByItemId.set(snap.id, itemData.sellingPrice);
     }
+    for (const line of data.items) {
+      const serverDefaultPrice = priceByItemId.get(line.itemId) ?? 0;
+      const customPrice = (line as any).price;
+      const unitPrice =
+        customPrice !== undefined && customPrice !== null && !isNaN(Number(customPrice)) && Number(customPrice) >= 0
+          ? Number(customPrice)
+          : serverDefaultPrice;
+      (line as SaleItem).price = unitPrice;
+      serverSubtotal += unitPrice * Number(line.quantity);
+    }
+
+    const discountError = validateDiscount(
+      data.discountType === 'percentage'
+        ? { type: 'percentage', value: Number(data.discountValue) || 0 }
+        : data.discountType === 'amount'
+          ? { type: 'amount', value: Number(data.discountValue) || 0 }
+          : { type: 'none' },
+      serverSubtotal
+    );
+    if (discountError) return { success: false, error: discountError };
+
+    const updDiscountTotal = data.discountType === 'percentage'
+      ? serverSubtotal * ((Number(data.discountValue) || 0) / 100)
+      : data.discountType === 'amount' ? (Number(data.discountValue) || 0) : 0;
+    const effectiveBaseTotal = serverSubtotal - Math.min(serverSubtotal, updDiscountTotal) + (Number(data.extraSales) || 0);
+    const payableTotal = data.total !== undefined && !isNaN(Number(data.total)) && Number(data.total) >= 0
+      ? Number(data.total)
+      : effectiveBaseTotal;
+    const updPaidError = validateAmountPaid(
+      data.paymentMethod === 'Split' ? Number(data.amountPaid) : undefined,
+      payableTotal
+    );
+    if (updPaidError) return { success: false, error: updPaidError };
 
     const result = await runTransaction(db, async (transaction) => {
       const oldCustomerRef = doc(customersCollection, oldSale.customerId);
@@ -500,6 +656,13 @@ export async function updateSale(
       if (!newCustomerDoc.exists()) {
         throw new Error(`Customer with id ${data.customerId} does not exist!`);
       }
+
+      // Credit can only spend the advance the customer really has (M2 guard).
+      const updCreditError = validateCreditApplied(
+        Number(data.creditApplied) || 0,
+        Number(newCustomerDoc.data()?.dueBalance) || 0
+      );
+      if (updCreditError) throw new Error(updCreditError);
 
       const itemDocs = await Promise.all(selectedItemRefs.map((ref) => transaction.get(ref)));
       const itemDocsMap: Record<string, { ref: any; data: Item; id: string }> = {};
@@ -544,7 +707,8 @@ export async function updateSale(
         totalProductionCost,
         discountType: data.discountType,
         discountValue: data.discountValue,
-        totalOverride: data.total,
+        extraSales: Number(data.extraSales) || 0,
+        totalOverride: data.total !== undefined && !isNaN(Number(data.total)) && Number(data.total) >= 0 ? Number(data.total) : undefined,
         creditApplied,
       });
 
@@ -609,28 +773,34 @@ export async function updateSale(
         }
       }
 
-      const cleanedData: any = { ...data };
-      if (data.paymentMethod !== 'Split') {
-        delete cleanedData.amountPaid;
-        delete cleanedData.splitPaymentMethod;
-      }
-
       const updatedSaleData: Omit<Sale, 'id'> & { date: Timestamp; creditApplied?: number } = {
-        ...cleanedData,
+        customerId: data.customerId,
         saleId: oldSale.saleId,
         items: itemsWithPrices,
         subtotal: calculatedSubtotal,
         total: totalAfterDiscount,
         date: Timestamp.fromDate(saleDate) as any,
-        creditApplied: creditApplied,
+        discountType: data.discountType || 'none',
+        discountValue: Number(data.discountValue) || 0,
         paymentMethod: finalTotal <= 0 ? 'Paid by Credit' : data.paymentMethod,
+        extraSales: Number(data.extraSales) || 0,
       };
+
+      if (creditApplied > 0) {
+        updatedSaleData.creditApplied = creditApplied;
+      }
+      if (data.paymentMethod === 'Split' && data.amountPaid !== undefined) {
+        updatedSaleData.amountPaid = Number(data.amountPaid) || 0;
+        if (data.splitPaymentMethod) {
+          updatedSaleData.splitPaymentMethod = data.splitPaymentMethod;
+        }
+      }
 
       transaction.update(saleRef, updatedSaleData);
 
       const saleForClient: Sale = {
-        id: saleDocId,
         ...updatedSaleData,
+        id: saleDocId,
         total: totalAfterDiscount,
         date: saleDate.toISOString(),
       };

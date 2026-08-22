@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   ShieldAlert,
   FolderSync,
+  Wallet,
 } from 'lucide-react';
 
 import {
@@ -85,6 +86,7 @@ export function AppSidebar() {
   const otherItems = React.useMemo(
     () => [
       { href: '/payables', icon: ArrowRightLeft, label: 'Payables (Suppliers)' },
+      { href: '/dues', icon: Wallet, label: 'Customer Dues' },
       { href: '/bulk-shelf-update', icon: FolderSync, label: 'Shelf Update (Bulk)' },
     ],
     []

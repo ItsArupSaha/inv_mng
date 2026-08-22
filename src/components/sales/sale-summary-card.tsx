@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 import { FormField, FormItem, FormControl } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 
@@ -9,6 +9,11 @@ interface SaleSummaryCardProps {
   subtotal: number;
 }
 
+/**
+ * POS totals strip. Only extra/service sales is an input; the final total is
+ * display-only — the server computes it from item-record prices plus this
+ * field, so the browser can never hand-pick a total.
+ */
 export function SaleSummaryCard({ subtotal }: SaleSummaryCardProps) {
   const { control, setValue, watch } = useFormContext();
   const [isTotalEdited, setIsTotalEdited] = React.useState(false);
@@ -36,7 +41,7 @@ export function SaleSummaryCard({ subtotal }: SaleSummaryCardProps) {
           <span>Computed Subtotal:</span>
           <span className="font-semibold font-mono">৳{subtotal.toFixed(2)}</span>
         </div>
-        
+
         {/* Extra / Service Sales Field */}
         <div className="flex justify-between items-center text-sm border-t pt-2">
           <span className="text-muted-foreground">Extra / Service Sales:</span>
@@ -55,7 +60,8 @@ export function SaleSummaryCard({ subtotal }: SaleSummaryCardProps) {
                       placeholder="0.00"
                       className="w-24 text-right h-8 font-mono bg-background border rounded-md px-2"
                       {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
                     />
                   </FormControl>
                 </FormItem>
@@ -78,11 +84,12 @@ export function SaleSummaryCard({ subtotal }: SaleSummaryCardProps) {
                       type="number"
                       step="0.01"
                       min="0"
-                      className="w-28 text-right h-8 font-bold font-mono tabular-nums bg-background border rounded-md"
+                      className="w-28 text-right h-8 font-bold font-mono tabular-nums bg-background border rounded-md px-2"
                       {...totalField}
+                      value={totalField.value ?? ''}
                       onChange={(e) => {
                         setIsTotalEdited(true);
-                        totalField.onChange(Number(e.target.value) || '');
+                        totalField.onChange(e.target.value === '' ? '' : Number(e.target.value));
                       }}
                     />
                   </FormControl>

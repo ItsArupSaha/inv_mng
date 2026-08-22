@@ -74,6 +74,10 @@ export function SalePaymentToggle() {
                   <FormControl><RadioGroupItem value="Bank" id="form-bank" /></FormControl>
                   <FormLabel htmlFor="form-bank" className="font-normal cursor-pointer">Bank</FormLabel>
                 </FormItem>
+                <FormItem className="flex items-center space-x-2">
+                  <FormControl><RadioGroupItem value="Due" id="form-due" /></FormControl>
+                  <FormLabel htmlFor="form-due" className="font-normal cursor-pointer">Due</FormLabel>
+                </FormItem>
               </RadioGroup>
             </FormControl>
             <FormMessage />

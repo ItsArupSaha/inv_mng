@@ -19,6 +19,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       { href: '/stock-warnings', label: 'Stock Warnings' },
       { href: '/reports', label: 'Reports' },
       { href: '/balance-sheet', label: 'Business Overview' },
+      { href: '/dues', label: 'Customer Dues' },
       { href: '/payables', label: 'Payables (Suppliers)' },
       { href: '/bulk-shelf-update', label: 'Shelf Update (Bulk)' },
     ].find((item) => pathname.startsWith(item.href));

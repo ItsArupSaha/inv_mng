@@ -55,9 +55,8 @@ export function EditSaleDialog({
       discountType: 'none',
       discountValue: 0,
       paymentMethod: 'Cash',
-      amountPaid: 0,
-      splitPaymentMethod: 'Cash',
-      creditApplied: 0,
+      dueCustomerName: '',
+      dueCustomerPhone: '',
       extraSales: 0,
       total: 0,
     },
@@ -76,14 +75,16 @@ export function EditSaleDialog({
         items: (sale.items || []).map((item) => ({
           itemId: item.itemId,
           quantity: item.quantity,
-          price: item.price,
+          price: item.price !== undefined ? item.price : 0,
         })),
         discountType: sale.discountType || 'none',
         discountValue: sale.discountValue || 0,
-        paymentMethod: sale.paymentMethod || 'Cash',
-        amountPaid: sale.amountPaid || 0,
-        splitPaymentMethod: sale.splitPaymentMethod || 'Cash',
-        creditApplied: sale.creditApplied || 0,
+        // Legacy Split/Paid-by-Credit sales default to Due when edited.
+        paymentMethod: (['Cash', 'Bank', 'Due'] as const).includes(sale.paymentMethod as any)
+          ? (sale.paymentMethod as 'Cash' | 'Bank' | 'Due')
+          : 'Due',
+        dueCustomerName: '',
+        dueCustomerPhone: '',
         extraSales: sale.extraSales || 0,
         total: sale.total || 0,
       });
@@ -93,13 +94,18 @@ export function EditSaleDialog({
   const watchItems = useWatch({ control: form.control, name: 'items' }) || [];
 
   const subtotal = React.useMemo(() => {
+    const priceById = new Map(items.map((item) => [item.id, Number(item.sellingPrice) || 0]));
     return watchItems.reduce((acc: number, item: any) => {
       if (!item?.itemId) return acc;
-      return acc + (Number(item?.price) || 0) * (Number(item?.quantity) || 0);
+      const unitPrice =
+        item.price !== undefined && item.price !== '' && !isNaN(Number(item.price))
+          ? Number(item.price)
+          : (priceById.get(item.itemId) || 0);
+      return acc + unitPrice * (Number(item?.quantity) || 0);
     }, 0);
-  }, [watchItems]);
+  }, [watchItems, items]);
 
-  const handleAddNewRow = () => append({ itemId: '', quantity: 1, price: 0 });
+  const handleAddNewRow = () => append({ itemId: '', quantity: 1 });
 
   const onSubmit = (data: SaleFormValues) => {
     if (!sale) return;

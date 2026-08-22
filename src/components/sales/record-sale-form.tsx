@@ -13,6 +13,7 @@ import type { Customer, Item, Sale } from '@/lib/types';
 import { SaleMemo } from '../sale-memo';
 import { saleFormSchema, type SaleFormValues } from './schema';
 import { SalePaymentToggle } from './sale-payment-toggle';
+import { DueCustomerFields } from './due-customer-fields';
 import { SaleItemsTable } from './sale-items-table';
 import { SaleSummaryCard } from './sale-summary-card';
 
@@ -24,7 +25,7 @@ interface RecordSaleFormProps {
   authUser: any;
 }
 
-const DEFAULT_ROWS = Array.from({ length: 7 }).map(() => ({ itemId: '', quantity: 1, price: 0 }));
+const DEFAULT_ROWS = Array.from({ length: 7 }).map(() => ({ itemId: '', quantity: 1 }));
 
 const getDefaultValues = () => ({
   items: DEFAULT_ROWS,
@@ -32,9 +33,8 @@ const getDefaultValues = () => ({
   discountType: 'none' as const,
   discountValue: 0,
   paymentMethod: 'Cash' as const,
-  amountPaid: 0,
-  splitPaymentMethod: 'Cash' as const,
-  creditApplied: 0,
+  dueCustomerName: '',
+  dueCustomerPhone: '',
   extraSales: 0,
   total: 0,
 });
@@ -68,11 +68,16 @@ export function RecordSaleForm({
   const watchItems = useWatch({ control: form.control, name: 'items' }) || [];
 
   const subtotal = React.useMemo(() => {
+    const priceById = new Map(items.map((item) => [item.id, Number(item.sellingPrice) || 0]));
     return watchItems.reduce((acc: number, item: any) => {
       if (!item?.itemId) return acc;
-      return acc + (Number(item?.price) || 0) * (Number(item?.quantity) || 0);
+      const unitPrice =
+        item.price !== undefined && item.price !== '' && !isNaN(Number(item.price))
+          ? Number(item.price)
+          : (priceById.get(item.itemId) || 0);
+      return acc + unitPrice * (Number(item?.quantity) || 0);
     }, 0);
-  }, [watchItems]);
+  }, [watchItems, items]);
 
   const focusFirstSearch = React.useCallback(() => {
     requestAnimationFrame(() => {
@@ -88,7 +93,7 @@ export function RecordSaleForm({
     focusFirstSearch();
   }, [focusFirstSearch]);
 
-  const handleAddNewRow = () => append({ itemId: '', quantity: 1, price: 0 });
+  const handleAddNewRow = () => append({ itemId: '', quantity: 1 });
 
   const handleResetForm = () => {
     form.reset(getDefaultValues() as any);
@@ -110,9 +115,15 @@ export function RecordSaleForm({
 
     startTransition(async () => {
       try {
+        const isDue = data.paymentMethod === 'Due';
         const saleData = {
           ...data,
-          customerId: walkInCustomer?.id || '',
+          // Due sales get their customer resolved/created on the server from
+          // the typed name+phone; cash/bank sales stay on the walk-in record.
+          customerId: isDue ? '' : walkInCustomer?.id || '',
+          dueCustomer: isDue
+            ? { name: data.dueCustomerName?.trim() || '', phone: data.dueCustomerPhone?.trim() || '' }
+            : undefined,
           items: activeItems as any,
           date: data.date.toISOString(),
           discountType: 'none' as const,
@@ -146,6 +157,7 @@ export function RecordSaleForm({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <SalePaymentToggle />
+          {form.watch('paymentMethod') === 'Due' && <DueCustomerFields customers={customers} />}
           <SaleItemsTable
             items={sellableItems}
             fields={fields}

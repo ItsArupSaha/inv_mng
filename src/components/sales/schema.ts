@@ -7,15 +7,16 @@ export const saleItemSchema = z.object({
 });
 
 export const saleFormSchema = z.object({
+  // Set by the edit dialog only; the POS ignores it and resolves due
+  // customers on the server.
   customerId: z.string().optional(),
   date: z.date({ required_error: "A sale date is required." }),
   items: z.array(saleItemSchema),
   discountType: z.enum(['none', 'percentage', 'amount']).optional().default('none'),
   discountValue: z.coerce.number().min(0, 'Discount must be non-negative').default(0).optional(),
-  paymentMethod: z.enum(['Cash', 'Bank', 'Due', 'Split', 'Paid by Credit'], { required_error: 'Payment method is required.' }),
-  amountPaid: z.coerce.number().optional(),
-  splitPaymentMethod: z.enum(['Cash', 'Bank']).optional(),
-  creditApplied: z.coerce.number().optional(),
+  paymentMethod: z.enum(['Cash', 'Bank', 'Due'], { required_error: 'Payment method is required.' }),
+  dueCustomerName: z.string().optional(),
+  dueCustomerPhone: z.string().optional(),
   extraSales: z.coerce.number().min(0, 'Extra sales must be non-negative').default(0).optional(),
   total: z.coerce.number().min(0, 'Total must be non-negative').optional(),
 }).refine(data => {
@@ -27,13 +28,20 @@ export const saleFormSchema = z.object({
   message: "Percentage discount must be between 0 and 100.",
   path: ['discountValue'],
 }).refine(data => {
-  if (data.paymentMethod === 'Split') {
-    return data.amountPaid !== undefined && data.amountPaid > 0 && !!data.splitPaymentMethod;
+  if (data.paymentMethod === 'Due') {
+    return !!(data.dueCustomerName || '').trim() && !!(data.dueCustomerPhone || '').trim();
   }
   return true;
 }, {
-  message: "Amount paid and its method are required for split payments.",
-  path: ['amountPaid'],
+  message: "Due sales need the customer's name and phone number.",
+  path: ['dueCustomerName'],
+}).refine(data => {
+  if (data.paymentMethod !== 'Due') return true;
+  const digits = (data.dueCustomerPhone || '').replace(/\D/g, '');
+  return digits.length >= 6 && digits.length <= 15;
+}, {
+  message: "Enter a valid phone number (6–15 digits).",
+  path: ['dueCustomerPhone'],
 });
 
 export type SaleFormValues = z.infer<typeof saleFormSchema>;

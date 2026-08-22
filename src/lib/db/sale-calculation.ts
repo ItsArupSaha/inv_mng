@@ -16,16 +16,19 @@ export interface SaleTotalsInput {
   totalProductionCost: number;
   discountType: SaleDiscountType;
   discountValue?: number;
-  totalOverride?: number | null;
+  /** Service/extra sales added on top of item lines — revenue with no cost. */
+  extraSales?: number;
+  /** Direct override of the total sale amount (e.g. rounded or edited in POS). */
+  totalOverride?: number;
   creditApplied: number;
 }
 
 /**
  * Single source of truth for sale money math.
- * Mirrors the exact formulas previously inlined in addSale/updateSale:
  * - subtotal = Σ price × qty
- * - discount clamped to subtotal
- * - explicit total override wins when >= 0
+ * - discount clamped to the item subtotal
+ * - extra sales (no cost) added after the discount
+ * - totalOverride sets totalAfterDiscount directly if provided (>= 0)
  * - profit = totalAfterDiscount − production cost
  * - finalTotal = totalAfterDiscount − credit applied
  */
@@ -43,8 +46,9 @@ export function computeSaleTotals(input: SaleTotalsInput): SaleTotals {
   }
   discountAmount = Math.min(subtotal, discountAmount);
 
-  let totalAfterDiscount = subtotal - discountAmount;
-  if (input.totalOverride !== undefined && input.totalOverride !== null && input.totalOverride >= 0) {
+  let totalAfterDiscount = subtotal - discountAmount + (Number(input.extraSales) || 0);
+
+  if (input.totalOverride !== undefined && input.totalOverride >= 0) {
     totalAfterDiscount = input.totalOverride;
   }
 
