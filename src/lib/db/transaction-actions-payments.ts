@@ -15,57 +15,51 @@ export async function addPayment(userId: string, data: { customerId: string, amo
   if (!db || !userId) throw new Error("Database not configured.");
 
   try {
+    const userRef = doc(db!, 'users', userId);
+    const customersCollection = collection(userRef, 'customers');
+    const transactionsCollection = collection(userRef, 'transactions');
+    const customerRef = doc(customersCollection, data.customerId);
+
+    // Fetch pending receivables prior to transaction writes
+    const receivablesQuery = query(
+      transactionsCollection,
+      where('type', '==', 'Receivable'),
+      where('status', '==', 'Pending'),
+      where('customerId', '==', data.customerId)
+    );
+    const pendingDocs = await getDocs(receivablesQuery);
+    const sortedPendingDocs = pendingDocs.docs
+      .map(doc => ({ doc, data: docToTransaction(doc) }))
+      .sort((a, b) => new Date(a.data.dueDate).getTime() - new Date(b.data.dueDate).getTime());
+
     const result = await runTransaction(db, async (transaction) => {
-      const userRef = doc(db!, 'users', userId);
-      const customersCollection = collection(userRef, 'customers');
-      const transactionsCollection = collection(userRef, 'transactions');
-
-      const customerRef = doc(customersCollection, data.customerId);
       const customerDoc = await transaction.get(customerRef);
-
       if (!customerDoc.exists()) {
         throw new Error("Customer not found.");
       }
 
-      const currentDue = customerDoc.data().dueBalance || 0;
+      // Read phase inside transaction
+      const receivableSnaps = await Promise.all(
+        sortedPendingDocs.map(p => transaction.get(doc(transactionsCollection, p.doc.id)))
+      );
+
+      const currentDue = Number(customerDoc.data().dueBalance) || 0;
       const newDue = currentDue - data.amount;
-
-      transaction.update(customerRef, { dueBalance: newDue });
-
-      const paymentTransactionRef = doc(transactionsCollection);
-      const paymentTransactionData = {
-        description: `Payment from customer`,
-        amount: data.amount,
-        dueDate: Timestamp.fromDate(new Date()),
-        status: 'Paid' as const,
-        type: 'Receivable' as const,
-        paymentMethod: data.paymentMethod,
-        customerId: data.customerId,
-        recognizedProfit: 0,
-      };
 
       let amountToSettle = data.amount;
       let totalRecognizedProfit = 0;
 
-      const receivablesQuery = query(
-        transactionsCollection,
-        where('type', '==', 'Receivable'),
-        where('status', '==', 'Pending'),
-        where('customerId', '==', data.customerId)
-      );
-
-      const pendingDocs = await getDocs(receivablesQuery);
-
-      const sortedPendingDocs = pendingDocs.docs
-        .map(doc => ({ doc, data: docToTransaction(doc) }))
-        .sort((a, b) => new Date(a.data.dueDate).getTime() - new Date(b.data.dueDate).getTime());
-
-      for (const { doc: docSnap, data: receivable } of sortedPendingDocs) {
+      // Plan receivable updates
+      const receivableUpdates: { ref: any; data: any }[] = [];
+      for (let i = 0; i < sortedPendingDocs.length; i++) {
         if (amountToSettle <= 0) break;
+        const snap = receivableSnaps[i];
+        if (!snap.exists()) continue;
 
-        const receivableRef = doc(transactionsCollection, docSnap.id);
-        const receivableAmount = receivable.amount;
-        const remainingProfit = receivable.remainingProfit || 0;
+        const receivable = docToTransaction(snap);
+        const receivableRef = snap.ref;
+        const receivableAmount = Number(receivable.amount) || 0;
+        const remainingProfit = Number(receivable.remainingProfit) || 0;
 
         const paymentForThisReceivable = Math.min(amountToSettle, receivableAmount);
         const profitToRecognize = remainingProfit > 0 && receivableAmount > 0
@@ -75,25 +69,44 @@ export async function addPayment(userId: string, data: { customerId: string, amo
         totalRecognizedProfit += profitToRecognize;
 
         if (paymentForThisReceivable < receivableAmount) {
-          // Partially paying off this receivable
-          transaction.update(receivableRef, {
-            amount: receivableAmount - paymentForThisReceivable,
-            remainingProfit: remainingProfit - profitToRecognize,
+          receivableUpdates.push({
+            ref: receivableRef,
+            data: {
+              amount: receivableAmount - paymentForThisReceivable,
+              remainingProfit: remainingProfit - profitToRecognize,
+            },
           });
         } else {
-          // Fully paying off this receivable — hide from history to avoid duplicates with the payment trace
-          transaction.update(receivableRef, {
-            status: 'Paid',
-            remainingProfit: 0,
-            isHiddenFromHistory: true,
+          receivableUpdates.push({
+            ref: receivableRef,
+            data: {
+              status: 'Paid',
+              remainingProfit: 0,
+              isHiddenFromHistory: true,
+            },
           });
         }
         amountToSettle -= paymentForThisReceivable;
       }
 
-      // Set the total recognized profit on the main payment transaction
-      paymentTransactionData.recognizedProfit = totalRecognizedProfit;
-      transaction.set(paymentTransactionRef, paymentTransactionData);
+      // --- WRITE PHASE STARTS HERE ---
+      transaction.update(customerRef, { dueBalance: newDue });
+
+      for (const update of receivableUpdates) {
+        transaction.update(update.ref, update.data);
+      }
+
+      const paymentTransactionRef = doc(transactionsCollection);
+      transaction.set(paymentTransactionRef, {
+        description: `Payment from customer`,
+        amount: data.amount,
+        dueDate: Timestamp.fromDate(new Date()),
+        status: 'Paid' as const,
+        type: 'Receivable' as const,
+        paymentMethod: data.paymentMethod,
+        customerId: data.customerId,
+        recognizedProfit: totalRecognizedProfit,
+      });
 
       return { success: true };
     });
