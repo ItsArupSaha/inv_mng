@@ -1,5 +1,3 @@
-'use server';
-
 import type { Purchase } from '../types';
 import {
   getPurchases as getPurchasesImpl,

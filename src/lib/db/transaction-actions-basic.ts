@@ -1,5 +1,3 @@
-'use server';
-
 import {
   Timestamp,
   addDoc,
@@ -9,7 +7,6 @@ import {
   getDoc,
   updateDoc
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Transaction } from '../types';
 import { invalidateAppData } from './data-version';
@@ -24,10 +21,7 @@ export async function addTransaction(userId: string, data: Omit<Transaction, 'id
   };
   const newDocRef = await addDoc(transactionsCollection, transactionData);
   await invalidateAppData(userId, { scope: 'ledger' });
-  revalidatePath(`/${data.type.toLowerCase()}s`);
-  revalidatePath('/dashboard');
   if (data.customerId) {
-    revalidatePath(`/customers/${data.customerId}`);
   }
   return { ...transactionData, id: newDocRef.id, dueDate: data.dueDate.toISOString() };
 }
@@ -40,13 +34,9 @@ export async function updateTransactionStatus(userId: string, id: string, status
   await updateDoc(transRef, { status });
 
   await invalidateAppData(userId, { scope: 'ledger' });
-  revalidatePath(`/${type.toLowerCase()}s`);
-  revalidatePath('/dashboard');
   if (transDoc.exists()) {
     const customerId = transDoc.data().customerId;
     if (customerId) {
-      revalidatePath(`/customers/${customerId}`);
-      revalidatePath('/receivables');
     }
   }
 }
@@ -56,6 +46,4 @@ export async function deleteTransaction(userId: string, id: string, type: 'Recei
   const transRef = doc(db, 'users', userId, 'transactions', id);
   await deleteDoc(transRef);
   await invalidateAppData(userId, { scope: 'ledger' });
-  revalidatePath(`/${type.toLowerCase()}s`);
-  revalidatePath('/dashboard');
 }

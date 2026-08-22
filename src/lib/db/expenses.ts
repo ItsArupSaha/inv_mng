@@ -1,6 +1,4 @@
 
-'use server';
-
 import {
     Timestamp,
     collection,
@@ -16,7 +14,6 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Expense, Metadata } from '../types';
 import { docToExpense } from './utils';
@@ -147,8 +144,6 @@ export async function addExpense(userId: string, data: Omit<Expense, 'id' | 'exp
         });
         
         await invalidateAppData(userId, { scope: 'ledger' });
-        revalidatePath('/expenses');
-        revalidatePath('/dashboard');
         return result;
     } catch (e) {
         console.error("Expense creation failed: ", e);
@@ -174,8 +169,6 @@ export async function updateExpense(userId: string, id: string, data: Omit<Expen
     };
     await updateDoc(expenseRef, expenseData);
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/expenses');
-    revalidatePath('/dashboard');
     return { ...data, id, expenseId: existingData.expenseId, date: data.date.toISOString() };
 }
 
@@ -184,6 +177,4 @@ export async function deleteExpense(userId: string, id: string) {
     const expenseRef = doc(db, 'users', userId, 'expenses', id);
     await deleteDoc(expenseRef);
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/expenses');
-    revalidatePath('/dashboard');
 }

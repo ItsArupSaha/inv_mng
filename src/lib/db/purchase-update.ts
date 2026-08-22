@@ -1,5 +1,3 @@
-'use server';
-
 import {
   Timestamp,
   collection,
@@ -13,7 +11,6 @@ import {
   type DocumentReference,
   type Transaction
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Metadata, Purchase, PurchaseItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
@@ -301,11 +298,6 @@ export async function updatePurchase(
       });
 
       await invalidateAppData(userId);
-      revalidatePath('/purchases');
-      revalidatePath('/items');
-      revalidatePath('/payables');
-      revalidatePath('/expenses');
-      revalidatePath('/dashboard');
       return result;
   } catch (e) {
       console.error("Purchase update failed: ", e);

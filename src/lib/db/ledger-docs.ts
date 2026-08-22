@@ -1,5 +1,3 @@
-'use server';
-
 import { collection, getDocs, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { cachedCollection } from './collection-cache';

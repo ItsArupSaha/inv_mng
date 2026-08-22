@@ -1,6 +1,4 @@
 
-'use server';
-
 import {
   Timestamp,
   collection,
@@ -13,7 +11,6 @@ import {
   runTransaction,
   startAfter
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { invalidateAppData, readLedgerVersion } from './data-version';
 import { cachedCollection } from './collection-cache';
 import { db } from '../firebase';
@@ -133,12 +130,7 @@ export async function addSalesReturn(
       });
 
       await invalidateAppData(userId);
-      revalidatePath('/sales-returns');
-      revalidatePath('/dashboard');
-      revalidatePath('/items');
-      revalidatePath('/receivables');
       if (data.customerId) {
-          revalidatePath(`/customers/${data.customerId}`);
       }
       return result;
 

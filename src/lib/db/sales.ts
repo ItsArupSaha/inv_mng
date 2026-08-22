@@ -1,5 +1,3 @@
-'use server';
-
 import type { Sale } from '../types';
 import {
   getSalesMaster,

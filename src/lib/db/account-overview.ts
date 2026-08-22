@@ -1,5 +1,3 @@
-'use server';
-
 import { getAccountOverview as getAccountOverviewImpl } from './account-overview-main';
 import {
   getAccountBalances as getAccountBalancesImpl,

@@ -1,5 +1,3 @@
-'use server';
-
 import { Timestamp, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCustomers } from './customers';

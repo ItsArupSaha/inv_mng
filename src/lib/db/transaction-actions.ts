@@ -1,5 +1,3 @@
-'use server';
-
 import type { Transaction } from '../types';
 import {
   addTransaction as addTransactionImpl,

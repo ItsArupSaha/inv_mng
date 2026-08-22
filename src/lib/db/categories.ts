@@ -1,5 +1,3 @@
-'use server';
-
 import {
     addDoc,
     collection,
@@ -10,7 +8,6 @@ import {
     query,
     updateDoc
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 
 import { db } from '../firebase';
 import type { Category } from '../types';
@@ -45,7 +42,6 @@ export async function addCategory(userId: string, data: Omit<Category, 'id' | 'c
     createdAt: new Date()
   });
   await invalidateAppData(userId, );
-  revalidatePath('/items');
   return { id: newDocRef.id, ...data, createdAt: new Date() };
 }
 
@@ -54,7 +50,6 @@ export async function updateCategory(userId: string, id: string, data: Partial<O
   const categoryRef = doc(db, 'users', userId, 'categories', id);
   await updateDoc(categoryRef, data);
   await invalidateAppData(userId, );
-  revalidatePath('/items');
 }
 
 export async function deleteCategory(userId: string, id: string) {
@@ -62,7 +57,6 @@ export async function deleteCategory(userId: string, id: string) {
   const categoryRef = doc(db, 'users', userId, 'categories', id);
   await deleteDoc(categoryRef);
   await invalidateAppData(userId, );
-  revalidatePath('/items');
 }
 
 // Initialize default pharmacy categories for new users

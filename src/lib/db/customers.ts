@@ -1,6 +1,4 @@
 
-'use server';
-
 import {
     addDoc,
     collection,
@@ -15,7 +13,6 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { Customer, CustomerWithDue } from '../types';
 import { docToCustomer } from './utils';
@@ -139,7 +136,6 @@ export async function addCustomer(userId: string, data: Omit<Customer, 'id' | 'd
     const dataWithDue = { ...data, dueBalance: data.openingBalance || 0 };
     const newDocRef = await addDoc(customersCollection, dataWithDue);
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/customers');
     return { id: newDocRef.id, ...dataWithDue };
 }
 
@@ -148,9 +144,6 @@ export async function updateCustomer(userId: string, id: string, data: Omit<Cust
     const customerRef = doc(db, 'users', userId, 'customers', id);
     await updateDoc(customerRef, data);
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/customers');
-    revalidatePath('/receivables');
-    revalidatePath(`/customers/${id}`);
 }
 
 export async function deleteCustomer(userId: string, id: string) {
@@ -158,6 +151,4 @@ export async function deleteCustomer(userId: string, id: string) {
     const customerRef = doc(db, 'users', userId, 'customers', id);
     await deleteDoc(customerRef);
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/customers');
-    revalidatePath('/receivables');
 }

@@ -1,5 +1,3 @@
-'use server';
-
 import { getItems } from './items';
 import { countItemAlerts } from '../item-alert-math';
 

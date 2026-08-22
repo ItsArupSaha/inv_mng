@@ -1,5 +1,3 @@
-'use server';
-
 import {
   addDoc,
   collection,
@@ -16,7 +14,6 @@ import {
   where,
   writeBatch
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 
 import { db } from '../firebase';
 import type { Item } from '../types';
@@ -62,7 +59,6 @@ export async function getItems(userId: string): Promise<Item[]> {
           console.error(`Failed to auto-migrate item ${item.id}:`, e);
         }
       }));
-      revalidatePath('/items');
     }
 
     return items;
@@ -119,7 +115,6 @@ export async function addItem(userId: string, data: Omit<Item, 'id'>) {
     sellingPrice: salable ? data.sellingPrice : 0,
   });
   await invalidateAppData(userId);
-  revalidatePath('/items');
   return { id: newDocRef.id, ...data, isSalable: salable };
 }
 
@@ -156,7 +151,6 @@ export async function updateItem(userId: string, id: string, data: Omit<Item, 'i
     }
   }
   await invalidateAppData(userId);
-  revalidatePath('/items');
 }
 
 export async function deleteItem(userId: string, id: string) {
@@ -164,7 +158,6 @@ export async function deleteItem(userId: string, id: string) {
   const itemRef = doc(db, 'users', userId, 'items', id);
   await deleteDoc(itemRef);
   await invalidateAppData(userId);
-  revalidatePath('/items');
 }
 
 export async function ignoreItemWarning(userId: string, id: string, ignore: boolean) {
@@ -172,8 +165,6 @@ export async function ignoreItemWarning(userId: string, id: string, ignore: bool
   const itemRef = doc(db, 'users', userId, 'items', id);
   await updateDoc(itemRef, { ignoredWarning: ignore });
   await invalidateAppData(userId);
-  revalidatePath('/items');
-  revalidatePath('/stock-warnings');
 }
 
 export async function bulkUpdateItemLocationByCompany(
@@ -204,7 +195,6 @@ export async function bulkUpdateItemLocationByCompany(
 
     await Promise.all(batchPromises);
     await invalidateAppData(userId);
-    revalidatePath('/items');
     return { success: true, updatedCount: batchPromises.length };
   } catch (error: any) {
     console.error('Failed to bulk update location:', error);
@@ -226,8 +216,6 @@ export async function resetAllIgnoredWarnings(userId: string) {
     await Promise.all(batchPromises);
 
     await invalidateAppData(userId);
-    revalidatePath('/items');
-    revalidatePath('/stock-warnings');
     return { success: true, count: snapshot.size };
   } catch (error: any) {
     console.error('Failed to reset ignored warnings:', error);

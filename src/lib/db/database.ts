@@ -1,8 +1,5 @@
 
-'use server';
-
 import { addDoc, collection, doc, getDoc, getDocs, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import type { AuthUser, InitialCapital } from '../types';
 import { initializeDefaultCategories } from './categories';
@@ -90,7 +87,6 @@ export async function completeOnboarding(userId: string, data: any) {
   }
   
   // Revalidate paths to ensure data is fresh across the app
-  revalidatePath('/dashboard', 'layout');
 }
 
 
@@ -107,7 +103,6 @@ export async function updateCompanyDetails(userId: string, data: Partial<AuthUse
     if (data.bankInfo !== undefined) updateData.bankInfo = data.bankInfo;
 
     await updateDoc(userDocRef, updateData);
-    revalidatePath('/dashboard', 'layout');
 }
 
 // --- Database Summary ---
@@ -160,6 +155,5 @@ export async function adjustInitialCapital(userId: string, adjustments: { cash: 
     }
 
     if (adjustments.cash !== 0 || adjustments.bank !== 0) {
-        revalidatePath('/dashboard');
     }
 }

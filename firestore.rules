@@ -1,0 +1,27 @@
+rules_version = '2';
+
+// PER-USER LOCKDOWN
+//
+// The app runs in the signed-in user's browser: every Firestore call carries
+// their Firebase Auth session, and these rules let each account touch ONLY
+// its own tenant subtree (users/{uid}/...). Any path outside a user's own
+// subtree is denied outright — no rule matches it, so nobody can read or
+// write another pharmacy's data, and anonymous requests get nothing at all.
+service cloud.firestore {
+  function isOwner(userId) {
+    return request.auth != null && request.auth.uid == userId;
+  }
+
+  match /databases/{database}/documents {
+    // Each pharmacy's tenant document and everything under it.
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Everything else in the database: no match → denied by default.
+  }
+}

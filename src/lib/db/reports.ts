@@ -1,6 +1,4 @@
 
-'use server';
-
 import type { ClosingStock } from '../types';
 import { getItems } from './items';
 import { getSales } from './sales';

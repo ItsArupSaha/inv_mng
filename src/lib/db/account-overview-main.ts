@@ -1,5 +1,3 @@
-'use server';
-
 import { Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getExpenses } from './expenses';

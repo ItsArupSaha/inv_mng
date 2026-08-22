@@ -1,6 +1,6 @@
 import type { Item } from './types';
 
-// Pure badge-count math, kept out of the 'use server' module (server-action
+// Pure badge-count math, kept separate from the data modules (db
 // files may only export async functions) so it stays unit-testable.
 
 function isoDateFromToday(days: number): string {

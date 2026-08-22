@@ -1,5 +1,3 @@
-'use server';
-
 import {
   Timestamp,
   collection,
@@ -9,7 +7,6 @@ import {
   runTransaction,
   where
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import { docToTransaction } from './utils';
 import { invalidateAppData } from './data-version';
@@ -101,11 +98,7 @@ export async function addPayment(userId: string, data: { customerId: string, amo
       return { success: true };
     });
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/receivables');
-    revalidatePath('/dashboard');
-    revalidatePath('/reports');
     if (data.customerId) {
-      revalidatePath(`/customers/${data.customerId}`);
     }
     return result;
 
@@ -194,10 +187,6 @@ export async function payPayable(userId: string, data: { transactionId: string, 
       return { success: true };
     });
   await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/payables');
-    revalidatePath('/dashboard');
-    revalidatePath('/expenses');
-    revalidatePath('/reports');
     return result;
 
   } catch (e) {
@@ -279,12 +268,6 @@ export async function refundCustomerOverpayment(userId: string, data: { customer
       return { success: true };
     });
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/payables');
-    revalidatePath('/dashboard');
-    revalidatePath('/expenses');
-    revalidatePath('/reports');
-    revalidatePath(`/customers/${data.customerId}`);
-
     return result;
 
   } catch (e) {

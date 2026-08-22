@@ -1,5 +1,3 @@
-'use server';
-
 import {
   Timestamp,
   collection,
@@ -10,7 +8,7 @@ import {
   runTransaction,
   where
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';import { db } from '../firebase';
+import { db } from '../firebase';
 import { invalidateAppData } from './data-version';
 import type { Item, ItemBatch, Metadata, Sale, SaleItem } from '../types';
 import { resolveIsSalable } from '../item-flags';
@@ -360,12 +358,7 @@ export async function addSale(
     await invalidateAppData(userId, {
       salesMasterPatch: { kind: 'upsert', sale: result.sale },
     });
-    revalidatePath('/sales');
-    revalidatePath('/dashboard');
-    revalidatePath('/items');
-    revalidatePath('/receivables');
     if (data.customerId) {
-      revalidatePath(`/customers/${data.customerId}`);
     }
     return result;
 
@@ -445,12 +438,6 @@ export async function deleteSale(userId: string, saleId: string): Promise<{ succ
     await invalidateAppData(userId, {
       salesMasterPatch: { kind: 'remove', saleId: saleId },
     });
-    revalidatePath('/sales');
-    revalidatePath('/items');
-    revalidatePath('/dashboard');
-    revalidatePath('/receivables');
-    revalidatePath('/customers');
-
     return { success: true };
   } catch (e) {
     console.error("Sale deletion failed: ", e);
@@ -654,12 +641,7 @@ export async function updateSale(
     await invalidateAppData(userId, {
       salesMasterPatch: result.sale ? { kind: 'upsert', sale: result.sale } : undefined,
     });
-    revalidatePath('/sales');
-    revalidatePath('/dashboard');
-    revalidatePath('/items');
-    revalidatePath('/receivables');
     if (data.customerId) {
-      revalidatePath(`/customers/${data.customerId}`);
     }
     return result;
   } catch (e) {

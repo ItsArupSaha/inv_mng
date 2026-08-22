@@ -1,5 +1,3 @@
-'use server';
-
 import {
   Timestamp,
   collection,
@@ -9,7 +7,6 @@ import {
   runTransaction,
   where
 } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { invalidateAppData } from './data-version';
 import { db } from '../firebase';
 import type { Item, Metadata, Purchase } from '../types';
@@ -193,11 +190,6 @@ export async function addPurchase(userId: string, data: Omit<Purchase, 'id' | 'd
       });
 
       await invalidateAppData(userId);
-      revalidatePath('/purchases');
-      revalidatePath('/items');
-      revalidatePath('/payables');
-      revalidatePath('/expenses');
-      revalidatePath('/dashboard');
       return result;
   } catch (e) {
       console.error("Purchase creation failed: ", e);

@@ -1,7 +1,4 @@
-'use server';
-
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
-import { revalidatePath } from 'next/cache';
 import { db } from '../firebase';
 import { invalidateAppData, readLedgerVersion } from './data-version';
 import { cachedCollection } from './collection-cache';
@@ -85,8 +82,6 @@ export async function addSecurityDeposit(
     });
 
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/dashboard');
-    revalidatePath('/balance-sheet');
   } catch (error) {
     console.error('Error adding security deposit:', error);
     throw error;
@@ -131,8 +126,6 @@ export async function updateSecurityDeposit(
     await updateDoc(docRef, updateData);
 
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/dashboard');
-    revalidatePath('/balance-sheet');
   } catch (error) {
     console.error('Error updating security deposit:', error);
     throw error;
@@ -149,8 +142,6 @@ export async function deleteSecurityDeposit(userId: string, id: string): Promise
     await deleteDoc(docRef);
 
     await invalidateAppData(userId, { scope: 'ledger' });
-    revalidatePath('/dashboard');
-    revalidatePath('/balance-sheet');
   } catch (error) {
     console.error('Error deleting security deposit:', error);
     throw error;
