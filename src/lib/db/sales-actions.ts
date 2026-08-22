@@ -108,17 +108,22 @@ async function deductSaleLinesFEFO(
   const itemsWithPrices: SaleItem[] = [];
   let totalProductionCost = 0;
 
+  // Pre-load all unique items' batches in parallel (1 concurrent network request)
+  const uniqueItemIds = Array.from(new Set(saleItems.map(si => si.itemId)));
+  const batchResults = await Promise.all(
+    uniqueItemIds.map(async (itemId) => {
+      const itemState = itemDocsMap[itemId];
+      const res = itemState ? await loadBatchesForSale(userId, itemId, itemState.data) : { batches: [], originalQuantities: {} };
+      return { itemId, ...res };
+    })
+  );
+
   const batchesByItem: Record<string, SaleBatch[]> = {};
   const originalsByItem: Record<string, Record<string, number>> = {};
-  const ensureBatches = async (itemId: string) => {
-    if (!batchesByItem[itemId]) {
-      const itemState = itemDocsMap[itemId];
-      const { batches, originalQuantities } = await loadBatchesForSale(userId, itemId, itemState.data);
-      batchesByItem[itemId] = batches;
-      originalsByItem[itemId] = originalQuantities;
-    }
-    return batchesByItem[itemId];
-  };
+  for (const res of batchResults) {
+    batchesByItem[res.itemId] = res.batches;
+    originalsByItem[res.itemId] = res.originalQuantities;
+  }
 
   for (const saleItem of saleItems) {
     const itemState = itemDocsMap[saleItem.itemId];
@@ -128,7 +133,7 @@ async function deductSaleLinesFEFO(
 
     const itemTitle = itemState.data.title || '';
     const qtyRequested = Number(saleItem.quantity);
-    const batches = await ensureBatches(saleItem.itemId);
+    const batches = batchesByItem[saleItem.itemId] || [];
     const effectiveStock = batches.length > 0 ? sumBatchQuantities(batches) : Number(itemState.data.stock) || 0;
 
     if (effectiveStock < qtyRequested) {

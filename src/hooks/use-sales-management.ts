@@ -29,6 +29,21 @@ export function useSalesManagement({ userId }: UseSalesManagementProps) {
   const [isSearching, setIsSearching] = React.useState(false);
   const [searchResults, setSearchResults] = React.useState<Sale[]>([]);
 
+  const handleSaleCreated = React.useCallback((newSale?: Sale) => {
+    if (!newSale) return;
+    setSales(prev => [newSale, ...prev.filter(s => s.id !== newSale.id)]);
+    if (newSale.items && newSale.items.length > 0) {
+      const soldMap = new Map(newSale.items.map(item => [item.itemId, Number(item.quantity) || 0]));
+      setItems(prev => prev.map(item => {
+        const soldQty = soldMap.get(item.id);
+        if (soldQty) {
+          return { ...item, stock: Math.max(0, (Number(item.stock) || 0) - soldQty) };
+        }
+        return item;
+      }));
+    }
+  }, []);
+
   const loadInitialData = React.useCallback(async () => {
     setIsInitialLoading(true);
     try {
@@ -141,6 +156,7 @@ export function useSalesManagement({ userId }: UseSalesManagementProps) {
     isSearching,
     displaySales,
     loadInitialData,
+    handleSaleCreated,
     handleLoadMore,
     handleSearch,
     handleClearSearch,

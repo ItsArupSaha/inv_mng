@@ -36,6 +36,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
     isSearching,
     displaySales,
     loadInitialData,
+    handleSaleCreated,
     handleLoadMore,
     handleSearch,
     handleClearSearch,
@@ -85,7 +86,7 @@ export default function SalesManagement({ userId }: SalesManagementProps) {
                 userId={userId}
                 items={items}
                 customers={customers}
-                onSuccess={loadInitialData}
+                onSuccess={handleSaleCreated}
                 authUser={authUser}
               />
             </CardContent>

@@ -21,7 +21,7 @@ interface RecordSaleFormProps {
   userId: string;
   items: Item[];
   customers: Customer[];
-  onSuccess: () => void;
+  onSuccess?: (sale?: Sale) => void;
   authUser: any;
 }
 
@@ -135,7 +135,7 @@ export function RecordSaleForm({
         if (result?.success && result.sale) {
           setCompletedSale(result.sale);
           setLastSale(result.sale);
-          onSuccess();
+          onSuccess?.(result.sale);
         } else {
           toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to record sale.' });
         }
