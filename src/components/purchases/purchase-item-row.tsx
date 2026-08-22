@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { Category } from '@/lib/types';
 import { PurchaseItemNameInput } from './purchase-item-name-input';
 import { PurchaseItemMedicineFields } from './purchase-item-medicine-fields';
@@ -52,7 +51,7 @@ export function PurchaseItemRow({
           isMedicine={!!isMedicine}
         />
 
-        <div className={cn('flex items-end gap-2', isMedicine ? 'md:col-span-3' : '')}>
+        <div className="flex items-end gap-2 md:col-span-3">
           <FormField
             control={control}
             name={`items.${index}.categoryId`}
@@ -95,7 +94,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.quantity`}
           render={({ field }) => (
-            <FormItem className={isMedicine ? 'md:col-span-2' : ''}>
+            <FormItem className="md:col-span-2">
               <FormLabel className="text-xs">Qty</FormLabel>
               <FormControl>
                 <Input type="number" min="1" placeholder="1" {...field} />
@@ -109,12 +108,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.cost`}
           render={({ field }) => (
-            <FormItem
-              className={cn(
-                isMedicine ? 'md:col-span-2' : '',
-                !isMedicine ? 'md:col-start-4' : ''
-              )}
-            >
+            <FormItem className="md:col-span-2">
               <FormLabel className="text-xs">Unit Cost</FormLabel>
               <FormControl>
                 <Input type="number" step="0.01" placeholder="0.00" {...field} />
@@ -128,7 +122,7 @@ export function PurchaseItemRow({
           control={control}
           name={`items.${index}.sellingPrice`}
           render={({ field }) => (
-            <FormItem className={isMedicine ? 'md:col-span-2' : ''}>
+            <FormItem className="md:col-span-2">
               <FormLabel className="text-xs">Selling Price</FormLabel>
               <FormControl>
                 <Input type="number" step="0.01" placeholder="0.00" disabled={isAssetOrSurgical} {...field} />

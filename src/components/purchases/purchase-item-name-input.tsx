@@ -85,7 +85,7 @@ export function PurchaseItemNameInput({
       control={control}
       name={`items.${index}.itemName`}
       render={({ field }) => (
-        <FormItem className={isMedicine ? 'md:col-span-3' : 'md:col-span-2'}>
+        <FormItem className="md:col-span-3">
           <FormLabel className="text-xs">Item Name</FormLabel>
           <FormControl>
             <div className="relative">

@@ -62,8 +62,8 @@ export function RecordPurchaseDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-4 border-b shrink-0">
           <DialogTitle className="font-headline">
             {editingPurchase ? 'Edit Purchase Details' : 'Record New Purchase'}
           </DialogTitle>
@@ -76,40 +76,38 @@ export function RecordPurchaseDialog({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit, onError)}
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 flex flex-col min-h-0 overflow-hidden"
           >
-            <div className="flex-1 overflow-y-auto pr-4 pl-1 -mr-4 -ml-1 py-4">
-              <div className="space-y-4 px-4">
-                <SupplierFormFields
-                  form={form}
-                  existingItems={existingItems || []}
-                />
-                <Separator />
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <SupplierFormFields
+                form={form}
+                existingItems={existingItems || []}
+              />
+              <Separator />
 
-                <FormLabel>Items</FormLabel>
-                <div className="space-y-3">
-                  {fields.map((field, index) => (
-                    <PurchaseItemRow
-                      key={field.id}
-                      index={index}
-                      categories={categories}
-                      existingItems={existingItems || []}
-                      onAddCategoryClick={onAddCategoryClick}
-                      onRemove={() => remove(index)}
-                      disabledRemove={fields.length === 1}
-                    />
-                  ))}
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Item
-                </Button>
-
-                <Separator />
-                <PurchasePaymentSection />
+              <FormLabel>Items</FormLabel>
+              <div className="space-y-3">
+                {fields.map((field, index) => (
+                  <PurchaseItemRow
+                    key={field.id}
+                    index={index}
+                    categories={categories}
+                    existingItems={existingItems || []}
+                    onAddCategoryClick={onAddCategoryClick}
+                    onRemove={() => remove(index)}
+                    disabledRemove={fields.length === 1}
+                  />
+                ))}
               </div>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+              </Button>
+
+              <Separator />
+              <PurchasePaymentSection />
             </div>
 
-            <div className="mt-auto pt-4 space-y-4 border-t px-6 pb-6 bg-background">
+            <div className="border-t p-6 bg-background space-y-4 shrink-0">
               <PurchaseSummarySection />
               <DialogFooter>
                 <Button type="submit" disabled={isPending}>
